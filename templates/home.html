@@ -205,7 +205,10 @@
         <p id="modal-ot-msg" class="text-amber-800 text-xs font-bold"></p>
         <div class="flex gap-2">
           <button type="button" onclick="confirmOt()"
-            class="bg-green-600 hover:bg-green-700 text-white font-black text-xs px-4 py-1.5 rounded-lg transition">
+            class="text-white font-black text-xs px-4 py-1.5 rounded-lg transition"
+            style="background-color:#2a8703;"
+            onmouseover="this.style.backgroundColor='#1f6502'"
+            onmouseout="this.style.backgroundColor='#2a8703'">
             &#10003; Yes, Overtime
           </button>
           <button type="button" onclick="cancelOt()"
