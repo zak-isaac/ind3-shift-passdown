@@ -40,8 +40,8 @@
   {% endif %}
 
 
-  <!-- ══ OT APPROVAL CODES (manager only) ══════════════════════════════════ -->
-  {% if is_manager %}
+  {# ══ OT APPROVAL CODES — HIDDEN FOR FUTURE USE (re-enable by restoring {% if is_manager %}) ══
+  {% if false %}
   <section class="bg-white rounded-2xl border border-amber-200 shadow-sm p-6">
     <div class="flex items-center justify-between mb-1">
       <h2 class="font-black text-base" style="color:#001e50;">&#128274; Overtime Approval Codes</h2>
@@ -51,7 +51,6 @@
       When an MST tries to start a shift outside their assignment, they are prompted to request
       an OT code. The code appears here. Read it to them verbally &mdash; codes expire in 4 hours and are single-use.
     </p>
-
     {% if ot_codes %}
     <div class="flex flex-col gap-3">
       {% for code in ot_codes %}
@@ -74,12 +73,10 @@
     {% else %}
     <p class="text-sm text-gray-400 italic">No pending OT requests right now. &#127881;</p>
     {% endif %}
-
-    <p class="text-xs text-gray-400 mt-4">
-      &#128260; This page does not auto-refresh. Reload to see new requests.
-    </p>
+    <p class="text-xs text-gray-400 mt-4">&#128260; This page does not auto-refresh. Reload to see new requests.</p>
   </section>
   {% endif %}
+  #}
 
   <!-- ══ ASSOCIATE ROSTER ══════════════════════════════════════════════ -->
   <section class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">

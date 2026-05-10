@@ -436,21 +436,17 @@ async def shift_start(
         err = f"{shift_type}+cannot+start+on+a+{day_label}.+{rule}."
         return RedirectResponse(f"/?error={err}", status_code=303)
 
-    # ── Shift-assignment validation (MST vs OT) ──────────────────────────────
-    assoc_num = assoc_num.strip()
-    if assoc_num:
-        assoc = _ROSTER.get(assoc_num)
-        if assoc and assoc.get("is_mst"):
-            assigned = (assoc.get("shift") or "").strip()
-            if assigned and assigned != shift_type:
-                # Shift mismatch — require a valid OT code
-                code = ot_code.strip().upper()
-                if not code:
-                    err = f"You+are+assigned+to+{assigned}+not+{shift_type}.+Request+an+OT+code+from+your+manager."
-                    return RedirectResponse(f"/?error={err}", status_code=303)
-                if not db.validate_ot_code(code, assoc_num, shift_type):
-                    return RedirectResponse("/?error=Invalid+or+expired+OT+code.+Ask+your+manager+for+a+new+one.", status_code=303)
-                db.consume_ot_code(code)
+    # ── Shift-assignment validation — OT code check DISABLED (hidden for future use)
+    # MSTs may start any shift without a code. Re-enable by restoring the block below.
+    # FUTURE USE:
+    #   assoc = _ROSTER.get(assoc_num)
+    #   if assoc and assoc.get("is_mst"):
+    #       assigned = (assoc.get("shift") or "").strip()
+    #       if assigned and assigned != shift_type:
+    #           code = ot_code.strip().upper()
+    #           if not code or not db.validate_ot_code(code, assoc_num, shift_type):
+    #               return RedirectResponse("/?error=Invalid+OT+code", status_code=303)
+    #           db.consume_ot_code(code)
 
     # ── All good — stash in cookie and redirect to PIN ───────────────────────
     import json

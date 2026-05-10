@@ -200,11 +200,11 @@
                  focus:border-wm-blue focus:ring-2 focus:ring-blue-100 outline-none transition" />
       </div>
 
-      <!-- OT prompt (shift mismatch) -->
+      <!-- OT prompt (shift mismatch) — simplified: Yes = proceed, No = back to home -->
       <div id="modal-ot-prompt" class="hidden bg-amber-50 border border-amber-300 rounded-xl p-3 flex flex-col gap-2">
         <p id="modal-ot-msg" class="text-amber-800 text-xs font-bold"></p>
         <div class="flex gap-2">
-          <button type="button" onclick="requestOtCode()"
+          <button type="button" onclick="confirmOt()"
             class="bg-green-600 hover:bg-green-700 text-white font-black text-xs px-4 py-1.5 rounded-lg transition">
             &#10003; Yes, Overtime
           </button>
@@ -213,28 +213,9 @@
             &#10007; No, Cancel
           </button>
         </div>
-        <p id="modal-ot-request-msg" class="hidden text-xs text-green-700 font-semibold"></p>
       </div>
 
-      <!-- OT code entry -->
-      <div id="modal-ot-code-row" class="hidden flex flex-col gap-1">
-        <label class="text-xs font-bold text-gray-500 uppercase tracking-wide block">Manager OT Code</label>
-        <div class="flex gap-2">
-          <input id="modal_ot_code" type="text" maxlength="8"
-            placeholder="Code from manager&hellip;"
-            oninput="this.value = this.value.toUpperCase(); clearOtErr()"
-            class="flex-1 rounded-xl border-2 border-gray-200 px-3 py-2 text-sm font-mono
-                   focus:border-wm-blue outline-none transition uppercase tracking-widest" />
-          <button type="button" onclick="verifyOtCode()"
-            class="bg-wm-blue hover:bg-blue-700 text-white font-black text-xs px-4 rounded-xl transition">
-            Verify
-          </button>
-        </div>
-        <p id="modal-ot-err" class="hidden text-xs text-red-600 font-semibold"></p>
-        <p id="modal-ot-ok"  class="hidden text-xs text-green-600 font-semibold">
-          &#10003; Code accepted &mdash; you may start the shift.
-        </p>
-      </div>
+      {# FUTURE USE: OT code entry (re-enable with the requestOtCode/verifyOtCode flow) #}
 
     </div>
 
@@ -436,84 +417,36 @@
 
   function hideOtPrompt() {
     document.getElementById('modal-ot-prompt').classList.add('hidden');
-    document.getElementById('modal-ot-code-row').classList.add('hidden');
-    document.getElementById('modal-ot-request-msg').classList.add('hidden');
     _otVerified = false;
     document.getElementById('hidden_ot_code').value = '';
     updateModalConfirmBtn();
   }
 
-  function cancelOt() { hideOtPrompt(); }
+  // Yes, Overtime — just confirm and let them proceed
+  function confirmOt() {
+    _otVerified = true;
+    document.getElementById('modal-ot-prompt').classList.add('hidden');
+    updateModalConfirmBtn();
+  }
+
+  // No, Cancel — close modal and return to home
+  function cancelOt() {
+    closeMstModal();
+    window.location.href = '/';
+  }
 
   function resetOtState() {
     _otVerified = false;
     document.getElementById('hidden_ot_code').value = '';
     const p = document.getElementById('modal-ot-prompt');
     if (p) p.classList.add('hidden');
-    const cr = document.getElementById('modal-ot-code-row');
-    if (cr) cr.classList.add('hidden');
-    const rm = document.getElementById('modal-ot-request-msg');
-    if (rm) rm.classList.add('hidden');
   }
 
-  async function requestOtCode() {
-    if (!_curAssoc) return;
-    try {
-      const fd = new FormData();
-      fd.append('assoc_num',       _curAssoc.assoc_num);
-      fd.append('requested_shift', selShift());
-      const r = await fetch('/shift/request-ot', { method: 'POST', body: fd });
-      const d = await r.json();
-      if (d.ok) {
-        const msg = document.getElementById('modal-ot-request-msg');
-        msg.textContent = '\ud83d\udccb ' + d.message;
-        msg.classList.remove('hidden');
-        document.getElementById('modal-ot-code-row').classList.remove('hidden');
-        setTimeout(() => document.getElementById('modal_ot_code').focus(), 80);
-      } else {
-        alert('OT request failed: ' + (d.error || 'Unknown error'));
-      }
-    } catch(e) { alert('Network error \u2014 try again.'); }
-    updateModalConfirmBtn();
-  }
-
-  async function verifyOtCode() {
-    const code  = document.getElementById('modal_ot_code').value.trim().toUpperCase();
-    const errEl = document.getElementById('modal-ot-err');
-    const okEl  = document.getElementById('modal-ot-ok');
-    if (!code) {
-      errEl.textContent = 'Enter the code from your manager.';
-      errEl.classList.remove('hidden'); return;
-    }
-    try {
-      const fd = new FormData();
-      fd.append('assoc_num',       _curAssoc.assoc_num);
-      fd.append('requested_shift', selShift());
-      fd.append('ot_code',         code);
-      const r = await fetch('/shift/check-ot', { method: 'POST', body: fd });
-      const d = await r.json();
-      if (d.ok) {
-        _otVerified = true;
-        document.getElementById('hidden_ot_code').value = code;
-        okEl.classList.remove('hidden'); errEl.classList.add('hidden');
-      } else {
-        errEl.textContent = d.error || 'Invalid code.';
-        errEl.classList.remove('hidden'); okEl.classList.add('hidden');
-      }
-    } catch(e) {
-      errEl.textContent = 'Verification failed \u2014 try again.';
-      errEl.classList.remove('hidden');
-    }
-    updateModalConfirmBtn();
-  }
-
-  function clearOtErr() {
-    document.getElementById('modal-ot-err').classList.add('hidden');
-    document.getElementById('modal-ot-ok').classList.add('hidden');
-    _otVerified = false;
-    document.getElementById('hidden_ot_code').value = '';
-    updateModalConfirmBtn();
-  }
+  /* FUTURE USE — OT code request/verify flow (disabled, routes still exist in main.py)
+  async function requestOtCode() { ... }
+  async function verifyOtCode()  { ... }
+  function clearOtErr()          { ... }
+  */
 
   // ── Modal confirm button gating ─────────────────────────────────────────────
   function updateModalConfirmBtn() {
