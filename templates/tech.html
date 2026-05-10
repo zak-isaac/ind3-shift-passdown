@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Technician – Shift Passdown</title>
+  <link rel="stylesheet" href="/static/tailwind.min.css">
+  <link rel="stylesheet" href="/static/dark.css" id="dark-css" disabled>
+  <script src="/static/htmx.min.js"></script>
+  <style>
+    .htmx-indicator{display:none}.htmx-request .htmx-indicator{display:inline-flex}
+
+    .prio-btn {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      padding: 10px 6px; border-radius: 12px; border: 2px solid #e5e7eb;
+      background: white; cursor: pointer; width: 100%;
+      transition: border-color .15s, background .15s, transform .1s;
+      outline: none; user-select: none;
+    }
+    .prio-btn:hover  { transform: translateY(-1px); border-color: #d1d5db; }
+    .prio-btn:active { transform: translateY(0); }
+    .prio-btn.selected { box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+    .prio-label { color: #374151; transition: color .15s; }
+  </style>
+</head>
+<body class="bg-gray-50 h-screen overflow-hidden flex flex-col">
+
+<!-- HEADER -->
+<header class="bg-wm-blue shadow-lg shrink-0">
+  <div class="max-w-3xl mx-auto px-4 py-2 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <a href="/" class="flex items-center gap-2 hover:opacity-80 transition shrink-0">
+        <img src="/static/wrench.svg" alt="Home" class="h-8 w-8" />
+        <span class="text-white font-black text-lg tracking-tight leading-none">WALMART</span>
+      </a>
+      <div class="h-8 w-px bg-blue-400 mx-1"></div>
+      <div>
+        <p class="text-white font-black text-base leading-tight">Technician View</p>
+        <p class="text-blue-100 text-sm font-medium">
+          <span class="text-wm-spark font-bold">{{ shift.shift_type }}</span>
+          &bull; {{ shift.date }}
+          &bull; MST: <span class="font-semibold">{{ shift.lead_name }}</span>
+        </p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="text-wm-spark text-sm font-black font-mono bg-white bg-opacity-10 px-3 py-1 rounded-full border border-wm-spark border-opacity-30">{{ dc_number }}</span>
+      <a href="/" class="text-blue-100 hover:text-white text-sm font-medium transition">&#8592; Home</a>
+      <button onclick="toggleDark()" class="text-blue-100 hover:text-white text-lg transition" title="Toggle dark mode">&#9790;</button>
+      <a href="/tech/logout" class="text-blue-100 hover:text-white text-xs font-medium border border-blue-400 px-2 py-1 rounded-lg transition">&#128275; Sign Out</a>
+    </div>
+  </div>
+</header>
+
+<!-- SHIFT BADGE -->
+<div class="bg-wm-blue text-white text-center py-2 text-xs font-semibold tracking-wide shrink-0">
+  MST: {{ shift.lead_name }} &nbsp;&bull;&nbsp; Logged in as: <span class="text-wm-spark font-black">{{ tech_name }}</span> &nbsp;&bull;&nbsp;
+  Signed on: <span id="signon-time" class="text-wm-spark"></span>
+</div>
+<script>
+  (function () {
+    const now = new Date();
+    const h = now.getHours(), m = now.getMinutes();
+    const period = h < 12 ? 'AM' : 'PM';
+    const h12 = h % 12 || 12;
+    document.getElementById('signon-time').textContent =
+      h12 + ':' + String(m).padStart(2, '0') + ' ' + period;
+  })();
+</script>
+
+{% if oos_units %}
+<!-- OOS BANNER -->
+<div class="bg-red-600 text-white px-4 py-2 shrink-0">
+  <div class="max-w-full mx-auto flex flex-wrap items-center gap-2">
+    <span class="font-black text-xs uppercase tracking-widest shrink-0">&#9940; Out of Service:</span>
+    {% for u in oos_units %}
+    <span class="bg-white bg-opacity-20 border border-white border-opacity-30 text-white text-xs font-bold px-2.5 py-1 rounded-full">{{ u }}</span>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<main class="flex-1 min-h-0 overflow-hidden flex gap-3 px-4 py-3 max-w-7xl mx-auto w-full">
+
+  <!-- LEFT: Entry Form (fixed width, no scroll) -->
+  <div class="w-80 shrink-0 flex flex-col gap-3">
+  <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex flex-col flex-1">
+    <h2 class="text-wm-dark font-bold text-sm mb-3 flex items-center gap-2">
+      <span class="text-wm-blue">&#9889;</span> Log Shift Happening
+    </h2>
+
+    <form
+      hx-post="/tech/entry"
+      hx-target="#my-entries"
+      hx-swap="innerHTML"
+      hx-indicator="#save-spinner"
+      hx-on::after-request="this.reset(); document.getElementById('hidden-tech-name').value='{{ tech_name }}'; initPriority();"
+      class="flex flex-col gap-4"
+    >
+      <input type="hidden" id="hidden-tech-name" name="tech_name" value="{{ tech_name }}" />
+      <input type="hidden" name="shift_id" value="{{ shift.id }}" />
+
+      <!-- Asset ID -->
+      <div class="flex flex-col gap-1">
+        <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">Asset ID</label>
+        <input id="f_unit" name="unit" type="text" list="asset-list"
+          placeholder="Type or select asset..." required autocomplete="off"
+          class="rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-wm-blue focus:ring-2 focus:ring-blue-200 outline-none transition" />
+        <datalist id="asset-list">
+          {% for a in assets %}<option value="{{ a }}">{% endfor %}
+        </datalist>
+      </div>
+
+      <!-- Summary -->
+      <div class="flex flex-col gap-1">
+        <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">Summary</label>
+        <textarea id="f_summary" name="summary" rows="3" required
+          placeholder="What you worked on, what was wrong, what you did..."
+          class="rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-wm-blue focus:ring-2 focus:ring-blue-200 outline-none transition resize-none"></textarea>
+      </div>
+
+      <!-- PRIORITY SELECTOR -->
+      <div class="flex flex-col gap-1">
+        <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">Status / Priority</label>
+        <input type="hidden" name="priority" id="priority-input" value="monitor" />
+        <div class="prio-group grid grid-cols-3 gap-2">
+          <button type="button" class="prio-btn" data-priority="down" data-border="#ef4444" data-bg="#fef2f2"
+            onclick="setPriority(this)">
+            <span class="text-2xl">🔴</span>
+            <span class="prio-label font-black text-sm">Down</span>
+            <span class="text-xs text-gray-500 leading-tight">Machine stopped</span>
+          </button>
+          <button type="button" class="prio-btn" data-priority="degraded" data-border="#eab308" data-bg="#fefce8"
+            onclick="setPriority(this)">
+            <span class="text-2xl">🟡</span>
+            <span class="prio-label font-black text-sm">Degraded</span>
+            <span class="text-xs text-gray-500 leading-tight">Running slow/rough</span>
+          </button>
+          <button type="button" class="prio-btn" data-priority="monitor" data-border="#22c55e" data-bg="#f0fdf4"
+            onclick="setPriority(this)">
+            <span class="text-2xl">🟢</span>
+            <span class="prio-label font-black text-sm">Monitor</span>
+            <span class="text-xs text-gray-500 leading-tight">Observed / FYI</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- LIVE PREVIEW -->
+      <div id="preview-box" class="hidden bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+        <p class="text-xs font-bold text-wm-blue uppercase tracking-wide mb-1">&#128065; Entry Preview</p>
+        <p id="preview-text" class="text-sm text-gray-700 leading-relaxed italic"></p>
+      </div>
+
+      <button type="submit"
+        class="flex items-center justify-center gap-2 bg-wm-blue hover:bg-blue-700 active:bg-blue-800
+               text-white font-bold py-2.5 rounded-xl transition shadow focus:outline-none focus:ring-4 focus:ring-blue-300 text-sm mt-auto">
+        <span id="save-spinner" class="htmx-indicator items-center gap-2 text-sm">
+          <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+          </svg>Saving...
+        </span>
+        &#128190; Save Happening
+      </button>
+    </form>
+  </div>
+  </div><!-- /left col -->
+
+  <!-- RIGHT: Entries + Done (scrolls internally) -->
+  <div class="flex-1 min-h-0 flex flex-col gap-3 overflow-y-auto pr-1">
+
+  <!-- MY ENTRIES -->
+  <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex-1">
+    <h2 class="text-wm-dark font-bold text-sm mb-3 flex items-center gap-2">
+      <span class="text-wm-spark">&#9998;</span> Shift Entries
+    </h2>
+    <div id="my-entries">
+      {% include 'partials/my_entries.html' %}
+    </div>
+  </div>
+
+  <!-- DONE FOR THE SHIFT -->
+  <form id="done-form"
+    hx-post="/tech/done"
+    hx-target="#done-btn-wrap"
+    hx-swap="innerHTML">
+    <input type="hidden" name="shift_id"  value="{{ shift.id }}"/>
+    <input type="hidden" name="tech_name" value="{{ tech_name }}"/>
+    <div id="done-btn-wrap">
+      <button type="submit"
+        class="w-full flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200
+               text-gray-700 border-2 border-gray-300 font-bold py-2.5 rounded-xl transition text-sm">
+        &#10003; Done for the shift
+      </button>
+    </div>
+  </form>
+
+  </div><!-- /right col -->
+
+</main>
+
+<footer class="bg-wm-dark text-blue-300 text-center text-xs py-2 shrink-0">
+  Shift Passdown Generator &bull; Technician Portal &bull; Walmart &copy; 2026
+</footer>
+
+<script src="/static/app.js"></script>
+<script>
+  // ── Priority selector ────────────────────────────────────────────
+  function setPriority(btn) {
+    const group = btn.closest('.prio-group');
+    group.querySelectorAll('.prio-btn').forEach(b => {
+      b.style.borderColor = '#e5e7eb';
+      b.style.background  = 'white';
+      b.classList.remove('selected');
+      b.querySelector('.prio-label').style.color = '#374151';
+    });
+    btn.style.borderColor = btn.dataset.border;
+    btn.style.background  = btn.dataset.bg;
+    btn.classList.add('selected');
+    btn.querySelector('.prio-label').style.color = btn.dataset.border;
+    // write value into the hidden input inside the same form
+    btn.closest('form').querySelector('[name="priority"]').value = btn.dataset.priority;
+  }
+
+  function initPriority() {
+    const monitor = document.querySelector('.prio-group [data-priority="monitor"]');
+    if (monitor) setPriority(monitor);
+  }
+
+  // Select Monitor by default on page load
+  initPriority();
+
+  // ── Dark mode ────────────────────────────────────────────────────
+  function toggleDark() {
+    const on = document.body.classList.toggle('dark-mode');
+    document.getElementById('dark-css').disabled = !on;
+    localStorage.setItem('dark', on ? '1' : '');
+  }
+  if (localStorage.getItem('dark')) {
+    document.body.classList.add('dark-mode');
+    document.getElementById('dark-css').disabled = false;
+  }
+
+  // Live preview
+  const previewBox  = document.getElementById('preview-box');
+  const previewText = document.getElementById('preview-text');
+
+  function buildPreview() {
+    const unit    = document.getElementById('f_unit').value.trim();
+    const summary = document.getElementById('f_summary').value.trim();
+    const any     = unit || summary;
+    previewBox.classList.toggle('hidden', !any);
+    previewText.textContent =
+      `{{ tech_name }} | ${unit || '[Unit]'}: ${summary || '...'}`;
+  }
+
+  ['f_unit', 'f_summary'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', buildPreview);
+  });
+
+  // ── Inline validation ─────────────────────────────────
+  function showErr(fieldId, msg) {
+    const field = document.getElementById(fieldId);
+    field.classList.add('border-red-400');
+    let err = field.parentElement.querySelector('.field-err');
+    if (!err) {
+      err = document.createElement('p');
+      err.className = 'field-err text-xs text-red-500 font-semibold mt-1';
+      field.parentElement.appendChild(err);
+    }
+    err.textContent = msg;
+  }
+  function clearErr(fieldId) {
+    const field = document.getElementById(fieldId);
+    field.classList.remove('border-red-400');
+    field.parentElement.querySelector('.field-err')?.remove();
+  }
+  ['f_unit','f_summary'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => clearErr(id));
+  });
+
+  // ── Duplicate warning + submit intercept ────────────────
+  let _forceSubmit = false;
+
+  document.querySelector('[hx-post="/tech/entry"]').addEventListener('htmx:confirm', async (e) => {
+    if (_forceSubmit) { _forceSubmit = false; return; }
+    e.preventDefault();
+
+    const unit    = document.getElementById('f_unit').value.trim();
+    const summary = document.getElementById('f_summary').value.trim();
+    let valid = true;
+
+    if (!unit)    { showErr('f_unit',    'Asset ID is required'); valid = false; }
+    if (!summary) { showErr('f_summary', 'Summary is required');   valid = false; }
+    if (!valid) return;
+
+    // Check for duplicate
+    const params = new URLSearchParams({
+      shift_id:  '{{ shift.id }}',
+      tech_name: '{{ tech_name }}',
+      unit,
+    });
+    const res  = await fetch(`/tech/check-unit?${params}`);
+    const data = await res.json();
+
+    if (data.duplicate) {
+      const ok = confirm(
+        `⚠️ You already logged "${unit}" at ${
+          new Date(data.time.replace(' ','T')).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})
+        }.\n\nSave again anyway?`
+      );
+      if (!ok) return;
+    }
+
+    _forceSubmit = true;
+    e.detail.issueRequest();
+  });
+
+  // ── Relative timestamps ───────────────────────────────
+  function relTime(iso) {
+    const diff = Math.floor((Date.now() - new Date(iso.replace(' ','T'))) / 60000);
+    if (diff < 1)  return 'just now';
+    if (diff < 60) return `${diff} min ago`;
+    const h = Math.floor(diff/60), m = diff%60;
+    return `${h}h ${m}m ago`;
+  }
+  function refreshRelTimes() {
+    document.querySelectorAll('.rel-time[data-iso]').forEach(el => {
+      el.textContent = relTime(el.dataset.iso);
+    });
+  }
+  refreshRelTimes();
+  setInterval(refreshRelTimes, 60000);
+  document.addEventListener('htmx:afterSwap', refreshRelTimes);
+</script>
+</body>
+</html>

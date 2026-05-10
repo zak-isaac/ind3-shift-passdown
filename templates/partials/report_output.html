@@ -1,0 +1,83 @@
+<!-- partials/report_output.html – Polished document preview -->
+<div class="flex flex-col gap-3">
+
+  <!-- Action bar -->
+  <div class="bg-wm-dark rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+    <div class="flex items-center gap-2">
+      <span class="text-wm-spark text-base">&#9989;</span>
+      <span class="text-white font-bold text-sm">Report Generated</span>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <button onclick="copyEmail()"
+        id="copy-email-btn"
+        class="text-xs bg-wm-spark text-gray-900 font-bold px-3 py-1.5 rounded-lg
+               hover:bg-yellow-400 transition whitespace-nowrap">
+        &#128203; Copy Email Version
+      </button>
+      <a href="/report/{{ report_id }}/docx" download
+        class="text-xs bg-white text-wm-dark font-bold px-3 py-1.5 rounded-lg
+               hover:bg-gray-100 transition whitespace-nowrap">
+        &#128196; Export DOCX
+      </a>
+      <a href="/report/{{ report_id }}/pdf" download
+        class="text-xs bg-white text-wm-dark font-bold px-3 py-1.5 rounded-lg
+               hover:bg-gray-100 transition whitespace-nowrap">
+        &#128196; Export PDF
+      </a>
+      <a href="/report/{{ report_id }}/download" download
+        class="text-xs text-blue-200 font-semibold px-2 py-1.5 rounded-lg
+               hover:text-white transition whitespace-nowrap">
+        &#128190; .txt
+      </a>
+    </div>
+  </div>
+
+  <!-- Document preview (paper card) -->
+  <div class="bg-white rounded-xl border border-gray-200 shadow-sm
+              overflow-y-auto max-h-[68vh] p-6"
+       style="font-family:'Times New Roman',Times,serif">
+    {{ preview_html | safe }}
+  </div>
+
+  <!-- Hidden email text for copy — use | e to prevent XSS but keep raw text via JS -->
+  <textarea id="email-text-hidden" class="sr-only" aria-hidden="true"
+    tabindex="-1" readonly>{{ email_text | e }}</textarea>
+
+</div>
+
+<script>
+function copyEmail() {
+  const ta  = document.getElementById('email-text-hidden');
+  const btn = document.getElementById('copy-email-btn');
+
+  function flash(ok) {
+    const orig = btn.innerHTML;
+    btn.innerHTML = ok ? '\u2713 Copied!' : '\u26a0 Select + copy manually';
+    setTimeout(() => { btn.innerHTML = orig; }, 2400);
+  }
+
+  // Modern Clipboard API (HTTPS / localhost only)
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(ta.value).then(() => flash(true)).catch(() => legacyCopy());
+  } else {
+    legacyCopy();
+  }
+
+  function legacyCopy() {
+    // Works on plain HTTP — select the textarea and execCommand
+    ta.classList.remove('sr-only');
+    ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0.01;width:1px;height:1px';
+    ta.select();
+    ta.setSelectionRange(0, ta.value.length);
+    try {
+      const ok = document.execCommand('copy');
+      flash(ok);
+    } catch (_) {
+      flash(false);
+    } finally {
+      ta.style.cssText = '';
+      ta.classList.add('sr-only');
+    }
+  }
+}
+</script>

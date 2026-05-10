@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Admin Settings – Shift Passdown</title>
+  <link rel="stylesheet" href="/static/tailwind.min.css">
+  <script src="/static/htmx.min.js"></script>
+  <style>
+    .htmx-indicator{display:none}.htmx-request .htmx-indicator{display:inline-block}
+    .htmx-request.htmx-indicator{display:inline-block}
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+<header class="bg-wm-blue shadow-lg sticky top-0 z-10">
+  <div class="max-w-4xl mx-auto px-5 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <img src="/static/wrench.svg" class="h-8 w-8" alt=""/>
+      <div>
+        <p class="text-white font-black text-base leading-tight">Admin Settings</p>
+        <p class="text-blue-200 text-xs">IND3</p>
+      </div>
+    </div>
+    <a href="/lead" class="text-blue-200 hover:text-white text-sm font-medium transition">← Dashboard</a>
+  </div>
+</header>
+
+<main class="max-w-4xl mx-auto px-4 py-8 flex flex-col gap-8">
+
+  <!-- Flash messages -->
+  {% if msg %}
+  <div class="bg-green-50 border border-green-300 text-green-800 rounded-xl px-5 py-3 text-sm font-semibold">
+    ✅ {{ msg }}
+  </div>
+  {% endif %}
+  {% if err %}
+  <div class="bg-red-50 border border-red-300 text-red-700 rounded-xl px-5 py-3 text-sm font-semibold">
+    ❌ {{ err }}
+  </div>
+  {% endif %}
+
+
+  <!-- ══ OT APPROVAL CODES (manager only) ══════════════════════════════════ -->
+  {% if is_manager %}
+  <section class="bg-white rounded-2xl border border-amber-200 shadow-sm p-6">
+    <div class="flex items-center justify-between mb-1">
+      <h2 class="font-black text-base" style="color:#001e50;">&#128274; Overtime Approval Codes</h2>
+      <span class="text-xs font-bold bg-amber-100 text-amber-700 px-2.5 py-0.5 rounded-full">Manager Only</span>
+    </div>
+    <p class="text-gray-500 text-xs mb-4">
+      When an MST tries to start a shift outside their assignment, they are prompted to request
+      an OT code. The code appears here. Read it to them verbally &mdash; codes expire in 4 hours and are single-use.
+    </p>
+
+    {% if ot_codes %}
+    <div class="flex flex-col gap-3">
+      {% for code in ot_codes %}
+      <div class="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+        <div class="flex flex-col gap-0.5">
+          <p class="font-black text-sm text-gray-800">{{ code.assoc_name }}</p>
+          <p class="text-xs text-gray-500">
+            Assigned: <strong>{{ code.assigned_shift or '&mdash;' }}</strong>
+            &rarr; Requesting: <strong>{{ code.requested_shift }}</strong>
+          </p>
+          <p class="text-xs text-gray-400">Requested at {{ code.created_at }} &bull; Expires {{ code.expires_at }}</p>
+        </div>
+        <div class="flex flex-col items-end gap-1">
+          <span class="font-black text-2xl font-mono tracking-widest text-wm-blue">{{ code.code }}</span>
+          <span class="text-xs text-amber-600 font-semibold">Read this to the MST</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-gray-400 italic">No pending OT requests right now. &#127881;</p>
+    {% endif %}
+
+    <p class="text-xs text-gray-400 mt-4">
+      &#128260; This page does not auto-refresh. Reload to see new requests.
+    </p>
+  </section>
+  {% endif %}
+
+  <!-- ══ ASSOCIATE ROSTER ══════════════════════════════════════════════ -->
+  <section class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+    <div class="flex items-center justify-between mb-1">
+      <h2 class="font-black text-base" style="color:#001e50;">👥 Associate Roster</h2>
+      <span class="text-xs text-gray-400">IND3</span>
+    </div>
+    <p class="text-gray-500 text-xs mb-4">
+      Roster seeded from the Associates spreadsheet. Changes are saved to the facility database.
+    </p>
+
+    <!-- Roster reload from Excel -->
+    <div class="flex items-center gap-3 mb-5 pb-4 border-b">
+      <button
+        hx-post="/admin/reload-roster"
+        hx-target="#roster-reload-msg"
+        hx-swap="innerHTML"
+        class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-4 py-2 rounded-xl text-xs transition border border-gray-300">
+        &#128260; Re-sync from Drax
+      </button>
+      <span id="roster-reload-msg" class="text-xs text-gray-500">
+        Imports all associates from the Drax file into the DB.
+      </span>
+    </div>
+
+    <!-- Associate table -->
+    <div id="assoc-table"
+         hx-get="/admin/associates"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+      <p class="text-gray-400 text-sm italic">Loading associates...</p>
+    </div>
+
+    <!-- Add Associate form -->
+    <div class="border-t pt-4 mt-4">
+      <h3 class="font-bold text-sm mb-2" style="color:#001e50;">&#10133; Add Associate Manually</h3>
+      <form
+        hx-post="/admin/associates/add"
+        hx-target="#assoc-table"
+        hx-swap="innerHTML"
+        hx-on::after-request="this.reset()"
+        class="grid grid-cols-2 gap-3">
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-bold text-gray-500 uppercase tracking-wide">Associate #</label>
+          <input name="assoc_num" type="text" required placeholder="e.g. 12345"
+            class="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-wm-blue outline-none transition" />
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-bold text-gray-500 uppercase tracking-wide">Full Name</label>
+          <input name="full_name" type="text" required placeholder="e.g. John Smith"
+            class="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-wm-blue outline-none transition" />
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-bold text-gray-500 uppercase tracking-wide">Shift</label>
+          <select name="shift"
+            class="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-wm-blue outline-none transition">
+            <option value="">— Any —</option>
+            <option value="S1">S1</option>
+            <option value="S2">S2</option>
+            <option value="S3">S3</option>
+            <option value="S4">S4</option>
+            <option value="S5">S5</option>
+          </select>
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-bold text-gray-500 uppercase tracking-wide">Default ID</label>
+          <input name="default_id" type="text" placeholder="optional"
+            class="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-wm-blue outline-none transition" />
+        </div>
+        <div class="col-span-2 flex items-center gap-3">
+          <label class="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" name="is_mst" value="1"
+              class="w-4 h-4 accent-wm-blue rounded" />
+            <span class="text-sm font-semibold text-gray-700">&#128202; MST &mdash; can log into the lead dashboard</span>
+          </label>
+          <button type="submit"
+            class="ml-auto bg-wm-blue hover:bg-blue-700 text-white font-black px-5 py-2 rounded-xl text-sm transition">
+            Add
+          </button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- ══ TEAMS NOTIFICATIONS ══════════════════════════════════════════════ -->
+  <section class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+    <div class="flex items-center justify-between mb-1">
+      <h2 class="font-black text-base" style="color:#001e50;">🔔 Teams Notifications</h2>
+      {% if teams_webhook_url %}
+      <span class="text-xs font-bold bg-green-100 text-green-700 px-2.5 py-0.5 rounded-full">✅ Active</span>
+      {% else %}
+      <span class="text-xs font-bold bg-gray-100 text-gray-500 px-2.5 py-0.5 rounded-full">Off</span>
+      {% endif %}
+    </div>
+    <p class="text-gray-500 text-xs mb-4">
+      Paste your Teams channel incoming webhook URL. A card will be posted whenever a tech logs a
+      <strong>Down</strong> or <strong>Degraded</strong> unit.
+    </p>
+
+    <form method="POST" action="/admin/teams-webhook" class="flex flex-col gap-3">
+      <input
+        name="webhook_url"
+        type="url"
+        placeholder="https://walmart.webhook.office.com/..."
+        value="{{ teams_webhook_url }}"
+        class="rounded-xl border-2 border-gray-200 focus:border-wm-blue px-4 py-2.5 text-sm
+               font-mono outline-none transition w-full"
+      />
+      <div class="flex gap-3">
+        <button type="submit"
+          class="bg-wm-blue hover:bg-blue-700 text-white font-black px-6 py-2.5 rounded-xl text-sm transition">
+          Save Webhook
+        </button>
+        {% if teams_webhook_url %}
+        <button type="submit" name="webhook_url" value=""
+          class="bg-white border border-gray-300 hover:border-red-400 text-gray-500 hover:text-red-600
+                 font-bold px-5 py-2.5 rounded-xl text-sm transition">
+          Clear
+        </button>
+        {% endif %}
+      </div>
+    </form>
+
+    <details class="mt-4 border-t pt-4">
+      <summary class="text-xs text-gray-400 cursor-pointer select-none hover:text-gray-600">How to get a webhook URL ↓</summary>
+      <ol class="text-xs text-gray-500 mt-2 ml-4 list-decimal space-y-1 leading-relaxed">
+        <li>Open Teams → find or create your maintenance channel</li>
+        <li>Click <strong>⋯ (More options)</strong> next to the channel name</li>
+        <li>Select <strong>Connectors</strong> → find <strong>Incoming Webhook</strong> → <strong>Add</strong></li>
+        <li>Give it a name (e.g. <em>IND3 Passdown</em>), click <strong>Create</strong></li>
+        <li>Copy the URL — paste it above</li>
+      </ol>
+    </details>
+  </section>
+
+
+
+</main>
+
+<footer class="text-center text-xs text-gray-400 py-4">
+  Shift Passdown Generator &bull; Admin &bull; Walmart &copy; 2026
+</footer>
+</body>
+</html>

@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Technician Sign-In – IND3 Shift Passdown</title>
+  <link rel="stylesheet" href="/static/tailwind.min.css">
+  <style>
+    /* Walmart brand vars */
+    :root {
+      --wm-blue:  #0053e2;
+      --wm-dark:  #001e50;
+      --wm-spark: #ffc220;
+    }
+
+    /* Diagonal-stripe hero bg */
+    .hero-bg {
+      background-color: var(--wm-dark);
+      background-image:
+        repeating-linear-gradient(
+          -45deg,
+          rgba(0,83,226,.08) 0px,
+          rgba(0,83,226,.08) 2px,
+          transparent       2px,
+          transparent       18px
+        );
+    }
+
+    /* Animated scanline sweep */
+    @keyframes scan {
+      0%   { top: -4px; }
+      100% { top: 100%; }
+    }
+    .scanline::after {
+      content: '';
+      position: absolute;
+      left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(to bottom, transparent, rgba(255,194,32,.25), transparent);
+      animation: scan 5s linear infinite;
+      pointer-events: none;
+    }
+
+    /* Pulse ring around icon */
+    @keyframes ring-pulse {
+      0%   { transform: scale(1);   opacity: .7; }
+      70%  { transform: scale(1.6); opacity: 0;  }
+      100% { transform: scale(1.6); opacity: 0;  }
+    }
+    .pulse-ring::before {
+      content: '';
+      position: absolute;
+      inset: -8px;
+      border-radius: 50%;
+      border: 3px solid var(--wm-spark);
+      animation: ring-pulse 2.2s ease-out infinite;
+    }
+
+    /* Number pad digit glow on focus */
+    input.assoc-input:focus {
+      box-shadow: 0 0 0 4px rgba(255,194,32,.35), 0 0 20px rgba(0,83,226,.25);
+    }
+
+    /* Spark loader dots on submit */
+    .btn-submitting { pointer-events: none; opacity: .8; }
+  </style>
+</head>
+
+<body class="hero-bg min-h-screen flex flex-col scanline relative overflow-hidden">
+
+  <!-- ── TOP NAV BAR ─────────────────────────────────────────────────────── -->
+  <header class="bg-wm-dark border-b border-blue-900 shadow-lg" style="border-color:#0053e2; border-bottom-width:2px;">
+    <div class="max-w-4xl mx-auto px-5 py-3 flex items-center justify-between">
+      <!-- Walmart wordmark -->
+      <div class="flex items-center gap-3">
+        <!-- Spark logo SVG -->
+        <svg width="32" height="32" viewBox="0 0 40 40" fill="none" aria-label="Walmart spark">
+          <path d="M20 2 L22.4 14.8 L32.7 7.3 L25.2 17.6 L38 20 L25.2 22.4 L32.7 32.7 L22.4 25.2 L20 38 L17.6 25.2 L7.3 32.7 L14.8 22.4 L2 20 L14.8 17.6 L7.3 7.3 L17.6 14.8 Z" fill="#ffc220"/>
+        </svg>
+        <span class="text-white font-black text-lg tracking-widest uppercase">Walmart</span>
+        <div class="w-px h-5 bg-blue-700 mx-1"></div>
+        <span class="text-blue-300 text-sm font-medium tracking-wide">IND3 Maintenance</span>
+      </div>
+      <!-- DC badge -->
+      <span class="text-wm-spark text-xs font-black font-mono bg-wm-blue bg-opacity-30 px-3 py-1 rounded-full border border-wm-spark border-opacity-30">
+        {{ dc_number }}
+      </span>
+    </div>
+  </header>
+
+  <!-- ── MAIN ───────────────────────────────────────────────────────────── -->
+  <main class="flex-1 flex items-center justify-center px-4 py-10">
+    <div class="w-full max-w-lg flex flex-col gap-5">
+
+      <!-- Shift context pill -->
+      {% if shift %}
+      <div class="bg-wm-blue bg-opacity-30 border border-wm-blue border-opacity-30 rounded-2xl px-5 py-4 flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <p class="text-wm-spark font-black text-xl tracking-tight">{{ shift.shift_type }}</p>
+          <p class="text-blue-200 text-sm mt-0.5">{{ shift.date }} &bull; MST: <strong class="text-white">{{ shift.lead_name }}</strong></p>
+        </div>
+        <span class="inline-flex items-center gap-2 bg-green-400 text-green-900 text-xs font-black px-3 py-1.5 rounded-full animate-pulse shadow-md">
+          <span class="w-2 h-2 bg-green-700 rounded-full"></span> SHIFT ACTIVE
+        </span>
+      </div>
+      {% endif %}
+
+      <!-- LOGIN CARD -->
+      <div class="bg-white rounded-2xl overflow-hidden shadow-2xl" style="box-shadow: 0 0 40px rgba(0,83,226,.3), 0 20px 60px rgba(0,0,0,.5);">
+
+        <!-- Card header — tech illustration -->
+        <div class="relative bg-wm-dark overflow-hidden" style="padding: 2rem 2rem 0;">
+
+          <!-- Background warehouse-rack pattern -->
+          <div class="absolute inset-0 opacity-10" aria-hidden="true">
+            <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+              <!-- Conveyor / rack silhouette lines -->
+              <line x1="0" y1="100%" x2="100%" y2="100%" stroke="#ffc220" stroke-width="2"/>
+              <line x1="0" y1="75%"  x2="100%" y2="75%"  stroke="#0053e2" stroke-width="1"/>
+              <line x1="0" y1="50%"  x2="100%" y2="50%"  stroke="#0053e2" stroke-width="1"/>
+              <line x1="20%" y1="0" x2="20%" y2="100%" stroke="#0053e2" stroke-width="1"/>
+              <line x1="50%" y1="0" x2="50%" y2="100%" stroke="#0053e2" stroke-width="1"/>
+              <line x1="80%" y1="0" x2="80%" y2="100%" stroke="#0053e2" stroke-width="1"/>
+            </svg>
+          </div>
+
+          <!-- Tech worker SVG illustration -->
+          <div class="flex justify-center relative z-10 pb-0">
+            <svg width="220" height="180" viewBox="0 0 220 180" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Walmart maintenance technician">
+
+              <!-- Shadow / ground -->
+              <ellipse cx="110" cy="175" rx="60" ry="6" fill="rgba(0,0,0,.35)"/>
+
+              <!-- ── WAREHOUSE SHELVING (BG) ── -->
+              <!-- Left rack -->
+              <rect x="8" y="60" width="6" height="115" fill="#0d3b8c" rx="2"/>
+              <rect x="8" y="60" width="55" height="5" fill="#0d3b8c" rx="1"/>
+              <rect x="8" y="90" width="55" height="4" fill="#0d3b8c" rx="1"/>
+              <rect x="8" y="120" width="55" height="4" fill="#0d3b8c" rx="1"/>
+              <rect x="57" y="60" width="6" height="115" fill="#0d3b8c" rx="2"/>
+              <!-- boxes on left rack -->
+              <rect x="12" y="65" width="16" height="20" fill="#1a4fc4" rx="2"/>
+              <rect x="31" y="65" width="28" height="20" fill="#0a2d80" rx="2"/>
+              <rect x="12" y="95" width="44" height="20" fill="#1a4fc4" rx="2"/>
+              <rect x="12" y="125" width="24" height="14" fill="#0a2d80" rx="2"/>
+              <rect x="39" y="125" width="18" height="14" fill="#1a4fc4" rx="2"/>
+
+              <!-- Right rack -->
+              <rect x="156" y="60" width="6" height="115" fill="#0d3b8c" rx="2"/>
+              <rect x="156" y="60" width="56" height="5" fill="#0d3b8c" rx="1"/>
+              <rect x="156" y="90" width="56" height="4" fill="#0d3b8c" rx="1"/>
+              <rect x="156" y="120" width="56" height="4" fill="#0d3b8c" rx="1"/>
+              <rect x="206" y="60" width="6" height="115" fill="#0d3b8c" rx="2"/>
+              <!-- boxes on right rack -->
+              <rect x="160" y="65" width="20" height="20" fill="#1a4fc4" rx="2"/>
+              <rect x="183" y="65" width="25" height="20" fill="#0a2d80" rx="2"/>
+              <rect x="160" y="95" width="48" height="20" fill="#1a4fc4" rx="2"/>
+              <rect x="160" y="125" width="30" height="14" fill="#0a2d80" rx="2"/>
+              <rect x="193" y="125" width="15" height="14" fill="#1a4fc4" rx="2"/>
+
+              <!-- ── TECH PERSON ── -->
+              <!-- Legs -->
+              <rect x="97" y="135" width="10" height="38" fill="#1e3a5f" rx="4"/>
+              <rect x="113" y="135" width="10" height="38" fill="#1e3a5f" rx="4"/>
+              <!-- Boots -->
+              <rect x="93" y="163" width="16" height="9" fill="#111" rx="3"/>
+              <rect x="111" y="163" width="16" height="9" fill="#111" rx="3"/>
+
+              <!-- Body / High-vis vest -->
+              <rect x="90" y="90" width="40" height="48" fill="#0053e2" rx="6"/>
+              <!-- Vest hi-vis stripes -->
+              <rect x="90" y="110" width="40" height="6" fill="#ffc220" rx="1" opacity=".9"/>
+              <rect x="90" y="122" width="40" height="5" fill="#ffc220" rx="1" opacity=".9"/>
+              <!-- Vest chest pocket -->
+              <rect x="94" y="95" width="12" height="10" fill="#0041b5" rx="2"/>
+              <!-- ID badge -->
+              <rect x="116" y="95" width="9" height="12" fill="#ffc220" rx="2"/>
+              <rect x="118" y="100" width="5" height="1.5" fill="#001e50" rx="1"/>
+              <rect x="118" y="103" width="5" height="1.5" fill="#001e50" rx="1"/>
+
+              <!-- Left arm (wrench hand) -->
+              <rect x="68" y="93" width="22" height="10" fill="#0053e2" rx="5" transform="rotate(15 68 93)"/>
+              <!-- Wrench -->
+              <rect x="44" y="89" width="28" height="7" fill="#888" rx="3"/>
+              <rect x="40" y="85" width="8" height="14" fill="#666" rx="3"/>
+              <rect x="42" y="83" width="4" height="4" fill="#555" rx="1"/>
+              <rect x="42" y="96" width="4" height="4" fill="#555" rx="1"/>
+
+              <!-- Right arm (clipboard) -->
+              <rect x="130" y="95" width="22" height="10" fill="#0053e2" rx="5" transform="rotate(-10 130 95)"/>
+              <!-- Clipboard -->
+              <rect x="148" y="78" width="28" height="36" fill="#f0f0e8" rx="3"/>
+              <rect x="156" y="74" width="12" height="6" fill="#888" rx="2"/>
+              <rect x="152" y="87" width="20" height="2" fill="#aaa" rx="1"/>
+              <rect x="152" y="92" width="20" height="2" fill="#aaa" rx="1"/>
+              <rect x="152" y="97" width="14" height="2" fill="#aaa" rx="1"/>
+              <rect x="152" y="102" width="16" height="2" fill="#ffc220" rx="1"/>
+
+              <!-- Neck -->
+              <rect x="104" y="78" width="12" height="14" fill="#c9956b" rx="4"/>
+
+              <!-- Head -->
+              <ellipse cx="110" cy="68" rx="18" ry="16" fill="#d4a27a"/>
+              <!-- Face details -->
+              <circle cx="104" cy="66" r="2" fill="#6b4226"/>
+              <circle cx="116" cy="66" r="2" fill="#6b4226"/>
+              <path d="M 105 73 Q 110 77 115 73" stroke="#6b4226" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+
+              <!-- Hard hat -->
+              <ellipse cx="110" cy="54" rx="22" ry="8" fill="#ffc220"/>
+              <rect x="90" y="52" width="40" height="10" fill="#ffc220" rx="3"/>
+              <rect x="88" y="58" width="44" height="5" fill="#ffab00" rx="2"/>
+              <!-- Hat brim -->
+              <ellipse cx="110" cy="63" rx="25" ry="4" fill="#ffab00"/>
+              <!-- Walmart logo on hat -->
+              <circle cx="110" cy="55" r="6" fill="#001e50" opacity=".6"/>
+              <path d="M110 50 L111.2 54.4 L115.2 51.9 L112.7 55.9 L117.1 57.1 L112.7 58.3 L115.2 62.3 L111.2 59.8 L110 64.2 L108.8 59.8 L104.8 62.3 L107.3 58.3 L102.9 57.1 L107.3 55.9 L104.8 51.9 L108.8 54.4 Z" fill="#ffc220" opacity=".9"/>
+
+              <!-- Floor line -->
+              <line x1="0" y1="172" x2="220" y2="172" stroke="#0d3b8c" stroke-width="2" opacity=".5"/>
+
+              <!-- Floating sparks / energy dots -->
+              <circle cx="75" cy="40" r="3" fill="#ffc220" opacity=".7">
+                <animate attributeName="opacity" values="0.7;0.2;0.7" dur="2s" repeatCount="indefinite"/>
+                <animate attributeName="cy" values="40;32;40" dur="2s" repeatCount="indefinite"/>
+              </circle>
+              <circle cx="148" cy="30" r="2" fill="#ffc220" opacity=".5">
+                <animate attributeName="opacity" values="0.5;0.1;0.5" dur="1.6s" repeatCount="indefinite"/>
+                <animate attributeName="cy" values="30;22;30" dur="1.6s" repeatCount="indefinite"/>
+              </circle>
+              <circle cx="60" cy="20" r="2" fill="#0053e2" opacity=".7">
+                <animate attributeName="opacity" values="0.7;0.2;0.7" dur="2.4s" repeatCount="indefinite"/>
+              </circle>
+            </svg>
+          </div>
+
+          <!-- "IND3 TECHNICIAN" headline -->
+          <div class="text-center pb-4 relative z-10">
+            <h1 class="text-white font-black text-2xl tracking-tight leading-none">Sign In to Your Shift</h1>
+            <p class="text-blue-300 text-sm mt-1">Enter your associate number to access the shift report</p>
+          </div>
+        </div><!-- /card header -->
+
+        <!-- Card body — form -->
+        <div class="p-6 flex flex-col gap-5 bg-white">
+
+          {% if error %}
+          <div class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm font-semibold flex items-center gap-2">
+            <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/></svg>
+            {{ error }}
+          </div>
+          {% endif %}
+
+          <form method="POST" action="/tech/login" class="flex flex-col gap-4" autocomplete="off" id="loginForm">
+            <input type="hidden" name="next" value="{{ next }}"/>
+
+            {% if shifts | length > 1 %}
+            <!-- Shift picker — only shown during overlap windows when 2 shifts run simultaneously -->
+            <div class="flex flex-col gap-2">
+              <label class="text-xs font-black text-gray-500 uppercase tracking-widest">Which shift are you joining?</label>
+              <div class="flex flex-col gap-2" id="shiftPicker">
+                {% for s in shifts %}
+                <label class="flex items-center gap-3 border-2 rounded-xl px-4 py-3 cursor-pointer transition
+                             {% if s.id == shift.id %}border-wm-blue bg-blue-50{% else %}border-gray-200 hover:border-blue-300{% endif %}"
+                       id="label-shift-{{ s.id }}">
+                  <input type="radio" name="shift_id" value="{{ s.id }}"
+                         {% if s.id == shift.id %}checked{% endif %}
+                         onchange="highlightShiftPick({{ s.id }})"
+                         class="accent-wm-blue w-4 h-4 shrink-0" />
+                  <div class="flex-1 min-w-0">
+                    <p class="font-black text-wm-dark text-base leading-none">{{ s.shift_type }}</p>
+                    <p class="text-gray-500 text-xs mt-0.5">{{ s.date }} &bull; MST: <strong>{{ s.lead_name }}</strong></p>
+                  </div>
+                  <span class="bg-green-400 text-green-900 text-xs font-black px-2 py-0.5 rounded-full animate-pulse">ACTIVE</span>
+                </label>
+                {% endfor %}
+              </div>
+            </div>
+            {% else %}
+            <input type="hidden" name="shift_id" value="{{ shift.id }}"/>
+            {% endif %}
+
+            <div class="flex flex-col gap-2">
+              <label class="text-xs font-black text-gray-500 uppercase tracking-widest">Associate Number</label>
+              <!-- Big centred numeric input -->
+              <div class="relative">
+                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0M9 14l2 2 4-4"/></svg>
+                </span>
+                <input
+                  name="assoc_code"
+                  id="assocInput"
+                  type="text"
+                  inputmode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="Enter Associate Number"
+                  maxlength="6"
+                  autofocus
+                  required
+                  class="assoc-input w-full pl-12 pr-4 py-4 text-2xl font-black text-center tracking-widest rounded-xl border-2 border-gray-300 focus:border-wm-blue outline-none transition"
+                  style="letter-spacing: .2em;"
+                />
+              </div>
+              <p class="text-xs text-gray-400 text-center">Not on the roster? Contact your MST lead.</p>
+            </div>
+
+            <button
+              type="submit"
+              id="submitBtn"
+              class="bg-wm-blue hover:bg-blue-700 active:bg-blue-800 text-white font-black py-4 rounded-xl transition shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300 text-lg flex items-center justify-center gap-2"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+              Access My Shift Report
+            </button>
+          </form>
+
+          <!-- Manager link -->
+          <p class="text-center text-xs text-gray-400">
+            MST Lead? &rarr; <a href="/lead/login" class="text-wm-blue hover:underline font-bold">Manager Dashboard</a>
+          </p>
+
+        </div><!-- /card body -->
+      </div><!-- /card -->
+
+    </div>
+  </main>
+
+  <!-- ── FOOTER ──────────────────────────────────────────────────────────── -->
+  <footer class="bg-wm-dark border-t border-blue-900 text-blue-400 text-center text-xs py-3">
+    Shift Passdown Generator &bull; IND3 &bull; Walmart &copy; 2026
+  </footer>
+
+  <script>
+    /* Shift picker highlight */
+    function highlightShiftPick(selectedId) {
+      document.querySelectorAll('#shiftPicker label').forEach(function(lbl) {
+        const radio = lbl.querySelector('input[type=radio]');
+        if (radio && parseInt(radio.value) === selectedId) {
+          lbl.classList.add('border-wm-blue', 'bg-blue-50');
+          lbl.classList.remove('border-gray-200');
+        } else {
+          lbl.classList.remove('border-wm-blue', 'bg-blue-50');
+          lbl.classList.add('border-gray-200');
+        }
+      });
+    }
+
+    /* Show loading state on submit */
+    document.getElementById('loginForm').addEventListener('submit', function() {
+      const btn = document.getElementById('submitBtn');
+      btn.classList.add('btn-submitting');
+      btn.innerHTML = '<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> Signing in…';
+    });
+
+    /* Auto-submit when 4+ digits entered (common assoc number length) */
+    document.getElementById('assocInput').addEventListener('input', function() {
+      this.value = this.value.replace(/\D/g, ''); // strip non-digits
+    });
+
+  </script>
+</body>
+</html>

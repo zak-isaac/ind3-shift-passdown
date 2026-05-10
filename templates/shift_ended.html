@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Shift Ended – Passdown</title>
+  <link rel="stylesheet" href="/static/tailwind.min.css">
+  <link rel="stylesheet" href="/static/dark.css" id="dark-css" disabled>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+
+<header class="bg-wm-blue shadow-lg">
+  <div class="max-w-3xl mx-auto px-6 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <a href="/" class="flex items-center gap-2 hover:opacity-80 transition shrink-0">
+        <img src="/static/wrench.svg" alt="Home" class="h-8 w-8" />
+        <span class="text-white font-black text-lg tracking-tight leading-none">WALMART</span>
+      </a>
+      <div class="h-7 w-px bg-blue-400 mx-1"></div>
+      <div>
+        <h1 class="text-white font-black text-base leading-tight">Shift Ended</h1>
+        <p class="text-blue-100 text-sm">{{ shift.shift_type }} &bull; {{ shift.date }} &bull; {{ shift.lead_name }}</p>
+      </div>
+    </div>
+    <span class="text-wm-spark text-sm font-black font-mono bg-white bg-opacity-10 px-3 py-1 rounded-full border border-wm-spark border-opacity-30">{{ dc_number }}</span>
+  </div>
+</header>
+
+<main class="flex-1 max-w-3xl mx-auto w-full px-4 py-10 flex flex-col gap-6">
+
+  <div class="bg-green-50 border border-green-300 text-green-800 rounded-2xl px-6 py-4 flex items-center gap-3">
+    <span class="text-2xl">&#9989;</span>
+    <div>
+      <p class="font-bold">Shift closed successfully.</p>
+      <p class="text-sm mt-0.5">The passdown report is saved below.</p>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+    <div class="bg-wm-dark px-4 py-3 flex items-center justify-between">
+      <span class="text-white font-bold text-sm">&#128203; Final Passdown Report</span>
+      <button onclick="copyReport(this)"
+        class="text-xs bg-wm-spark text-gray-900 font-bold px-3 py-1 rounded-lg hover:bg-yellow-400 transition">
+        &#128203; Copy
+      </button>
+    </div>
+    <pre id="report-text"
+      class="p-4 text-xs text-gray-800 leading-relaxed whitespace-pre-wrap font-mono max-h-96 overflow-y-auto">{{ content }}</pre>
+  </div>
+
+  <a href="/"
+    class="block text-center bg-wm-blue hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition text-sm shadow">
+    &#8592; Back to Home
+  </a>
+
+  <!-- CARRY-OVERS -->
+  {% if carry_overs %}
+  <div class="bg-orange-50 border-2 border-orange-400 rounded-2xl p-5">
+    <h2 class="text-orange-700 font-black text-base flex items-center gap-2 mb-3">
+      &#128198; Items Flagged for Carry-Over
+      <span class="bg-orange-400 text-white text-xs font-black px-2 py-0.5 rounded-full">{{ carry_overs | length }}</span>
+    </h2>
+    <p class="text-xs text-orange-600 mb-3">These will appear at the top of the next shift’s MST dashboard.</p>
+    <ul class="flex flex-col gap-2">
+      {% for e in carry_overs %}
+      <li class="bg-white rounded-xl border border-orange-200 px-4 py-3">
+        <p class="text-sm font-bold text-gray-800">{{ e.unit }}</p>
+        <p class="text-xs text-gray-600 mt-0.5">{{ e.issue }}</p>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <!-- MST NOTES -->
+  {% if shift_notes %}
+  <div class="bg-blue-50 border border-blue-200 rounded-2xl p-5">
+    <h2 class="text-wm-dark font-bold text-base flex items-center gap-2 mb-2">&#128221; MST Shift Notes</h2>
+    <p class="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{{ shift_notes }}</p>
+  </div>
+  {% endif %}
+
+  <!-- EMAIL STUB -->
+  <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+    <div class="bg-wm-dark px-5 py-3 flex items-center justify-between">
+      <span class="text-white font-bold text-sm">&#128231; Email Passdown</span>
+      <span class="text-blue-300 text-xs">Opens your default mail client</span>
+    </div>
+    <div class="p-5 flex flex-col gap-3">
+      <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">Recipient</label>
+      <input id="email-to" type="email" placeholder="manager@walmart.com"
+        class="rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:border-wm-blue outline-none" />
+      <a id="email-link" href="#" onclick="buildMailto(event)"
+        class="block text-center bg-wm-spark text-gray-900 font-bold py-2.5 rounded-xl
+               hover:bg-yellow-400 transition text-sm shadow">
+        &#128231; Open in Outlook / Mail
+      </a>
+      <p class="text-xs text-gray-400 italic text-center">
+        No email API configured — this opens your system mail client with the report pre-filled.
+        <br>To enable direct sending, set <code class="bg-gray-100 px-1 rounded">SMTP_HOST</code> in your environment.
+      </p>
+    </div>
+  </div>
+
+</main>
+
+<footer class="bg-wm-dark text-blue-300 text-center text-xs py-3">
+  Shift Passdown Generator &bull; Walmart &copy; 2026
+</footer>
+
+<script>
+function copyReport(btn) {
+  const text = document.getElementById('report-text').innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '\u2713 Copied!';
+    setTimeout(() => { btn.textContent = orig; }, 2000);
+  });
+}
+
+function buildMailto(e) {
+  const to = document.getElementById('email-to').value.trim();
+  if (!to) { e.preventDefault(); alert('Enter a recipient email address first.'); return; }
+  const report = document.getElementById('report-text').innerText;
+  const subject = encodeURIComponent('Shift Passdown – {{ shift.shift_type }} – {{ shift.date }}');
+  const body    = encodeURIComponent(report);
+  e.currentTarget.href = `mailto:${to}?subject=${subject}&body=${body}`;
+}
+
+function toggleDark() {
+  const on = document.body.classList.toggle('dark-mode');
+  document.getElementById('dark-css').disabled = !on;
+  localStorage.setItem('dark', on ? '1' : '');
+}
+if (localStorage.getItem('dark')) {
+  document.body.classList.add('dark-mode');
+  document.getElementById('dark-css').disabled = false;
+}
+</script>
+</body>
+</html>

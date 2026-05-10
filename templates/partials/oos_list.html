@@ -1,0 +1,21 @@
+{% if units %}
+  {% for u in units %}
+  <div class="flex items-center justify-between gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+    <span class="text-sm font-bold text-red-700">&#9940; {{ u }}</span>
+    <button
+      type="button"
+      hx-post="/oos/remove"
+      hx-vals='{"unit": "{{ u }}"}'
+      hx-target="#oos-list"
+      hx-swap="innerHTML"
+      title="Mark as returned to service"
+      class="text-xs text-red-400 hover:text-red-700 font-bold px-2 py-0.5 rounded hover:bg-red-100 transition shrink-0">
+      &#10005; RTS
+    </button>
+  </div>
+  {% endfor %}
+{% else %}
+  <p class="text-xs text-gray-400 italic px-1 py-2">
+    &#9989; No units currently out of service &mdash; add one above.
+  </p>
+{% endif %}

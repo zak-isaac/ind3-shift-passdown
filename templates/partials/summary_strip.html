@@ -1,0 +1,26 @@
+<!-- partials/summary_strip.html — pinned stats bar below MST nav -->
+<div class="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+
+  <span class="font-bold text-white">
+    📋 {{ total }} entr{{ 'y' if total == 1 else 'ies' }}
+  </span>
+
+  {% if downs %}
+  <span class="font-bold text-red-300">🔴 {{ downs }} down</span>
+  {% endif %}
+
+  {% if degs %}
+  <span class="font-bold text-yellow-300">🟡 {{ degs }} degraded</span>
+  {% endif %}
+
+  <span class="text-blue-200">👷 {{ techs }} tech{{ 's' if techs != 1 else '' }} active</span>
+
+  {% if done %}
+  <span class="text-green-300">✅ {{ done }} signed off</span>
+  {% endif %}
+
+  <!-- Shift running timer — JS updates this every 60s -->
+  <span class="text-blue-300 ml-auto font-mono text-xs" id="shift-timer"
+        data-started="{{ created }}">⏱ --:--</span>
+
+</div>

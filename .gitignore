@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Exports / PII
+*.csv
+*.xlsx
+*.xls
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+uvicorn.log
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,46 @@
+/* dark.css — applied when body has .dark-mode class */
+
+body.dark-mode { background-color: #111827 !important; color: #f3f4f6 !important; }
+
+body.dark-mode header { background-color: #001e50 !important; }
+body.dark-mode footer { background-color: #0a0f1e !important; }
+
+body.dark-mode .bg-white      { background-color: #1f2937 !important; }
+body.dark-mode .bg-gray-50    { background-color: #111827 !important; }
+body.dark-mode .bg-gray-100   { background-color: #1f2937 !important; }
+body.dark-mode .bg-blue-50    { background-color: #1e3a5f !important; }
+body.dark-mode .bg-green-50   { background-color: #052e16 !important; }
+body.dark-mode .bg-red-50     { background-color: #450a0a !important; }
+
+body.dark-mode .text-gray-800 { color: #f3f4f6 !important; }
+body.dark-mode .text-gray-700 { color: #e5e7eb !important; }
+body.dark-mode .text-gray-600 { color: #d1d5db !important; }
+body.dark-mode .text-gray-500 { color: #9ca3af !important; }
+body.dark-mode .text-gray-400 { color: #6b7280 !important; }
+body.dark-mode .text-gray-300 { color: #4b5563 !important; }
+body.dark-mode .text-wm-dark  { color: #93c5fd !important; }
+
+body.dark-mode .border-gray-100 { border-color: #374151 !important; }
+body.dark-mode .border-gray-200 { border-color: #374151 !important; }
+body.dark-mode .border-gray-300 { border-color: #4b5563 !important; }
+body.dark-mode .border-blue-200 { border-color: #1e40af !important; }
+body.dark-mode .border-green-300{ border-color: #166534 !important; }
+body.dark-mode .border-red-200  { border-color: #7f1d1d !important; }
+body.dark-mode .border-dashed   { border-color: #374151 !important; }
+
+body.dark-mode .divide-y > * + * { border-color: #374151 !important; }
+
+body.dark-mode input,
+body.dark-mode textarea,
+body.dark-mode select {
+  background-color: #374151 !important;
+  color: #f3f4f6 !important;
+  border-color: #4b5563 !important;
+}
+
+body.dark-mode details summary { color: #e5e7eb !important; }
+body.dark-mode .text-green-800  { color: #86efac !important; }
+body.dark-mode .text-red-500    { color: #fca5a5 !important; }
+body.dark-mode pre              { color: #e5e7eb !important; }
+
+body.dark-mode .hover\:bg-gray-50:hover { background-color: #1f2937 !important; }

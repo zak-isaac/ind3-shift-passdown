@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>IND3 Shift Passdown – Floor Reference Sheet</title>
+  <link rel="stylesheet" href="/static/tailwind.min.css">
+  <style>
+    :root { --wm-blue: #0053e2; --wm-dark: #001e50; --wm-spark: #ffc220; }
+
+    @media print {
+      .no-print { display: none !important; }
+      body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .force-color { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+
+    body { font-family: Arial, Helvetica, sans-serif; }
+
+    .url-box {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 1.5rem;
+      font-weight: 900;
+      letter-spacing: .05em;
+      background: #001e50;
+      color: #ffc220;
+      padding: .75rem 1.5rem;
+      border-radius: .75rem;
+      text-align: center;
+      word-break: break-all;
+    }
+
+    .step-num {
+      width: 2rem; height: 2rem;
+      border-radius: 50%;
+      background: #0053e2;
+      color: white;
+      font-weight: 900;
+      font-size: 1rem;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+
+    /* Physical roster table */
+    .roster-table { width: 100%; border-collapse: collapse; }
+    .roster-table th {
+      background: #001e50;
+      color: white;
+      padding: .4rem .6rem;
+      font-size: .7rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      text-align: left;
+    }
+    .roster-table td {
+      border: 1px solid #d1d5db;
+      padding: .5rem .6rem;
+      height: 1.8rem;
+      font-size: .75rem;
+    }
+    .roster-table tr:nth-child(even) td { background: #f9fafb; }
+  </style>
+</head>
+<body class="bg-gray-100">
+
+  <!-- Print / back bar — hidden when printing -->
+  <div class="no-print fixed top-0 left-0 right-0 z-50 bg-wm-blue text-white px-6 py-3 flex items-center justify-between shadow-lg">
+    <span class="font-black text-lg">WALMART &mdash; Floor Reference Sheet</span>
+    <div class="flex gap-3 items-center">
+      <button onclick="window.print()"
+        class="bg-wm-spark text-gray-900 font-black px-4 py-2 rounded-lg hover:bg-yellow-400 transition text-sm">
+        &#128438; Print / Laminate
+      </button>
+      <a href="/lead" class="text-blue-200 hover:text-white text-sm font-medium">&#8592; Dashboard</a>
+    </div>
+  </div>
+
+  <!-- A4/Letter page -->
+  <div class="no-print pt-16"></div>
+  <div class="max-w-2xl mx-auto px-8 py-8 bg-white" style="min-height:100vh;">
+
+    <!-- ── PAGE HEADER ──────────────────────────────────────────── -->
+    <div class="flex items-center justify-between pb-4 mb-6 force-color" style="border-bottom: 4px solid #0053e2;">
+      <div class="flex items-center gap-3">
+        <svg width="32" height="32" viewBox="0 0 40 40" fill="none">
+          <path d="M20 2 L22.4 14.8 L32.7 7.3 L25.2 17.6 L38 20 L25.2 22.4 L32.7 32.7 L22.4 25.2 L20 38 L17.6 25.2 L7.3 32.7 L14.8 22.4 L2 20 L14.8 17.6 L7.3 7.3 L17.6 14.8 Z" fill="#ffc220"/>
+        </svg>
+        <div>
+          <p class="font-black text-xl tracking-tight" style="color:#001e50;">Walmart — IND3 Maintenance</p>
+          <p class="text-gray-500 text-xs mt-0.5">Shift Passdown System &bull; Floor Reference</p>
+        </div>
+      </div>
+      <div class="text-right">
+        <p class="font-black text-base" style="color:#0053e2;">{{ dc_number }}</p>
+        {% if shift %}
+        <p class="text-xs text-gray-400 mt-0.5">Active: {{ shift.shift_type }} &bull; {{ shift.lead_name }}</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ── TECH SECTION ─────────────────────────────────────────── -->
+    <div class="mb-8 rounded-2xl border-2 force-color p-5" style="border-color:#0053e2;">
+
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 rounded-full flex items-center justify-center shrink-0 force-color" style="background:#0053e2;">
+          <span style="color:white; font-size:1.2rem;">🔧</span>
+        </div>
+        <div>
+          <p class="font-black text-lg" style="color:#001e50;">Technicians — Log Your Happenings</p>
+          <p class="text-gray-500 text-sm">Open the URL below on any shared workstation or tablet</p>
+        </div>
+      </div>
+
+      <!-- Big URL -->
+      <div class="url-box force-color mb-5">
+        http://{{ host }}/tech/login
+      </div>
+
+      <!-- Steps -->
+      <div class="flex flex-col gap-3">
+        <div class="flex items-start gap-3">
+          <div class="step-num force-color">1</div>
+          <p class="text-sm text-gray-700 pt-1">Type the URL above into any browser. Hit <strong>Enter</strong>.</p>
+        </div>
+        <div class="flex items-start gap-3">
+          <div class="step-num force-color">2</div>
+          <p class="text-sm text-gray-700 pt-1">Enter your <strong>Associate Number</strong> (the number on your badge).</p>
+        </div>
+        <div class="flex items-start gap-3">
+          <div class="step-num force-color">3</div>
+          <p class="text-sm text-gray-700 pt-1">Fill in the <strong>Asset ID</strong>, write a <strong>Summary</strong> of what happened, pick a <strong>Status</strong> (Down / Degraded / Monitor), then hit <strong>Save</strong>.</p>
+        </div>
+        <div class="flex items-start gap-3">
+          <div class="step-num force-color">4</div>
+          <p class="text-sm text-gray-700 pt-1">Log as many happenings as needed. You can log from <strong>any computer</strong> on the network.</p>
+        </div>
+      </div>
+
+      <!-- Priority legend -->
+      <div class="mt-4 flex gap-3 flex-wrap">
+        <div class="flex items-center gap-1.5 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5">
+          <span>🔴</span><span class="text-xs font-bold text-red-700">Down — Machine completely stopped</span>
+        </div>
+        <div class="flex items-center gap-1.5 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-1.5">
+          <span>🟡</span><span class="text-xs font-bold text-yellow-800">Degraded — Running but not right</span>
+        </div>
+        <div class="flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5">
+          <span>🟢</span><span class="text-xs font-bold text-green-700">Monitor — Observed, FYI only</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── MST LEAD SECTION ─────────────────────────────────────── -->
+    <div class="mb-8 rounded-2xl border-2 force-color p-5" style="border-color:#ffc220; background:#fffbeb;">
+
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 rounded-full flex items-center justify-center shrink-0 force-color" style="background:#ffc220;">
+          <span style="color:#001e50; font-size:1.2rem; font-weight:900;">★</span>
+        </div>
+        <div>
+          <p class="font-black text-lg" style="color:#001e50;">MST Lead — Dashboard Access</p>
+          <p class="text-gray-500 text-sm">Start shifts, monitor entries, generate the passdown report</p>
+        </div>
+      </div>
+
+      <div class="url-box force-color mb-4" style="background:#001e50; color:#ffc220;">
+        http://{{ host }}/lead/login
+      </div>
+
+      <p class="text-sm text-gray-700">Enter the <strong>Manager PIN</strong> to access the live dashboard. From there you can start/end shifts, see all tech entries in real-time, and generate the passdown report at the end of your shift.</p>
+
+    </div>
+
+    <!-- ── PHYSICAL BACKUP ROSTER ────────────────────────────────── -->
+    <div class="mb-6">
+      <div class="flex items-center justify-between mb-3">
+        <p class="font-black text-base" style="color:#001e50;">&#128221; Physical Backup Roster</p>
+        <p class="text-xs text-gray-400 italic">Use if system is unavailable — enter after system is restored</p>
+      </div>
+
+      <table class="roster-table force-color">
+        <thead>
+          <tr>
+            <th style="width:5%;">#</th>
+            <th style="width:28%;">Tech Name</th>
+            <th style="width:15%;">Assoc #</th>
+            <th style="width:12%;">Time In</th>
+            <th style="width:20%;">Asset ID</th>
+            <th style="width:20%;">Issue (brief)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for i in range(15) %}
+          <tr>
+            <td class="text-gray-400 text-center">{{ i + 1 }}</td>
+            <td></td><td></td><td></td><td></td><td></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── FOOTER ─────────────────────────────────────────────────── -->
+    <div class="text-center text-xs text-gray-400 border-t border-gray-200 pt-4">
+      <p>IND3 Maintenance &bull; Walmart &bull; {{ dc_number }} &bull; Shift Passdown Generator &copy; 2026</p>
+      <p class="mt-1">Laminate and post near the shared workstation in the break room or toolroom.</p>
+    </div>
+
+  </div>
+</body>
+</html>

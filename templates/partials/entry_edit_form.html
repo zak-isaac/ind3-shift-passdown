@@ -1,0 +1,93 @@
+<!-- partials/entry_edit_form.html
+     Swapped in as outerHTML of the entry <li> when Edit is clicked.
+     Save → full my_entries refresh. Cancel → same. -->
+
+<li id="entry-{{ entry.id }}"
+    class="bg-yellow-50 border-2 border-yellow-400 rounded-xl px-4 py-4 flex flex-col gap-3">
+
+  <p class="text-xs font-black text-yellow-700 uppercase tracking-widest">&#9998; Editing entry</p>
+
+  <form
+    hx-post="/tech/entry/{{ entry.id }}/edit?shift_id={{ entry.shift_id }}"
+    hx-target="#my-entries"
+    hx-swap="innerHTML"
+    class="flex flex-col gap-3"
+  >
+    <input type="hidden" name="shift_id"   value="{{ entry.shift_id }}"/>
+    <input type="hidden" name="tech_name"  value="{{ tech_name }}"/>
+
+    <!-- Asset ID -->
+    <div class="flex flex-col gap-1">
+      <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">Asset ID</label>
+      <input
+        name="unit"
+        type="text"
+        list="asset-list"
+        value="{{ entry.unit }}"
+        required
+        autocomplete="off"
+        class="rounded-xl border-2 border-yellow-300 focus:border-wm-blue px-4 py-2 text-sm font-bold outline-none transition"
+      />
+    </div>
+
+    <!-- Summary -->
+    <div class="flex flex-col gap-1">
+      <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">Summary</label>
+      <textarea
+        name="summary"
+        rows="3"
+        required
+        class="rounded-xl border-2 border-yellow-300 focus:border-wm-blue px-4 py-2 text-sm outline-none transition resize-none"
+      >{{ entry.issue }}</textarea>
+    </div>
+
+    <!-- Priority -->
+    <div class="flex flex-col gap-1">
+      <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">Status</label>
+      <input type="hidden" name="priority" id="edit-priority-{{ entry.id }}" value="{{ entry.priority or 'monitor' }}" />
+      <div class="prio-group grid grid-cols-3 gap-2">
+        <button type="button" class="prio-btn" data-priority="down" data-border="#ef4444" data-bg="#fef2f2"
+          onclick="setPriority(this)">
+          <span class="text-xl">🔴</span>
+          <span class="prio-label font-black text-sm">Down</span>
+        </button>
+        <button type="button" class="prio-btn" data-priority="degraded" data-border="#eab308" data-bg="#fefce8"
+          onclick="setPriority(this)">
+          <span class="text-xl">🟡</span>
+          <span class="prio-label font-black text-sm">Degraded</span>
+        </button>
+        <button type="button" class="prio-btn" data-priority="monitor" data-border="#22c55e" data-bg="#f0fdf4"
+          onclick="setPriority(this)">
+          <span class="text-xl">🟢</span>
+          <span class="prio-label font-black text-sm">Monitor</span>
+        </button>
+      </div>
+      <script>
+        (function(){
+          var current = "{{ entry.priority or 'monitor' }}";
+          var btn = document.querySelector('#entry-{{ entry.id }} [data-priority="' + current + '"]');
+          if (btn) setPriority(btn);
+        })();
+      </script>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex gap-2 pt-1">
+      <button type="submit"
+        class="flex-1 bg-wm-blue hover:bg-blue-700 text-white font-black py-2.5 rounded-xl
+               transition text-sm focus:outline-none focus:ring-4 focus:ring-blue-300">
+        &#10003; Save
+      </button>
+      <button type="button"
+        hx-get="/tech/my-entries?shift_id={{ entry.shift_id }}&tech_name={{ tech_name | urlencode }}"
+        hx-target="#my-entries"
+        hx-swap="innerHTML"
+        class="flex-1 bg-white border-2 border-gray-300 hover:border-gray-400 text-gray-600
+               font-bold py-2.5 rounded-xl transition text-sm">
+        &#10005; Cancel
+      </button>
+    </div>
+
+  </form>
+
+</li>
