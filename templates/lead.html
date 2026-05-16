@@ -169,6 +169,7 @@
         hx-swap="innerHTML"
         hx-encoding="multipart/form-data"
         hx-indicator="#lead-cmms-spinner"
+        hx-push-url="false"
         class="flex flex-col gap-3"
       >
         <input type="hidden" name="shift_id" value="{{ shift.id }}" />
@@ -580,8 +581,11 @@ function requestNotifPermission() {
         htmx.trigger(document.getElementById('live-feed'), 'refresh');
         htmx.trigger(document.getElementById('asset-stats'), 'refresh');
         htmx.trigger(document.getElementById('summary-strip'), 'refresh');
+        const parts = [];
+        if (msg.count)  parts.push(`${msg.count} WO${msg.count !== 1 ? 's' : ''} imported`);
+        if (msg.pm_count) parts.push(`${msg.pm_count} PM${msg.pm_count !== 1 ? 's' : ''} completed`);
         document.getElementById('new-entry-msg').textContent =
-          `\uD83D\uDCC2 CMMS import: ${msg.count} work order${msg.count !== 1 ? 's' : ''} added`;
+          `\uD83D\uDCC2 CMMS: ${parts.join(' • ') || 'file processed'}`;
         const toast = document.getElementById('new-entry-toast');
         toast.classList.remove('hidden');
         setTimeout(() => toast.classList.add('hidden'), 8000);
