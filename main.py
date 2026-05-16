@@ -701,6 +701,8 @@ async def _process_cmms_upload(
     request: Request,
     shift_id: int,
     file: UploadFile,
+    uploader_name: str = "CMMS Import",
+    include_entries_oob: bool = False,
 ) -> HTMLResponse:
     """Shared logic for both tech and lead CMMS CSV uploads."""
     import json as _json
@@ -714,7 +716,7 @@ async def _process_cmms_upload(
 
     if not file.filename or not file.filename.lower().endswith((".csv", ".xlsx", ".xls")):
         return HTMLResponse(
-            '<p class="text-red-500 text-sm font-semibold p-3">❌ Please upload a CSV file exported from Cetaris.</p>',
+            '<p class="text-red-500 text-sm font-semibold p-3">❌ Please upload a CSV or Excel file exported from Cetaris.</p>',
             status_code=400,
         )
 
@@ -725,15 +727,14 @@ async def _process_cmms_upload(
     if not work_orders:
         return templates.TemplateResponse(
             request, "partials/cmms_import_result.html",
-            {"imported": [], "skipped": skipped, "error": "No maintenance work orders found in this file."},
+            {"imported": [], "skipped": skipped, "error": "No maintenance work orders found in this file.",
+             "include_entries_oob": False},
         )
 
     imported = []
     for wo in work_orders:
-        # Merge with any existing CMMS remarks for this WO in this shift
         existing_remarks = db.get_cmms_raw_remarks(shift_id, wo.wo_number)
-        merged_remarks   = list(dict.fromkeys(existing_remarks + wo.remarks))  # dedup, order-preserving
-
+        merged_remarks   = list(dict.fromkeys(existing_remarks + wo.remarks))
         summary = await summarize_remarks(merged_remarks)
         db.upsert_cmms_entry(
             shift_id=shift_id,
@@ -741,15 +742,25 @@ async def _process_cmms_upload(
             asset_id=wo.asset_id,
             summary=summary,
             raw_remarks_json=_json.dumps(merged_remarks),
+            tech_name=uploader_name,
         )
         imported.append({"wo": wo.wo_number, "asset": wo.asset_id, "summary": summary})
 
-    # Notify MST dashboards a refresh is warranted
     await _ws.broadcast({"type": "cmms_import", "count": len(imported)})
+
+    # For tech uploads: also send an OOB swap to refresh #my-entries
+    entries = db.get_entries(shift_id) if include_entries_oob else []
 
     return templates.TemplateResponse(
         request, "partials/cmms_import_result.html",
-        {"imported": imported, "skipped": skipped, "error": ""},
+        {
+            "imported": imported,
+            "skipped": skipped,
+            "error": "",
+            "include_entries_oob": include_entries_oob,
+            "entries": entries,
+            "tech_name": uploader_name,
+        },
     )
 
 
@@ -761,12 +772,18 @@ async def tech_cmms_upload(
 ):
     """Tech dashboard CMMS CSV upload endpoint."""
     assoc_code = request.cookies.get(_TECH_ASSOC_COOKIE, "")
-    if not assoc_code or not _ROSTER.get(assoc_code):
+    assoc = _ROSTER.get(assoc_code) if assoc_code else None
+    if not assoc:
         return HTMLResponse(
             '<p class="text-red-500 text-sm font-semibold p-3">❌ Session expired. Please sign in again.</p>',
             status_code=401,
         )
-    return await _process_cmms_upload(request, shift_id, file)
+    uploader_name = assoc.get("display_name") or assoc.get("full_name", "CMMS Import")
+    return await _process_cmms_upload(
+        request, shift_id, file,
+        uploader_name=uploader_name,
+        include_entries_oob=True,
+    )
 
 
 @app.post("/lead/cmms-upload", response_class=HTMLResponse)
@@ -778,7 +795,13 @@ async def lead_cmms_upload(
     """Lead/MST dashboard CMMS CSV upload endpoint."""
     if not _is_lead_authed(request):
         return _lead_redirect("/lead")
-    return await _process_cmms_upload(request, shift_id, file)
+    shift = db.get_shift(shift_id)
+    uploader_name = f"{shift['lead_name']} (MST)" if shift else "MST Import"
+    return await _process_cmms_upload(
+        request, shift_id, file,
+        uploader_name=uploader_name,
+        include_entries_oob=False,
+    )
 
 
 @app.get("/tech/entry/{entry_id}/edit-form", response_class=HTMLResponse)

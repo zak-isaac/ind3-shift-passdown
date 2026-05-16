@@ -28,6 +28,9 @@
         <div class="flex items-center gap-2 flex-wrap">
           <p class="text-sm font-bold text-wm-dark">{{ e.unit }}</p>
           <span class="text-xs font-bold px-2 py-0.5 rounded-full {{ pbg }} {{ ptxt }}">{{ plabel }}</span>
+          {% if e.source == 'cmms' %}
+          <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-wm-blue">📋 CMMS</span>
+          {% endif %}
         </div>
         <p class="text-xs text-gray-600 mt-0.5 leading-relaxed">{{ e.issue }}</p>
         <p class="text-xs text-blue-400 font-semibold mt-1">

@@ -391,6 +391,7 @@ def upsert_cmms_entry(
     asset_id: str,
     summary: str,
     raw_remarks_json: str,
+    tech_name: str = "CMMS Import",
 ) -> int:
     """Insert or replace a CMMS-imported entry for this WO+shift.
 
@@ -413,7 +414,7 @@ def upsert_cmms_entry(
             "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             (
                 shift_id,
-                "CMMS Import",
+                tech_name,
                 asset_id,
                 issue_text,
                 "",          # action — MST fills in
