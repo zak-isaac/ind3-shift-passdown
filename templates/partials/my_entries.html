@@ -1,7 +1,9 @@
-<!-- partials/my_entries.html — all shift entries; edit/delete only for own -->
-{% if entries %}
+<!-- partials/my_entries.html — shows only the logged-in tech's entries -->
+{% set my = entries | selectattr('tech_name', 'equalto', tech_name) | list %}
+
+{% if my %}
   <ul class="flex flex-col gap-3">
-    {% for e in entries %}
+    {% for e in my %}
 
     {% if e.priority == 'down' %}
       {% set pbg = 'bg-red-100' %}{% set ptxt = 'text-red-700' %}{% set plabel = '🔴 Down' %}
@@ -11,12 +13,9 @@
       {% set pbg = 'bg-green-50' %}{% set ptxt = 'text-green-700' %}{% set plabel = '🟢 Monitor' %}
     {% endif %}
 
-    {% set own = tech_name and e.tech_name == tech_name %}
-
     <li id="entry-{{ e.id }}"
         class="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-start justify-between gap-3">
       <div class="flex-1 min-w-0">
-        <p class="text-xs font-black text-wm-blue mb-0.5">{{ e.tech_name }}</p>
         <div class="flex items-center gap-2 flex-wrap">
           <p class="text-sm font-bold text-wm-dark">{{ e.unit }}</p>
           <span class="text-xs font-bold px-2 py-0.5 rounded-full {{ pbg }} {{ ptxt }}">{{ plabel }}</span>
@@ -29,7 +28,6 @@
           &#128336; <span class="rel-time" data-iso="{{ e.created_at }}">{{ e.created_at | fmt_time }}</span>
         </p>
       </div>
-      {% if own %}
       <div class="flex flex-col gap-1.5 shrink-0">
         <button
           hx-get="/tech/entry/{{ e.id }}/edit-form?shift_id={{ e.shift_id }}&tech_name={{ tech_name | urlencode }}"
@@ -47,14 +45,13 @@
           aria-label="Remove entry">&#10005; Del
         </button>
       </div>
-      {% endif %}
     </li>
 
     {% endfor %}
   </ul>
   <p class="text-xs text-gray-400 mt-2 text-center">
-    {{ entries | length }} entr{{ 'y' if entries | length == 1 else 'ies' }} this shift &bull; Lead dashboard updates in real-time.
+    {{ my | length }} happening{{ 's' if my | length != 1 else '' }} logged this shift.
   </p>
 {% else %}
-  <p class="text-gray-400 text-sm italic text-center py-4">No entries yet this shift.</p>
+  <p class="text-gray-400 text-sm italic text-center py-4">No happenings logged yet this shift.</p>
 {% endif %}

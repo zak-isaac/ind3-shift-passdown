@@ -9,6 +9,12 @@
   <style>
     .htmx-indicator{display:none}.htmx-request .htmx-indicator{display:inline-flex}
 
+    /* Visible scrollbar for the entries panel */
+    .entries-scroll::-webkit-scrollbar { width: 6px; }
+    .entries-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+    .entries-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    .entries-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
     .prio-btn {
       display: flex; flex-direction: column; align-items: center; gap: 4px;
       padding: 10px 6px; border-radius: 12px; border: 2px solid #e5e7eb;
@@ -211,12 +217,12 @@
   </div><!-- /left col -->
 
   <!-- RIGHT: Entries + Done (scrolls independently) -->
-  <div class="flex-1 min-h-0 flex flex-col gap-3 overflow-y-auto pr-1">
+  <div class="entries-scroll flex-1 min-h-0 flex flex-col gap-3 overflow-y-auto pr-2">
 
   <!-- MY ENTRIES -->
-  <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex-1">
+  <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
     <h2 class="text-wm-dark font-bold text-sm mb-3 flex items-center gap-2">
-      <span class="text-wm-spark">&#9998;</span> Shift Entries
+      <span class="text-wm-spark">&#9998;</span> My Shift Happenings
       {% if pm_count %}
       <span class="ml-auto bg-green-100 text-green-800 text-xs font-black px-2.5 py-0.5 rounded-full">
         &#128295; {{ pm_count }} PM{{ 's' if pm_count != 1 else '' }} completed
