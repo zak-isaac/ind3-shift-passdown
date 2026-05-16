@@ -1040,12 +1040,26 @@ async def user_guide(request: Request):
 
 @app.get("/guide/download")
 async def download_guide(request: Request):
-    """Serve the guide as a downloadable HTML file."""
+    """Serve the guide as a self-contained downloadable HTML file."""
     from fastapi.responses import Response
-    html = templates.get_template("guide.html").render({})
+    html: str = templates.get_template("guide.html").render({})
+
+    # Remove server-only dependencies that break in a local file
+    html = html.replace(
+        '<link rel="stylesheet" href="/static/tailwind.min.css">',
+        "",  # hero is 100% inline; content uses custom classes in <style>
+    )
+    html = html.replace('<script src="/static/htmx.min.js"></script>', "")
+
+    # Patch internal nav links so they open the live site in a new tab
+    # instead of going nowhere when the file is opened locally
+    html = html.replace('href="/lead"', 'href="http://localhost:8765/lead" target="_blank"')
+    html = html.replace('href="/analytics"', 'href="http://localhost:8765/analytics" target="_blank"')
+    html = html.replace('href="/guide/download"', 'href="#" onclick="alert(\"Open from the system to download again.\"); return false;"')
+
     return Response(
         content=html,
-        media_type="text/html",
+        media_type="text/html; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="IND3-Reliability-Guide.html"'},
     )
 
