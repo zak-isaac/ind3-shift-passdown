@@ -76,6 +76,8 @@ def init_db() -> None:
             c.execute("ALTER TABLE entries ADD COLUMN wo_number TEXT NOT NULL DEFAULT ''")
         if "raw_remarks" not in existing_entry_cols:
             c.execute("ALTER TABLE entries ADD COLUMN raw_remarks TEXT NOT NULL DEFAULT '[]'")
+        if "excluded" not in existing_entry_cols:
+            c.execute("ALTER TABLE entries ADD COLUMN excluded INTEGER NOT NULL DEFAULT 0")
 
         existing_shift_cols = {row[1] for row in c.execute("PRAGMA table_info(shifts)")}
         if "notes" not in existing_shift_cols:
@@ -387,13 +389,20 @@ def add_entry(shift_id: int, tech_name: str,
 # CMMS Import (Cetaris auto-import)
 # ---------------------------------------------------------------------------
 
-def get_cmms_entry(shift_id: int, wo_number: str) -> Optional[dict]:
-    """Return the existing CMMS import entry for this WO in this shift, or None."""
+def get_cmms_entry(shift_id: int, wo_number: str, tech_name: str = "") -> Optional[dict]:
+    """Return an existing CMMS entry for this WO+shift, optionally filtered by tech."""
     with _conn() as c:
-        row = c.execute(
-            "SELECT * FROM entries WHERE shift_id=? AND wo_number=? AND source='cmms' LIMIT 1",
-            (shift_id, wo_number),
-        ).fetchone()
+        if tech_name:
+            row = c.execute(
+                "SELECT * FROM entries "
+                "WHERE shift_id=? AND wo_number=? AND tech_name=? AND source='cmms' LIMIT 1",
+                (shift_id, wo_number, tech_name),
+            ).fetchone()
+        else:
+            row = c.execute(
+                "SELECT * FROM entries WHERE shift_id=? AND wo_number=? AND source='cmms' LIMIT 1",
+                (shift_id, wo_number),
+            ).fetchone()
     return dict(row) if row else None
 
 
@@ -405,52 +414,59 @@ def upsert_cmms_entry(
     raw_remarks_json: str,
     tech_name: str = "CMMS Import",
 ) -> int:
-    """Insert or replace a CMMS-imported entry for this WO+shift.
+    """Insert or update a CMMS entry keyed on (shift_id, wo_number, tech_name).
 
-    If an entry already exists for this WO it is deleted first so we always
-    have exactly one canonical entry per WO per shift.
-    Returns the new entry id.
+    Different techs working the same WO each get their own row.
+    Re-uploading the same file updates that tech's row in place.
+    Returns the entry id.
     """
-    import json
+    issue_text = f"WO #{wo_number} \u2014 {summary}"
     with _conn() as c:
-        # Remove stale entry so re-uploads cleanly replace
-        c.execute(
-            "DELETE FROM entries WHERE shift_id=? AND wo_number=? AND source='cmms'",
-            (shift_id, wo_number),
-        )
-        issue_text = f"WO #{wo_number} — {summary}"
+        existing = c.execute(
+            "SELECT id FROM entries "
+            "WHERE shift_id=? AND wo_number=? AND tech_name=? AND source='cmms'",
+            (shift_id, wo_number, tech_name),
+        ).fetchone()
+        if existing:
+            c.execute(
+                "UPDATE entries SET unit=?, issue=?, raw_remarks=? WHERE id=?",
+                (asset_id, issue_text, raw_remarks_json, existing[0]),
+            )
+            return existing[0]
         cur = c.execute(
             "INSERT INTO entries "
             "(shift_id, tech_name, unit, issue, action, result, priority, "
             " created_at, source, wo_number, raw_remarks) "
             "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             (
-                shift_id,
-                tech_name,
-                asset_id,
-                issue_text,
-                "",          # action — MST fills in
-                "",          # result — MST fills in
-                "monitor",
-                _now(),
-                "cmms",
-                wo_number,
-                raw_remarks_json,
+                shift_id, tech_name, asset_id, issue_text,
+                "", "", "monitor", _now(), "cmms", wo_number, raw_remarks_json,
             ),
         )
         return cur.lastrowid
 
 
-def get_cmms_raw_remarks(shift_id: int, wo_number: str) -> list[str]:
-    """Return the stored raw remarks list for an existing CMMS entry."""
+def get_cmms_raw_remarks(shift_id: int, wo_number: str, tech_name: str = "") -> list[str]:
+    """Return stored raw remarks for a CMMS entry, scoped to a specific tech."""
     import json
-    row = get_cmms_entry(shift_id, wo_number)
+    row = get_cmms_entry(shift_id, wo_number, tech_name)
     if not row:
         return []
     try:
         return json.loads(row.get("raw_remarks", "[]"))
     except (ValueError, TypeError):
         return []
+
+
+def set_entry_excluded(entry_id: int, excluded: bool) -> None:
+    """MST-only: mark an entry as excluded (hidden) from the generated report."""
+    with _conn() as c:
+        c.execute("UPDATE entries SET excluded=? WHERE id=?", (1 if excluded else 0, entry_id))
+
+
+
+    with _conn() as c:
+        c.execute("DELETE FROM entries WHERE id=?", (entry_id,))
 
 
 # ---------------------------------------------------------------------------

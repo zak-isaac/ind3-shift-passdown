@@ -14,40 +14,21 @@
     {% endif %}
 
     <li id="entry-{{ e.id }}"
-        class="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-start justify-between gap-3">
-      <div class="flex-1 min-w-0">
-        <!-- Status badges -->
-        <div class="flex items-center gap-2 flex-wrap mb-1">
-          <span class="text-xs font-bold px-2 py-0.5 rounded-full {{ pbg }} {{ ptxt }}">{{ plabel }}</span>
-          {% if e.source == 'cmms' %}
-          <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-wm-blue">&#128203; CMMS</span>
-          {% endif %}
-        </div>
-        <!-- Entry text: UNIT: description (WO #number). -->
-        <p class="text-sm font-bold text-wm-dark leading-snug">
-          {{ e.unit }}: {{ e.issue | strip_wo_prefix }}{% if e.wo_number %} (WO #{{ e.wo_number }}){% endif %}.
-        </p>
-        <p class="text-xs text-blue-400 font-semibold mt-1">
-          &#128336; <span class="rel-time" data-iso="{{ e.created_at }}">{{ e.created_at | fmt_time }}</span>
-        </p>
+        class="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+      <!-- Status badges -->
+      <div class="flex items-center gap-2 flex-wrap mb-1">
+        <span class="text-xs font-bold px-2 py-0.5 rounded-full {{ pbg }} {{ ptxt }}">{{ plabel }}</span>
+        {% if e.source == 'cmms' %}
+        <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-wm-blue">&#128203; CMMS</span>
+        {% endif %}
       </div>
-      <div class="flex flex-col gap-1.5 shrink-0">
-        <button
-          hx-get="/tech/entry/{{ e.id }}/edit-form?shift_id={{ e.shift_id }}&tech_name={{ tech_name | urlencode }}"
-          hx-target="#entry-{{ e.id }}"
-          hx-swap="outerHTML"
-          class="text-blue-400 hover:text-wm-blue text-xs font-semibold focus:outline-none"
-          aria-label="Edit entry">&#9998; Edit
-        </button>
-        <button
-          hx-delete="/tech/entry/{{ e.id }}?shift_id={{ e.shift_id }}&tech_name={{ tech_name | urlencode }}"
-          hx-target="#my-entries"
-          hx-swap="innerHTML"
-          hx-confirm="Remove this entry?"
-          class="text-red-400 hover:text-red-600 text-xs font-semibold focus:outline-none"
-          aria-label="Remove entry">&#10005; Del
-        </button>
-      </div>
+      <!-- Entry text: UNIT: description (WO #number). -->
+      <p class="text-sm font-bold text-wm-dark leading-snug">
+        {{ e.unit }}: {{ e.issue | strip_wo_prefix }}{% if e.wo_number %} (WO #{{ e.wo_number }}){% endif %}.
+      </p>
+      <p class="text-xs text-blue-400 font-semibold mt-1">
+        &#128336; <span class="rel-time" data-iso="{{ e.created_at }}">{{ e.created_at | fmt_time }}</span>
+      </p>
     </li>
 
     {% endfor %}

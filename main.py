@@ -748,7 +748,7 @@ async def _process_cmms_upload(
 
     imported = []
     for wo in work_orders:
-        existing_remarks = db.get_cmms_raw_remarks(shift_id, wo.wo_number)
+        existing_remarks = db.get_cmms_raw_remarks(shift_id, wo.wo_number, uploader_name)
         merged_remarks   = list(dict.fromkeys(existing_remarks + wo.remarks))
         summary = await summarize_remarks(merged_remarks)
         db.upsert_cmms_entry(
@@ -1111,12 +1111,50 @@ async def lead_feed(request: Request):
 async def toggle_carry_over(
     request: Request,
     entry_id: int,
-    state: int = Form(1),  # 1 = flag, 0 = unflag
+    state: int = Form(1),
 ):
     if not _is_lead_authed(request):
         raise HTTPException(status_code=403)
     db.set_carry_over(entry_id, bool(state))
     return HTMLResponse("")
+
+
+# ── MST entry controls: exclude from report + hard delete ────────────────────────────
+
+@app.post("/lead/entry/{entry_id}/exclude", response_class=HTMLResponse)
+async def lead_exclude_entry(
+    request: Request,
+    entry_id: int,
+    excluded: int = Form(1),
+):
+    """Toggle exclusion of an entry from the generated report."""
+    if not _is_lead_authed(request):
+        raise HTTPException(status_code=403)
+    db.set_entry_excluded(entry_id, bool(excluded))
+    # Re-render just this entry row so the button + styling update in place
+    shift = db.get_active_shift()
+    if not shift:
+        return HTMLResponse("")
+    entries = db.get_entries(shift["id"])
+    entry = next((e for e in entries if e["id"] == entry_id), None)
+    if not entry:
+        return HTMLResponse("")  # deleted or wrong shift
+    return templates.TemplateResponse(
+        request, "partials/live_feed_row.html", {"e": entry}
+    )
+
+
+@app.delete("/lead/entry/{entry_id}", response_class=HTMLResponse)
+async def lead_delete_entry(
+    request: Request,
+    entry_id: int,
+):
+    """Hard-delete an entry from the shift (MST only)."""
+    if not _is_lead_authed(request):
+        raise HTTPException(status_code=403)
+    db.delete_entry(entry_id)
+    return HTMLResponse("")  # target row gets removed by HTMX hx-swap outerHTML
+
 
 
 # ── Shift notes ───────────────────────────────────────────────────────────────────────
@@ -1523,11 +1561,12 @@ async def lead_generate(
     happenings: list[RewrittenHappening] = [
         RewrittenHappening(
             title=e["unit"],
-            paragraph=e["issue"].strip(),
+            paragraph=_WO_PREFIX_RE.sub('', e["issue"]).strip()
+                      + (f" (WO #{e['wo_number']})" if e.get("wo_number") else ""),
             tech_name=e.get("tech_name", ""),
         )
         for e in db_entries
-        if e["unit"].strip() or e["issue"].strip()
+        if (e["unit"].strip() or e["issue"].strip()) and not e.get("excluded")
     ]
 
     # Append any MST-authored extra happenings from the form
