@@ -79,10 +79,10 @@
 </div>
 {% endif %}
 
-<main class="flex-1 overflow-y-auto flex flex-col lg:flex-row gap-3 px-4 py-3 max-w-7xl mx-auto w-full">
+<main class="flex-1 min-h-0 flex flex-row gap-3 px-4 py-3 max-w-7xl mx-auto w-full">
 
-  <!-- LEFT: Entry Form (fixed width, no scroll) -->
-  <div class="w-full lg:w-80 shrink-0 flex flex-col gap-3">
+  <!-- LEFT: CMMS import (fixed narrow width) -->
+  <div class="w-72 shrink-0 flex flex-col gap-3">
   <!-- LOG SHIFT HAPPENING FORM — hidden, re-enable by removing 'hidden' -->
   <div class="hidden bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex flex-col flex-1">
     <h2 class="text-wm-dark font-bold text-sm mb-3 flex items-center gap-2">
@@ -210,8 +210,8 @@
 
   </div><!-- /left col -->
 
-  <!-- RIGHT: Entries + Done -->
-  <div class="flex-1 flex flex-col gap-3">
+  <!-- RIGHT: Entries + Done (scrolls independently) -->
+  <div class="flex-1 min-h-0 flex flex-col gap-3 overflow-y-auto pr-1">
 
   <!-- MY ENTRIES -->
   <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex-1">
