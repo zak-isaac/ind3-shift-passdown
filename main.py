@@ -18,7 +18,7 @@ import db
 import registry
 from report_models import OosUnit, ReportData, RewrittenHappening
 from formatter import format_html_preview, format_email
-from cetaris_parser import parse_cetaris_csv, count_skipped
+from cetaris_parser import parse_cetaris, ParseResult
 from summarizer import summarize_remarks
 from exporters import export_docx, export_pdf
 
@@ -721,13 +721,17 @@ async def _process_cmms_upload(
         )
 
     content = await file.read()
-    work_orders = parse_cetaris_csv(content)
-    skipped     = count_skipped(content)
+    result: ParseResult = parse_cetaris(content)
+    work_orders = result.work_orders
+    skipped     = result.skipped
+    pm_count    = result.pm_count
+    pm_wos      = result.pm_wo_numbers
 
-    if not work_orders:
+    if not work_orders and pm_count == 0:
         return templates.TemplateResponse(
             request, "partials/cmms_import_result.html",
-            {"imported": [], "skipped": skipped, "error": "No maintenance work orders found in this file.",
+            {"imported": [], "skipped": skipped, "pm_count": 0,
+             "error": "No maintenance work orders found in this file.",
              "include_entries_oob": False},
         )
 
@@ -746,7 +750,23 @@ async def _process_cmms_upload(
         )
         imported.append({"wo": wo.wo_number, "asset": wo.asset_id, "summary": summary})
 
-    await _ws.broadcast({"type": "cmms_import", "count": len(imported)})
+    # Add a single PM summary entry if any PM WOs were found
+    if pm_count > 0:
+        pm_summary = (
+            f"{pm_count} Preventive Maintenance work order"
+            f"{'s' if pm_count != 1 else ''} completed this shift "
+            f"(WO: {', '.join(pm_wos)})"
+        )
+        db.upsert_cmms_entry(
+            shift_id=shift_id,
+            wo_number="PM-SUMMARY",
+            asset_id="PM",
+            summary=pm_summary,
+            raw_remarks_json=_json.dumps([]),
+            tech_name=uploader_name,
+        )
+
+    await _ws.broadcast({"type": "cmms_import", "count": len(imported) + (1 if pm_count else 0)})
 
     # For tech uploads: also send an OOB swap to refresh #my-entries
     entries = db.get_entries(shift_id) if include_entries_oob else []
@@ -756,6 +776,7 @@ async def _process_cmms_upload(
         {
             "imported": imported,
             "skipped": skipped,
+            "pm_count": pm_count,
             "error": "",
             "include_entries_oob": include_entries_oob,
             "entries": entries,

@@ -69,7 +69,7 @@ def format_html_preview(data: ReportData) -> str:
         body = _none("No shift happenings recorded.")
     out.append(_sec("&#9889;", "Shift Happenings", body))
 
-    # 3. RO
+    # 3. Reliable Operations
     if data.ro:
         rows = "".join(
             f'<li style="display:flex;gap:8px;margin-bottom:4px;">'
@@ -78,8 +78,8 @@ def format_html_preview(data: ReportData) -> str:
         )
         body = f'<ul style="list-style:none;margin:0;padding:0;">{rows}</ul>'
     else:
-        body = _none("No repair orders recorded this shift.")
-    out.append(_sec("&#128203;", "RO", body))
+        body = _none("No reliable operations recorded this shift.")
+    out.append(_sec("&#128203;", "Reliable Operations", body))
 
     # 4. RTS
     if data.rts:

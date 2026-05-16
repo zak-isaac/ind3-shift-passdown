@@ -177,12 +177,12 @@ def export_docx(data: ReportData) -> bytes:
     else:
         _none("No shift happenings recorded.")
 
-    # ── Repair Orders ────────────────────────────────────────────────────
-    _sec("Repair Orders (RO)")
+    # ── Reliable Operations ─────────────────────────────────────────────
+    _sec("Reliable Operations")
     if data.ro:
         for ro in data.ro: _item(f"\u25b6  {ro}")
     else:
-        _none("No repair orders recorded this shift.")
+        _none("No reliable operations recorded this shift.")
 
     # ── Returned to Service ──────────────────────────────────────────────
     _sec("Returned to Service (RTS)")
@@ -384,13 +384,13 @@ def export_pdf(data: ReportData) -> bytes:
     else:
         add_none("No shift happenings recorded.")
 
-    # ── REPAIR ORDERS (RO) ────────────────────────────────────────────────
-    add_section("Repair Orders (RO)")
+    # ── RELIABLE OPERATIONS ─────────────────────────────────────────────
+    add_section("Reliable Operations")
     if data.ro:
         for r in data.ro:
             story.append(Paragraph(f"&#9658;&#160;&#160;{r}", BODY))
     else:
-        add_none("No repair orders recorded this shift.")
+        add_none("No reliable operations recorded this shift.")
 
     # ── RETURNED TO SERVICE (RTS) ─────────────────────────────────────────
     add_section("Returned to Service (RTS)")
