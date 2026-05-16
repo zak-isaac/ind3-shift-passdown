@@ -20,7 +20,7 @@ _ELEMENT_MODEL    = "gpt-4o"   # confirm with Element docs / your provisioned mo
 _ELEMENT_API_KEY  = os.getenv("ELEMENT_API_KEY", "")
 
 _SYSTEM_PROMPT = (
-    "You are a maintenance shift assistant at a Walmart distribution center. "
+    "You are a reliability shift assistant at a Walmart distribution center. "
     "Technicians have logged multiple remarks for the same work order. "
     "Combine them into a single clear, concise summary (2-3 sentences max). "
     "Do not add information that wasn't in the original remarks. "

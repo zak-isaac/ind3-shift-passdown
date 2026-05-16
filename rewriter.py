@@ -35,7 +35,7 @@ def rewrite_happening(item: HappeningInput) -> RewrittenHappening:
 
     if kind == "repair":
         para = (
-            f"A maintenance condition was identified involving {item.title}. "
+            f"A reliability condition was identified involving {item.title}. "
             f"{note}. "
             f"Corrective action was completed and the equipment was verified "
             f"for proper operation prior to being returned to service."
@@ -51,7 +51,7 @@ def rewrite_happening(item: HappeningInput) -> RewrittenHappening:
         para = (
             f"Attention was directed to {item.title} during this shift. "
             f"{note}. "
-            f"The matter was assessed and addressed by the maintenance team."
+            f"The matter was assessed and addressed by the reliability team."
         )
 
     return RewrittenHappening(title=item.title, paragraph=para)

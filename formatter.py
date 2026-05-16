@@ -150,7 +150,7 @@ def format_email(data: ReportData) -> str:
 
     header = "\n".join([
         _DIV,
-        f"  WALMART MAINTENANCE OPERATIONS{dc}",
+        f"  WALMART RELIABILITY OPERATIONS{dc}",
         f"  SHIFT PASSDOWN REPORT",
         _DIV,
         "",

@@ -98,7 +98,7 @@ def export_docx(data: ReportData) -> bytes:
     _cell_pad(top_cell, top=110, bottom=30, left=200, right=200)
     p = top_cell.paragraphs[0]
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r = p.add_run(f"WALMART MAINTENANCE OPERATIONS{dc}")
+    r = p.add_run(f"WALMART RELIABILITY OPERATIONS{dc}")
     r.bold, r.font.size, r.font.color.rgb = True, Pt(15), WHITE
 
     sub_cell = banner.rows[1].cells[0]
@@ -275,7 +275,7 @@ def export_pdf(data: ReportData) -> bytes:
         dc_suffix = f"  |  {data.dc_number}" if data.dc_number else ""
         canvas.drawCentredString(
             PAGE_W / 2, PAGE_H - 0.47 * inch,
-            f"WALMART MAINTENANCE OPERATIONS{dc_suffix}",
+            f"WALMART RELIABILITY OPERATIONS{dc_suffix}",
         )
 
         # Report sub-title

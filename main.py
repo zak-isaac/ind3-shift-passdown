@@ -742,7 +742,7 @@ async def _process_cmms_upload(
         return templates.TemplateResponse(
             request, "partials/cmms_import_result.html",
             {"imported": [], "skipped": skipped, "pm_count": 0,
-             "error": "No maintenance work orders found in this file.",
+             "error": "No reliability work orders found in this file.",
              "include_entries_oob": False},
         )
 
