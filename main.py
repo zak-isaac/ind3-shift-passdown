@@ -293,7 +293,16 @@ def _fmt_time(val: str) -> str:
     except Exception:
         return val
 
-templates.env.filters["fmt_time"] = _fmt_time
+_WO_PREFIX_RE = __import__('re').compile(
+    r'^WO\s*#?\s*\d+\s*[\u2013\u2014\-]\s*', __import__('re').IGNORECASE
+)
+
+def _strip_wo_prefix(text: str) -> str:
+    """Strip the 'WO #12345 - ' prefix Cetaris embeds in Tech Remarks."""
+    return _WO_PREFIX_RE.sub('', text).strip()
+
+templates.env.filters["fmt_time"]        = _fmt_time
+templates.env.filters["strip_wo_prefix"] = _strip_wo_prefix
 
 # Register urlencode filter — Jinja2 base env doesn't include it (that's a Flask-ism)
 from urllib.parse import quote as _url_quote

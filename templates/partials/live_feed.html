@@ -83,8 +83,10 @@
         </span>
       </div>
 
-      <!-- Row 2: issue text -->
-      <p class="text-sm text-gray-700 mt-1.5 leading-snug">{{ e.issue }}</p>
+      <!-- Row 2: issue text in unified format -->
+      <p class="text-sm text-gray-700 mt-1.5 leading-snug">
+        {{ e.unit }}: {{ e.issue | strip_wo_prefix }}{% if e.wo_number %} (WO #{{ e.wo_number }}){% endif %}.
+      </p>
 
     </div>
 
