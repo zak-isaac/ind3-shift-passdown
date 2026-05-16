@@ -175,7 +175,7 @@
       hx-swap="innerHTML"
       hx-encoding="multipart/form-data"
       hx-indicator="#cmms-spinner"
-      onsubmit="this.reset()"
+      hx-on::after-request="this.reset()"
       class="flex flex-col gap-3"
     >
       <input type="hidden" name="shift_id" value="{{ shift.id }}" />

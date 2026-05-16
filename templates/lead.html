@@ -576,6 +576,16 @@ function requestNotifPermission() {
         setTimeout(() => toast.classList.add('hidden'), 8000);
         _pushNotif(msg.priority, msg.tech, msg.unit);
       }
+      if (msg.type === 'cmms_import') {
+        htmx.trigger(document.getElementById('live-feed'), 'refresh');
+        htmx.trigger(document.getElementById('asset-stats'), 'refresh');
+        htmx.trigger(document.getElementById('summary-strip'), 'refresh');
+        document.getElementById('new-entry-msg').textContent =
+          `\uD83D\uDCC2 CMMS import: ${msg.count} work order${msg.count !== 1 ? 's' : ''} added`;
+        const toast = document.getElementById('new-entry-toast');
+        toast.classList.remove('hidden');
+        setTimeout(() => toast.classList.add('hidden'), 8000);
+      }
       if (msg.type === 'tech_done') {
         htmx.trigger(document.getElementById('tech-participation'), 'refresh');
         htmx.trigger(document.getElementById('summary-strip'), 'refresh');
