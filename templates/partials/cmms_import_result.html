@@ -1,0 +1,39 @@
+{% if error %}
+<div class="bg-red-50 border border-red-300 rounded-xl px-4 py-3 flex items-start gap-3">
+  <span class="text-red-500 text-lg shrink-0">⚠️</span>
+  <p class="text-red-700 text-sm font-semibold">{{ error }}</p>
+</div>
+{% elif imported %}
+<div class="flex flex-col gap-2">
+  <!-- Success header -->
+  <div class="bg-green-50 border border-green-300 rounded-xl px-4 py-3 flex items-center gap-3">
+    <span class="text-xl">✅</span>
+    <div>
+      <p class="text-green-800 font-black text-sm">
+        {{ imported | length }} work order{{ 's' if imported | length != 1 else '' }} imported
+      </p>
+      {% if skipped > 0 %}
+      <p class="text-green-600 text-xs">{{ skipped }} indirect labor / unallocated rows skipped</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Imported WO list -->
+  <ul class="flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1">
+    {% for item in imported %}
+    <li class="bg-white border border-gray-200 rounded-lg px-3 py-2">
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="bg-wm-blue text-white text-xs font-black px-2 py-0.5 rounded-full">{{ item.asset }}</span>
+        <span class="text-gray-500 text-xs font-mono">WO #{{ item.wo }}</span>
+      </div>
+      <p class="text-xs text-gray-600 mt-1 leading-snug">{{ item.summary }}</p>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% else %}
+<div class="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 flex items-center gap-3">
+  <span class="text-xl">📭</span>
+  <p class="text-amber-800 text-sm font-semibold">No maintenance work orders found. Check the file is a Cetaris export.</p>
+</div>
+{% endif %}

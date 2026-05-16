@@ -156,6 +156,49 @@
   <!-- RIGHT: SIDEBAR (2 cols) — Problem Assets + Tech + Report -->
   <section class="lg:col-span-2 flex flex-col gap-4">
 
+    <!-- CMMS IMPORT CARD -->
+    <div class="bg-white rounded-2xl border-2 border-wm-blue border-opacity-30 shadow-sm p-4">
+      <h2 class="text-wm-dark font-bold text-sm mb-1 flex items-center gap-2">
+        <span class="text-wm-blue">&#128196;</span> Cetaris Import
+        <span class="ml-auto bg-wm-blue text-white text-xs font-black px-2 py-0.5 rounded-full">CMMS</span>
+      </h2>
+      <p class="text-gray-400 text-xs mb-3">Upload a Cetaris CSV export to auto-fill shift happenings.</p>
+      <form
+        hx-post="/lead/cmms-upload"
+        hx-target="#lead-cmms-result"
+        hx-swap="innerHTML"
+        hx-encoding="multipart/form-data"
+        hx-indicator="#lead-cmms-spinner"
+        class="flex flex-col gap-3"
+      >
+        <input type="hidden" name="shift_id" value="{{ shift.id }}" />
+        <label class="flex flex-col gap-1">
+          <span class="text-xs font-bold text-gray-600 uppercase tracking-wide">Select Cetaris CSV</span>
+          <input
+            type="file"
+            name="file"
+            accept=".csv,.xlsx,.xls"
+            required
+            class="text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0
+                   file:text-xs file:font-bold file:bg-wm-blue file:text-white hover:file:bg-blue-700
+                   file:cursor-pointer cursor-pointer"
+          />
+        </label>
+        <button type="submit"
+          class="flex items-center justify-center gap-2 bg-wm-blue hover:bg-blue-700
+                 text-white font-bold py-2 rounded-xl transition text-sm">
+          <span id="lead-cmms-spinner" class="htmx-indicator items-center gap-1 text-sm">
+            <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+            </svg>Importing...
+          </span>
+          &#128228; Upload &amp; Import
+        </button>
+      </form>
+      <div id="lead-cmms-result" class="mt-3"></div>
+    </div>
+
     <!-- PROBLEM ASSETS (moved from full-width) -->
     <div class="bg-white rounded-2xl border-2 border-gray-200 shadow-sm p-4">
       <div class="flex items-center justify-between mb-3">

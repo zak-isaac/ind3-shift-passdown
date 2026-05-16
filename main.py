@@ -4,7 +4,7 @@ import hashlib
 import socket
 from datetime import date, datetime, time, timedelta
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, Form, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, Form, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -18,6 +18,8 @@ import db
 import registry
 from report_models import OosUnit, ReportData, RewrittenHappening
 from formatter import format_html_preview, format_email
+from cetaris_parser import parse_cetaris_csv, count_skipped
+from summarizer import summarize_remarks
 from exporters import export_docx, export_pdf
 
 # Assets loaded from assets.json at startup (sourced from Asset_ID.xlsx)
@@ -387,7 +389,7 @@ async def request_ot_code(
         assigned_shift, requested_shift,
     )
     print(f"[OT] Code generated for {assoc['display_name']} "
-          f"({assigned_shift}→{requested_shift}): {code}", flush=True)
+          f"({assigned_shift}->{requested_shift}): {code}", flush=True)
     return JSONResponse({"ok": True, "message": "OT request submitted. See your manager to get the approval code."})
 
 
@@ -691,6 +693,92 @@ async def tech_delete_entry(
         request, "partials/my_entries.html",
         {"entries": entries, "tech_name": tech_name},
     )
+
+
+# ── CMMS Import (Cetaris CSV upload) ─────────────────────────────────────────
+
+async def _process_cmms_upload(
+    request: Request,
+    shift_id: int,
+    file: UploadFile,
+) -> HTMLResponse:
+    """Shared logic for both tech and lead CMMS CSV uploads."""
+    import json as _json
+
+    shift = db.get_shift(shift_id)
+    if not shift:
+        return HTMLResponse(
+            '<p class="text-red-500 text-sm font-semibold p-3">❌ Shift not found.</p>',
+            status_code=404,
+        )
+
+    if not file.filename or not file.filename.lower().endswith((".csv", ".xlsx", ".xls")):
+        return HTMLResponse(
+            '<p class="text-red-500 text-sm font-semibold p-3">❌ Please upload a CSV file exported from Cetaris.</p>',
+            status_code=400,
+        )
+
+    content = await file.read()
+    work_orders = parse_cetaris_csv(content)
+    skipped     = count_skipped(content)
+
+    if not work_orders:
+        return templates.TemplateResponse(
+            request, "partials/cmms_import_result.html",
+            {"imported": [], "skipped": skipped, "error": "No maintenance work orders found in this file."},
+        )
+
+    imported = []
+    for wo in work_orders:
+        # Merge with any existing CMMS remarks for this WO in this shift
+        existing_remarks = db.get_cmms_raw_remarks(shift_id, wo.wo_number)
+        merged_remarks   = list(dict.fromkeys(existing_remarks + wo.remarks))  # dedup, order-preserving
+
+        summary = await summarize_remarks(merged_remarks)
+        db.upsert_cmms_entry(
+            shift_id=shift_id,
+            wo_number=wo.wo_number,
+            asset_id=wo.asset_id,
+            summary=summary,
+            raw_remarks_json=_json.dumps(merged_remarks),
+        )
+        imported.append({"wo": wo.wo_number, "asset": wo.asset_id, "summary": summary})
+
+    # Notify MST dashboards a refresh is warranted
+    await _ws.broadcast({"type": "cmms_import", "count": len(imported)})
+
+    return templates.TemplateResponse(
+        request, "partials/cmms_import_result.html",
+        {"imported": imported, "skipped": skipped, "error": ""},
+    )
+
+
+@app.post("/tech/cmms-upload", response_class=HTMLResponse)
+async def tech_cmms_upload(
+    request: Request,
+    shift_id: int  = Form(...),
+    file: UploadFile = File(...),
+):
+    """Tech dashboard CMMS CSV upload endpoint."""
+    assoc_code = request.cookies.get(_TECH_ASSOC_COOKIE, "")
+    if not assoc_code or not _ROSTER.get(assoc_code):
+        return HTMLResponse(
+            '<p class="text-red-500 text-sm font-semibold p-3">❌ Session expired. Please sign in again.</p>',
+            status_code=401,
+        )
+    return await _process_cmms_upload(request, shift_id, file)
+
+
+@app.post("/lead/cmms-upload", response_class=HTMLResponse)
+async def lead_cmms_upload(
+    request: Request,
+    shift_id: int  = Form(...),
+    file: UploadFile = File(...),
+):
+    """Lead/MST dashboard CMMS CSV upload endpoint."""
+    if not _is_lead_authed(request):
+        return _lead_redirect("/lead")
+    return await _process_cmms_upload(request, shift_id, file)
 
 
 @app.get("/tech/entry/{entry_id}/edit-form", response_class=HTMLResponse)

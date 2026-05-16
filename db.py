@@ -69,6 +69,13 @@ def init_db() -> None:
             c.execute("ALTER TABLE entries ADD COLUMN priority TEXT NOT NULL DEFAULT 'monitor'")
         if "carry_over" not in existing_entry_cols:
             c.execute("ALTER TABLE entries ADD COLUMN carry_over INTEGER NOT NULL DEFAULT 0")
+        # CMMS import tracking — added for Cetaris auto-import feature
+        if "source" not in existing_entry_cols:
+            c.execute("ALTER TABLE entries ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'")
+        if "wo_number" not in existing_entry_cols:
+            c.execute("ALTER TABLE entries ADD COLUMN wo_number TEXT NOT NULL DEFAULT ''")
+        if "raw_remarks" not in existing_entry_cols:
+            c.execute("ALTER TABLE entries ADD COLUMN raw_remarks TEXT NOT NULL DEFAULT '[]'")
 
         existing_shift_cols = {row[1] for row in c.execute("PRAGMA table_info(shifts)")}
         if "notes" not in existing_shift_cols:
@@ -362,6 +369,75 @@ def add_entry(shift_id: int, tech_name: str,
             (shift_id, tech_name, unit, issue, action, result, priority, _now()),
         )
         return cur.lastrowid
+
+
+# ---------------------------------------------------------------------------
+# CMMS Import (Cetaris auto-import)
+# ---------------------------------------------------------------------------
+
+def get_cmms_entry(shift_id: int, wo_number: str) -> Optional[dict]:
+    """Return the existing CMMS import entry for this WO in this shift, or None."""
+    with _conn() as c:
+        row = c.execute(
+            "SELECT * FROM entries WHERE shift_id=? AND wo_number=? AND source='cmms' LIMIT 1",
+            (shift_id, wo_number),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def upsert_cmms_entry(
+    shift_id: int,
+    wo_number: str,
+    asset_id: str,
+    summary: str,
+    raw_remarks_json: str,
+) -> int:
+    """Insert or replace a CMMS-imported entry for this WO+shift.
+
+    If an entry already exists for this WO it is deleted first so we always
+    have exactly one canonical entry per WO per shift.
+    Returns the new entry id.
+    """
+    import json
+    with _conn() as c:
+        # Remove stale entry so re-uploads cleanly replace
+        c.execute(
+            "DELETE FROM entries WHERE shift_id=? AND wo_number=? AND source='cmms'",
+            (shift_id, wo_number),
+        )
+        issue_text = f"WO #{wo_number} — {summary}"
+        cur = c.execute(
+            "INSERT INTO entries "
+            "(shift_id, tech_name, unit, issue, action, result, priority, "
+            " created_at, source, wo_number, raw_remarks) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                shift_id,
+                "CMMS Import",
+                asset_id,
+                issue_text,
+                "",          # action — MST fills in
+                "",          # result — MST fills in
+                "monitor",
+                _now(),
+                "cmms",
+                wo_number,
+                raw_remarks_json,
+            ),
+        )
+        return cur.lastrowid
+
+
+def get_cmms_raw_remarks(shift_id: int, wo_number: str) -> list[str]:
+    """Return the stored raw remarks list for an existing CMMS entry."""
+    import json
+    row = get_cmms_entry(shift_id, wo_number)
+    if not row:
+        return []
+    try:
+        return json.loads(row.get("raw_remarks", "[]"))
+    except (ValueError, TypeError):
+        return []
 
 
 def set_carry_over(entry_id: int, state: bool) -> None:
