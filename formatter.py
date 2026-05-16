@@ -54,34 +54,24 @@ def format_html_preview(data: ReportData) -> str:
     out.append(_sec("&#128666;", "Vendors", body))
 
     # 2. Shift Happenings — PM count first (auto), then asset entries
-    pm_line = None
+    happening_lines: list[str] = []
+
     if data.pm_count:
-        label = f"{data.pm_count} PM{'s' if data.pm_count != 1 else ''} completed"
-        pm_line = (
-            f'<li style="display:flex;gap:10px;margin-bottom:10px;'
-            f'padding-bottom:10px;border-bottom:1px solid #eee;">'
-            f'<span style="flex-shrink:0;font-weight:900;color:#000;'
-            f'min-width:60px;font-size:14px;">PM</span>'
-            f'<span style="flex:1;color:#111;line-height:1.6;">{label}</span>'
-            f'</li>'
+        label = f"{data.pm_count} PM{'s' if data.pm_count != 1 else ''} completed this shift"
+        happening_lines.append(
+            f'<li style="padding:8px 0;border-bottom:1px solid #eee;font-size:14px;color:#111;line-height:1.7;">'
+            f'<strong style="color:#000;">PM:</strong> {label}</li>'
         )
 
-    if data.happenings or pm_line:
-        items = ""
-        if pm_line:
-            items += pm_line
-        items += "".join(
-            f'<li style="display:flex;gap:10px;margin-bottom:10px;'
-            f'padding-bottom:10px;border-bottom:1px solid #eee;">'
-            f'<span style="flex-shrink:0;font-weight:900;color:#000;'
-            f'min-width:60px;font-size:14px;">{h.title}</span>'
-            f'<span style="flex:1;color:#111;line-height:1.6;">'
-            f'{h.title}: {h.paragraph}. {"(WO #" + h.wo_number + ")." if h.wo_number else ""}'
-            f'</span>'
-            f'</li>'
-            for h in data.happenings
+    for h in data.happenings:
+        wo_ref = f" <span style='color:#555;font-size:13px;'>(WO #{h.wo_number})</span>" if h.wo_number else ""
+        happening_lines.append(
+            f'<li style="padding:8px 0;border-bottom:1px solid #eee;font-size:14px;color:#111;line-height:1.7;">'
+            f'<strong style="color:#000;">{h.title}:</strong> {h.paragraph}.{wo_ref}</li>'
         )
-        body = f'<ul style="list-style:none;margin:0;padding:0;">{items}</ul>'
+
+    if happening_lines:
+        body = f'<ul style="list-style:none;margin:0;padding:0;">{"".join(happening_lines)}</ul>'
     else:
         body = _none("No shift happenings recorded.")
     out.append(_sec("&#9889;", "Shift Happenings", body))

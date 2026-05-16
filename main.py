@@ -1032,6 +1032,12 @@ async def analytics_dashboard(request: Request):
     )
 
 
+@app.get("/guide", response_class=HTMLResponse)
+async def user_guide(request: Request):
+    """Public user guide — no auth required so techs can access it too."""
+    return templates.TemplateResponse(request, "guide.html", {})
+
+
 
 @app.get("/history/shift/{shift_id}", response_class=HTMLResponse)
 async def shift_report_view(request: Request, shift_id: int):
