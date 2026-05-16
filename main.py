@@ -1038,6 +1038,18 @@ async def user_guide(request: Request):
     return templates.TemplateResponse(request, "guide.html", {})
 
 
+@app.get("/guide/download")
+async def download_guide(request: Request):
+    """Serve the guide as a downloadable HTML file."""
+    from fastapi.responses import Response
+    html = templates.get_template("guide.html").render({})
+    return Response(
+        content=html,
+        media_type="text/html",
+        headers={"Content-Disposition": 'attachment; filename="IND3-Reliability-Guide.html"'},
+    )
+
+
 
 @app.get("/history/shift/{shift_id}", response_class=HTMLResponse)
 async def shift_report_view(request: Request, shift_id: int):
