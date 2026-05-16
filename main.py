@@ -747,9 +747,30 @@ async def _process_cmms_upload(
         )
 
     imported = []
+    skipped_unchanged = 0
     for wo in work_orders:
-        existing_remarks = db.get_cmms_raw_remarks(shift_id, wo.wo_number, uploader_name)
-        merged_remarks   = list(dict.fromkeys(existing_remarks + wo.remarks))
+        # Fetch the existing entry for THIS tech + WO in one call
+        existing_entry   = db.get_cmms_entry(shift_id, wo.wo_number, uploader_name)
+        existing_remarks: list[str] = []
+        if existing_entry:
+            try:
+                existing_remarks = _json.loads(existing_entry.get("raw_remarks", "[]"))
+            except (ValueError, TypeError):
+                existing_remarks = []
+
+        merged_remarks = list(dict.fromkeys(existing_remarks + wo.remarks))
+
+        # Nothing new — preserve the original entry and timestamp untouched
+        if existing_entry and merged_remarks == existing_remarks:
+            skipped_unchanged += 1
+            imported.append({
+                "wo": wo.wo_number,
+                "asset": wo.asset_id,
+                "summary": existing_entry.get("issue", ""),
+                "unchanged": True,
+            })
+            continue
+
         summary = await summarize_remarks(merged_remarks)
         db.upsert_cmms_entry(
             shift_id=shift_id,
@@ -759,14 +780,16 @@ async def _process_cmms_upload(
             raw_remarks_json=_json.dumps(merged_remarks),
             tech_name=uploader_name,
         )
-        imported.append({"wo": wo.wo_number, "asset": wo.asset_id, "summary": summary})
+        imported.append({"wo": wo.wo_number, "asset": wo.asset_id, "summary": summary, "unchanged": False})
 
     # Track PM WOs silently — deduplicated by UNIQUE constraint in DB
     for wo_num in pm_wos:
         db.upsert_pm_wo(shift_id=shift_id, wo_number=wo_num, tech_name=uploader_name)
 
     pm_count = db.get_pm_count(shift_id)  # total for this shift (cumulative)
-    await _ws.broadcast({"type": "cmms_import", "count": len(imported), "pm_count": pm_count})
+    new_entries = [e for e in imported if not e.get("unchanged")]
+    if new_entries:
+        await _ws.broadcast({"type": "cmms_import", "count": len(new_entries), "pm_count": pm_count})
 
     # For tech uploads: also send an OOB swap to refresh #my-entries
     entries = db.get_entries(shift_id) if include_entries_oob else []
@@ -774,13 +797,14 @@ async def _process_cmms_upload(
     return templates.TemplateResponse(
         request, "partials/cmms_import_result.html",
         {
-            "imported": imported,
-            "skipped": skipped,
-            "pm_count": pm_count,
-            "error": "",
+            "imported":          imported,
+            "skipped":           skipped,
+            "skipped_unchanged": skipped_unchanged,
+            "pm_count":          pm_count,
+            "error":             "",
             "include_entries_oob": include_entries_oob,
-            "entries": entries,
-            "tech_name": uploader_name,
+            "entries":           entries,
+            "tech_name":         uploader_name,
         },
     )
 
