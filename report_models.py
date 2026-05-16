@@ -27,6 +27,7 @@ class ReportData(BaseModel):
     dc_number: str = ""
     vendors:   list[str]               = Field(default_factory=list)
     happenings: list[RewrittenHappening] = Field(default_factory=list)
+    pm_count:  int                     = 0
     ro:        list[str]               = Field(default_factory=list)
     rts:       list[str]               = Field(default_factory=list)
     oos:       list[OosUnit]           = Field(default_factory=list)

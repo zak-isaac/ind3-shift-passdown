@@ -131,6 +131,18 @@ def init_db() -> None:
         """)
 
         c.execute("""
+            CREATE TABLE IF NOT EXISTS pm_wos (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                shift_id   INTEGER NOT NULL REFERENCES shifts(id),
+                wo_number  TEXT    NOT NULL,
+                asset_id   TEXT    NOT NULL DEFAULT '',
+                tech_name  TEXT    NOT NULL DEFAULT '',
+                created_at TEXT    NOT NULL,
+                UNIQUE(shift_id, wo_number)
+            )
+        """)
+
+        c.execute("""
             CREATE TABLE IF NOT EXISTS associates (
                 assoc_num    TEXT PRIMARY KEY,
                 full_name    TEXT NOT NULL,
@@ -439,6 +451,37 @@ def get_cmms_raw_remarks(shift_id: int, wo_number: str) -> list[str]:
         return json.loads(row.get("raw_remarks", "[]"))
     except (ValueError, TypeError):
         return []
+
+
+# ---------------------------------------------------------------------------
+# PM Work Orders (Preventive Maintenance — counted, not shown as happenings)
+# ---------------------------------------------------------------------------
+
+def upsert_pm_wo(
+    shift_id: int,
+    wo_number: str,
+    asset_id: str = "",
+    tech_name: str = "",
+) -> None:
+    """Record a PM work order for this shift. Silently ignores duplicates."""
+    with _conn() as c:
+        c.execute(
+            """
+            INSERT OR IGNORE INTO pm_wos (shift_id, wo_number, asset_id, tech_name, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (shift_id, wo_number, asset_id, tech_name, _now()),
+        )
+
+
+def get_pm_count(shift_id: int) -> int:
+    """Return the number of unique PM work orders completed this shift."""
+    with _conn() as c:
+        row = c.execute(
+            "SELECT COUNT(*) FROM pm_wos WHERE shift_id = ?",
+            (shift_id,),
+        ).fetchone()
+    return row[0] if row else 0
 
 
 def set_carry_over(entry_id: int, state: bool) -> None:

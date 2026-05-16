@@ -560,6 +560,7 @@ async def tech_page(request: Request):
         return RedirectResponse("/tech/login", status_code=303)
     entries   = db.get_entries(shift["id"])
     oos_units = db.get_oos_units()
+    pm_count  = db.get_pm_count(shift["id"])
     return templates.TemplateResponse(
         request, "tech.html",
         {
@@ -569,6 +570,7 @@ async def tech_page(request: Request):
             "is_manager": session.get("is_manager", False),
             "assets":     _ASSETS,
             "oos_units":  oos_units,
+            "pm_count":   pm_count,
         }
     )
 
@@ -750,23 +752,12 @@ async def _process_cmms_upload(
         )
         imported.append({"wo": wo.wo_number, "asset": wo.asset_id, "summary": summary})
 
-    # Add a single PM summary entry if any PM WOs were found
-    if pm_count > 0:
-        pm_summary = (
-            f"{pm_count} Preventive Maintenance work order"
-            f"{'s' if pm_count != 1 else ''} completed this shift "
-            f"(WO: {', '.join(pm_wos)})"
-        )
-        db.upsert_cmms_entry(
-            shift_id=shift_id,
-            wo_number="PM-SUMMARY",
-            asset_id="PM",
-            summary=pm_summary,
-            raw_remarks_json=_json.dumps([]),
-            tech_name=uploader_name,
-        )
+    # Track PM WOs silently — deduplicated by UNIQUE constraint in DB
+    for wo_num in pm_wos:
+        db.upsert_pm_wo(shift_id=shift_id, wo_number=wo_num, tech_name=uploader_name)
 
-    await _ws.broadcast({"type": "cmms_import", "count": len(imported) + (1 if pm_count else 0)})
+    pm_count = db.get_pm_count(shift_id)  # total for this shift (cumulative)
+    await _ws.broadcast({"type": "cmms_import", "count": len(imported), "pm_count": pm_count})
 
     # For tech uploads: also send an OOB swap to refresh #my-entries
     entries = db.get_entries(shift_id) if include_entries_oob else []
@@ -1267,9 +1258,10 @@ async def lead_summary(request: Request):
         return HTMLResponse("")
     entries = db.get_entries(shift["id"])
     done    = db.get_done_techs(shift["id"])
-    techs   = {e["tech_name"] for e in entries}
+    techs   = {e["tech_name"] for e in entries if e.get("source") != "pm"}
     downs   = sum(1 for e in entries if e["priority"] == "down")
     degs    = sum(1 for e in entries if e["priority"] == "degraded")
+    pm_count = db.get_pm_count(shift["id"])
     return templates.TemplateResponse(request, "partials/summary_strip.html", {
         "total":    len(entries),
         "downs":    downs,
@@ -1277,6 +1269,7 @@ async def lead_summary(request: Request):
         "techs":    len(techs),
         "done":     len(done),
         "created":  shift["created_at"],
+        "pm_count": pm_count,
     })
 
 
@@ -1543,6 +1536,7 @@ async def lead_generate(
         dc_number=DC_NUMBER,
         vendors=[v.strip() for v in vendor_name if v.strip()],
         happenings=happenings,
+        pm_count=db.get_pm_count(shift_id),
         ro=[r.strip() for r in ro_item if r.strip()],
         rts=rts_clean,
         oos=[OosUnit(unit=u) for u in oos_units],

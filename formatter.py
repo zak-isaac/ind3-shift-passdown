@@ -53,9 +53,24 @@ def format_html_preview(data: ReportData) -> str:
         body = _none("No vendor activity recorded during this shift.")
     out.append(_sec("&#128666;", "Vendors", body))
 
-    # 2. Shift Happenings — asset ID + tech's summary + who logged it
-    if data.happenings:
-        rows = "".join(
+    # 2. Shift Happenings — PM count first (auto), then asset entries
+    pm_line = None
+    if data.pm_count:
+        label = f"{data.pm_count} PM{'s' if data.pm_count != 1 else ''} completed"
+        pm_line = (
+            f'<li style="display:flex;gap:10px;margin-bottom:10px;'
+            f'padding-bottom:10px;border-bottom:1px solid #eee;">'
+            f'<span style="flex-shrink:0;font-weight:900;color:#000;'
+            f'min-width:60px;font-size:14px;">PM</span>'
+            f'<span style="flex:1;color:#111;line-height:1.6;">{label}</span>'
+            f'</li>'
+        )
+
+    if data.happenings or pm_line:
+        items = ""
+        if pm_line:
+            items += pm_line
+        items += "".join(
             f'<li style="display:flex;gap:10px;margin-bottom:10px;'
             f'padding-bottom:10px;border-bottom:1px solid #eee;">'
             f'<span style="flex-shrink:0;font-weight:900;color:#000;'
@@ -64,7 +79,7 @@ def format_html_preview(data: ReportData) -> str:
             f'</li>'
             for h in data.happenings
         )
-        body = f'<ul style="list-style:none;margin:0;padding:0;">{rows}</ul>'
+        body = f'<ul style="list-style:none;margin:0;padding:0;">{items}</ul>'
     else:
         body = _none("No shift happenings recorded.")
     out.append(_sec("&#9889;", "Shift Happenings", body))
@@ -150,17 +165,19 @@ def format_email(data: ReportData) -> str:
         or ["  No vendor activity recorded during this shift."]))
 
     h_lines: list[str] = []
+    if data.pm_count:
+        h_lines.append(f"  •  {data.pm_count} PM{'s' if data.pm_count != 1 else ''} completed")
     for h in data.happenings:
         h_lines.append(f"  •  {h.title}  —  {h.paragraph}")
     secs.append(_txt_sec("Shift Happenings",
         h_lines or ["  No shift happenings recorded."]))
 
-    secs.append(_txt_sec("Repair Orders (RO)",
+    secs.append(_txt_sec("Reliable Operations",
         [f"  \u25b6  {r}" for r in data.ro]
-        or ["  No repair orders recorded this shift."]))
+        or ["  No reliable operations recorded this shift."]))
 
     secs.append(_txt_sec("Returned to Service (RTS)",
-        [f"  \u2713  {u}  \u2014  Returned to Service" for u in data.rts]
+        [f"  \u2713  {u}  —  Returned to Service" for u in data.rts]
         or ["  No units returned to service this shift."]))
 
     secs.append(_txt_sec("Current Out of Service Equipment",
