@@ -1057,8 +1057,9 @@ def force_reseed_associates(roster: dict) -> None:
                 display_name = excluded.display_name,
                 default_id   = excluded.default_id,
                 shift        = excluded.shift,
-                status       = excluded.status
-                -- is_mst intentionally NOT updated: preserves admin toggles
+                status       = excluded.status,
+                -- Promote to MST if Drax says so; never auto-demote (admin toggle wins)
+                is_mst       = MAX(is_mst, excluded.is_mst)
             """,
             rows,
         )

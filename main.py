@@ -1263,12 +1263,18 @@ async def reload_roster(request: Request):
                 '<span class="text-red-600 text-xs font-semibold">&#10007; Drax file not found — '
                 'make sure OneDrive is synced and the file exists.</span>'
             )
-        fresh = assoc_mod.load_associates()   # from Excel
-        db.force_reseed_associates(fresh)     # upsert DB (preserves is_mst flags)
-        _ROSTER = db.associates_to_roster()   # reload in-memory roster
+        fresh = assoc_mod.load_associates()   # read Excel
+        db.force_reseed_associates(fresh)     # upsert DB
+        _ROSTER = db.associates_to_roster()   # reload in-memory
         count = len(_ROSTER) - 1             # subtract manager entry
+        msg_html = (
+            f'<span class="text-green-600 text-xs font-semibold">'
+            f'&#10003; Synced {count} associates from Drax</span>'
+        )
+        # HX-Trigger tells HTMX to fire a custom event so #assoc-table re-fetches
         return HTMLResponse(
-            f'<span class="text-green-600 text-xs font-semibold">&#10003; Synced {count} associates from Drax — DB updated</span>'
+            msg_html,
+            headers={"HX-Trigger": "rosterReloaded"},
         )
     except Exception as exc:
         return HTMLResponse(

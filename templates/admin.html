@@ -105,7 +105,7 @@
     <!-- Associate table -->
     <div id="assoc-table"
          hx-get="/admin/associates"
-         hx-trigger="load"
+         hx-trigger="load, rosterReloaded from:body"
          hx-swap="innerHTML">
       <p class="text-gray-400 text-sm italic">Loading associates...</p>
     </div>
