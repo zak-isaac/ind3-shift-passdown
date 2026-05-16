@@ -603,30 +603,48 @@ def set_carry_over(entry_id: int, state: bool) -> None:
 
 
 def get_carry_over_entries(current_shift_id: int = 0) -> list[dict]:
-    """Return carry-over entries from the shift that ran immediately before
-    the current one.
+    """Return carry-over entries from the most recent predecessor shift that
+    actually has carry-over entries flagged.
 
-    Works correctly in three scenarios:
-    - Normal: predecessor is closed (is_active=0)
-    - Overlap window: predecessor is still active but has a lower ID
-    - End-of-shift call: pass current_shift_id to find the correct predecessor
+    Skips over empty or accidentally-closed gaps so that, e.g., an empty
+    S4 shell between S5 and the real S4 never swallows S5's carry-overs.
 
-    Falls back to the most-recently-closed shift when no current_shift_id given.
+    Works in all scenarios:
+    - Normal handover (predecessor closed)
+    - Overlap window (predecessor still active but lower ID)
+    - Empty shells / accidental closes in between
     """
     with _conn() as c:
         if current_shift_id:
-            # Predecessor = the most-recent shift with a lower ID
+            # Walk back from current_shift_id and find the nearest predecessor
+            # that actually has at least one carry_over=1 entry.
             row = c.execute(
-                "SELECT id FROM shifts WHERE id < ? ORDER BY id DESC LIMIT 1",
+                """
+                SELECT DISTINCT e.shift_id
+                FROM entries e
+                WHERE e.carry_over = 1
+                  AND e.shift_id < ?
+                ORDER BY e.shift_id DESC
+                LIMIT 1
+                """,
                 (current_shift_id,),
             ).fetchone()
         else:
-            # Legacy path: pick the most-recently-closed shift
+            # Legacy / no-context path: most recent shift with carry-over entries
             row = c.execute(
-                "SELECT id FROM shifts WHERE is_active=0 ORDER BY id DESC LIMIT 1"
+                """
+                SELECT DISTINCT e.shift_id
+                FROM entries e
+                JOIN shifts s ON s.id = e.shift_id
+                WHERE e.carry_over = 1 AND s.is_active = 0
+                ORDER BY e.shift_id DESC
+                LIMIT 1
+                """
             ).fetchone()
+
         if not row:
             return []
+
         rows = c.execute(
             "SELECT e.*, s.date, s.shift_type, s.lead_name FROM entries e"
             " JOIN shifts s ON s.id = e.shift_id"
