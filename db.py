@@ -602,12 +602,29 @@ def set_carry_over(entry_id: int, state: bool) -> None:
         c.execute("UPDATE entries SET carry_over=? WHERE id=?", (1 if state else 0, entry_id))
 
 
-def get_carry_over_entries() -> list[dict]:
-    """Entries from the most-recently-closed shift that were flagged for carry-over."""
+def get_carry_over_entries(current_shift_id: int = 0) -> list[dict]:
+    """Return carry-over entries from the shift that ran immediately before
+    the current one.
+
+    Works correctly in three scenarios:
+    - Normal: predecessor is closed (is_active=0)
+    - Overlap window: predecessor is still active but has a lower ID
+    - End-of-shift call: pass current_shift_id to find the correct predecessor
+
+    Falls back to the most-recently-closed shift when no current_shift_id given.
+    """
     with _conn() as c:
-        row = c.execute(
-            "SELECT id FROM shifts WHERE is_active=0 ORDER BY id DESC LIMIT 1"
-        ).fetchone()
+        if current_shift_id:
+            # Predecessor = the most-recent shift with a lower ID
+            row = c.execute(
+                "SELECT id FROM shifts WHERE id < ? ORDER BY id DESC LIMIT 1",
+                (current_shift_id,),
+            ).fetchone()
+        else:
+            # Legacy path: pick the most-recently-closed shift
+            row = c.execute(
+                "SELECT id FROM shifts WHERE is_active=0 ORDER BY id DESC LIMIT 1"
+            ).fetchone()
         if not row:
             return []
         rows = c.execute(

@@ -494,9 +494,10 @@ async def lead_force_end(request: Request):
 async def shift_end(request: Request, shift_id: int = Form(...)):
     if not _is_lead_authed(request):
         return _lead_redirect("/lead")
-    shift = db.get_active_shift()
-    if not shift or shift["id"] != shift_id:
-        raise HTTPException(status_code=404, detail="Shift not found")
+    # Use get_shift so we always find the correct shift even during overlap
+    shift = db.get_shift(shift_id)
+    if not shift or not shift.get("is_active"):
+        raise HTTPException(status_code=404, detail="Shift not found or already ended")
 
     # Prefer the last lead-generated report; fall back to auto-building one
     last = db.get_last_report_for_shift(shift_id)
@@ -517,21 +518,21 @@ async def shift_end(request: Request, shift_id: int = Form(...)):
             shift_type=shift["shift_type"],
             lead_name=shift["lead_name"],
             dc_number=DC_NUMBER,
-            happenings=happenings,
+            happenings=rewritten,          # ← was 'happenings' (NameError)
         )
         content = format_email(data)
         db.save_report(shift_id, content, data.model_dump_json())
 
     db.close_shift(shift_id)
 
-    carry_overs = db.get_carry_over_entries()
+    carry_overs = db.get_carry_over_entries(current_shift_id=shift_id)
     shift_notes = db.get_shift_notes(shift_id)
 
     return templates.TemplateResponse(
         request, "shift_ended.html",
         {
-            "shift": shift,
-            "content": content,
+            "shift":       shift,
+            "content":     content,
             "carry_overs": carry_overs,
             "shift_notes": shift_notes,
         },
@@ -997,7 +998,7 @@ async def lead_page(request: Request, status: str = "", shift_id: int = 0):
     matched    = [s for s in shifts if s["id"] == shift_id]
     shift      = matched[0] if matched else shifts[0]
     entries = db.get_entries(shift["id"])
-    carry_overs = db.get_carry_over_entries()
+    carry_overs = db.get_carry_over_entries(current_shift_id=shift["id"])
     shift_notes = db.get_shift_notes(shift["id"])
     response = templates.TemplateResponse(
         request, "lead.html",
@@ -1010,10 +1011,10 @@ async def lead_page(request: Request, status: str = "", shift_id: int = 0):
 
 
 @app.get("/lead/tech-participation", response_class=HTMLResponse)
-async def lead_tech_participation(request: Request):
+async def lead_tech_participation(request: Request, shift_id: int = 0):
     if not _is_lead_authed(request):
         return HTMLResponse('')
-    shift = db.get_active_shift()
+    shift = db.get_shift(shift_id) if shift_id else db.get_active_shift()
     if not shift:
         return HTMLResponse('')
     techs      = db.get_tech_participation(shift["id"])
@@ -1132,11 +1133,11 @@ async def weekly_summary(request: Request, days: int = 28):
 
 
 @app.get("/lead/asset-stats", response_class=HTMLResponse)
-async def lead_asset_stats(request: Request):
+async def lead_asset_stats(request: Request, shift_id: int = 0):
     """HTMX polling endpoint — asset frequency badges + chart data."""
     if not _is_lead_authed(request):
         return HTMLResponse('')
-    shift = db.get_active_shift()
+    shift = db.get_shift(shift_id) if shift_id else db.get_active_shift()
     if not shift:
         return HTMLResponse('<p class="text-gray-400 italic text-sm p-2">No active shift.</p>')
     stats = db.get_asset_stats(shift["id"])
@@ -1147,25 +1148,26 @@ async def lead_asset_stats(request: Request):
 
 
 @app.get("/lead/feed", response_class=HTMLResponse)
-async def lead_feed(request: Request):
+async def lead_feed(request: Request, shift_id: int = 0):
     """HTMX polling endpoint – returns live entry feed partial.
 
-    If the active shift has changed since the page loaded (different shift ID),
-    we return HX-Refresh so the entire dashboard reloads clean with the new shift.
+    Accepts shift_id so each MST always sees their own shift, even during
+    overlap windows when two shifts are running simultaneously.
+    Only sends HX-Refresh when the requested shift is no longer active
+    (i.e. it has been ended), not on a shift-id mismatch.
     """
     if not _is_lead_authed(request):
-        return HTMLResponse('')   # silently empty — HTMX poll, not a page
+        return HTMLResponse('')
 
-    shift = db.get_active_shift()
+    shift = db.get_shift(shift_id) if shift_id else db.get_active_shift()
     if not shift:
+        # Shift was ended — reload so the page transitions to ended state
         return HTMLResponse(
-            '<p class="text-gray-400 italic text-sm">No active shift.</p>',
+            '<p class="text-gray-400 italic text-sm">Shift ended.</p>',
             headers={"HX-Refresh": "true"}
         )
-
-    # Detect shift change — force full page reload so header + form update too
-    page_shift_id = request.headers.get("X-Shift-Id", "")
-    if page_shift_id and str(shift["id"]) != page_shift_id:
+    # If the specific shift was ended, reload cleanly
+    if not shift.get("is_active"):
         return HTMLResponse("", headers={"HX-Refresh": "true"})
 
     entries = db.get_entries(shift["id"])
@@ -1429,10 +1431,10 @@ async def tech_toggle_done(request: Request, shift_id: int = Form(...), tech_nam
 # ── Lead summary strip ────────────────────────────────────────────────────────
 
 @app.get("/lead/summary", response_class=HTMLResponse)
-async def lead_summary(request: Request):
+async def lead_summary(request: Request, shift_id: int = 0):
     if not _is_lead_authed(request):
         return HTMLResponse("")
-    shift = db.get_active_shift()
+    shift = db.get_shift(shift_id) if shift_id else db.get_active_shift()
     if not shift:
         return HTMLResponse("")
     entries = db.get_entries(shift["id"])
@@ -1580,7 +1582,7 @@ async def print_report(request: Request):
     if not shift:
         return RedirectResponse("/", status_code=303)
     entries = db.get_entries(shift["id"])
-    carry_overs = db.get_carry_over_entries()
+    carry_overs = db.get_carry_over_entries(current_shift_id=shift["id"])
     shift_notes = db.get_shift_notes(shift["id"])
     return templates.TemplateResponse(
         request, "print_report.html",

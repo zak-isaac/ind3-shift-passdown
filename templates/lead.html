@@ -81,7 +81,7 @@
 <!-- SUMMARY STRIP -->
 <div class="bg-wm-dark px-5 py-2"
      id="summary-strip"
-     hx-get="/lead/summary"
+     hx-get="/lead/summary?shift_id={{ shift.id }}"
      hx-trigger="load, every 60s, refresh"
      hx-swap="innerHTML">
   <span class="text-blue-300 text-xs">Loading stats...</span>
@@ -144,10 +144,9 @@
 
     <div
       id="live-feed"
-      hx-get="/lead/feed"
+      hx-get="/lead/feed?shift_id={{ shift.id }}"
       hx-trigger="load, every 10s, refresh"
       hx-swap="innerHTML"
-      hx-headers='{"X-Shift-Id": "{{ shift.id }}"}'
     >
       <div class="text-gray-400 text-sm italic p-4">Loading entries...</div>
     </div>
@@ -211,7 +210,7 @@
       </div>
       <div
         id="asset-stats"
-        hx-get="/lead/asset-stats"
+        hx-get="/lead/asset-stats?shift_id={{ shift.id }}"
         hx-trigger="load, every 30s, refresh"
         hx-swap="innerHTML"
         style="min-height:5rem">
@@ -228,7 +227,7 @@
         <span class="text-gray-400 text-xs">Real-time</span>
       </div>
       <div id="tech-participation"
-        hx-get="/lead/tech-participation"
+        hx-get="/lead/tech-participation?shift_id={{ shift.id }}"
         hx-trigger="load, every 30s, refresh"
         hx-swap="innerHTML"
         style="min-height:3rem">
