@@ -1452,6 +1452,19 @@ async def lead_summary(request: Request):
     })
 
 
+# ── Happenings preview (live partial for generate panel) ───────────────────────
+
+@app.get("/lead/happenings-preview", response_class=HTMLResponse)
+async def lead_happenings_preview(request: Request, shift_id: int):
+    """Returns the live entry list shown inside the generate panel."""
+    if not _is_lead_authed(request):
+        return HTMLResponse("")
+    entries = db.get_entries(shift_id)
+    return templates.TemplateResponse(
+        request, "partials/happenings_preview.html", {"entries": entries}
+    )
+
+
 # ── Duplicate unit check ────────────────────────────────────────────────────────
 
 @app.get("/tech/check-unit")

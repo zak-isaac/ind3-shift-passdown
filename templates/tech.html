@@ -8,7 +8,8 @@
   <script src="/static/htmx.min.js"></script>
   <style>
     .htmx-indicator{display:none}.htmx-request .htmx-indicator{display:inline-flex}
-
+    /* hide the idle Upload label while the CMMS form request is running */
+    #cmms-form.htmx-request .btn-idle-text { display:none; }
     /* Visible scrollbar for the entries panel */
     .entries-scroll::-webkit-scrollbar { width: 6px; }
     .entries-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
@@ -177,19 +178,22 @@
       <span class="text-wm-blue">&#128196;</span> Import from Cetaris
     </h2>
     <form
+      id="cmms-form"
       hx-post="/tech/cmms-upload"
       hx-target="#cmms-result"
       hx-swap="innerHTML"
       hx-encoding="multipart/form-data"
       hx-indicator="#cmms-spinner"
       hx-push-url="false"
-      hx-on::after-request="this.reset()"
+      hx-on::before-request="_cmmsUploadStart()"
+      hx-on::after-request="_cmmsUploadDone()"
       class="flex flex-col gap-3"
     >
       <input type="hidden" name="shift_id" value="{{ shift.id }}" />
       <label class="flex flex-col gap-1">
         <span class="text-xs font-bold text-gray-600 uppercase tracking-wide">Select Cetaris CSV</span>
         <input
+          id="cmms-file-input"
           type="file"
           name="file"
           accept=".csv,.xlsx,.xls"
@@ -199,16 +203,21 @@
                  file:cursor-pointer cursor-pointer"
         />
       </label>
-      <button type="submit"
+
+      <!-- Upload button: idle / uploading / importing states -->
+      <button id="cmms-btn" type="submit"
         class="flex items-center justify-center gap-2 bg-wm-blue hover:bg-blue-700
                text-white font-bold py-2 rounded-xl transition text-sm">
-        <span id="cmms-spinner" class="htmx-indicator items-center gap-1 text-sm">
-          <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+        <!-- idle label — hidden while request is in flight -->
+        <span class="btn-idle-text flex items-center gap-1.5">&#128228; Upload &amp; Import</span>
+        <!-- spinner — only visible during htmx request -->
+        <span id="cmms-spinner" class="htmx-indicator items-center gap-1.5 text-sm">
+          <svg class="animate-spin h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-          </svg>Importing...
+          </svg>
+          <span id="cmms-spinner-text">Uploading…</span>
         </span>
-        &#128228; Upload &amp; Import
       </button>
     </form>
     <div id="cmms-result" class="mt-3"></div>
@@ -229,7 +238,12 @@
       </span>
       {% endif %}
     </h2>
-    <div id="my-entries">
+    <div
+      id="my-entries"
+      hx-get="/tech/my-entries?shift_id={{ shift.id }}&tech_name={{ tech_name | urlencode }}"
+      hx-trigger="refresh"
+      hx-swap="innerHTML"
+    >
       {% include 'partials/my_entries.html' %}
     </div>
   </div>
@@ -388,6 +402,49 @@
   refreshRelTimes();
   setInterval(refreshRelTimes, 60000);
   document.addEventListener('htmx:afterSwap', refreshRelTimes);
+
+  // ── WebSocket — real-time entry refresh ────────────────────────────────
+  (function () {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    let ws;
+    function connect() {
+      ws = new WebSocket(`${proto}://${location.host}/ws/feed`);
+      ws.onmessage = (evt) => {
+        const msg = JSON.parse(evt.data);
+        // Refresh my entries whenever any import/entry event comes through
+        if (msg.type === 'cmms_import' || msg.type === 'new_entry') {
+          htmx.trigger(document.getElementById('my-entries'), 'refresh');
+        }
+      };
+      ws.onclose = () => { setTimeout(connect, 3000); };
+      ws.onerror = () => { ws.close(); };
+      setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.send('ping'); }, 25000);
+    }
+    connect();
+  }());
+
+  // ── CMMS upload button two-phase text ─────────────────────────────
+  let _importTimer = null;
+
+  function _cmmsUploadStart() {
+    const txt = document.getElementById('cmms-spinner-text');
+    if (txt) txt.textContent = 'Uploading…';
+    // After ~1.8s (file sent), switch to the processing label
+    _importTimer = setTimeout(() => {
+      if (txt) txt.textContent = 'Importing from Cetaris…';
+    }, 1800);
+  }
+
+  function _cmmsUploadDone() {
+    clearTimeout(_importTimer);
+    const txt = document.getElementById('cmms-spinner-text');
+    if (txt) txt.textContent = 'Uploading…';  // reset for next time
+    // Reset file input so same file can be re-submitted
+    const fi = document.getElementById('cmms-file-input');
+    if (fi) fi.value = '';
+    // Belt-and-suspenders: also trigger the HTMX refresh on my-entries
+    htmx.trigger(document.getElementById('my-entries'), 'refresh');
+  }
 </script>
 </body>
 </html>

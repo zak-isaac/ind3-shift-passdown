@@ -1,0 +1,19 @@
+{% set included = entries | rejectattr('excluded', 'equalto', 1) | list %}
+{% if included %}
+<p class="text-xs font-bold text-wm-blue mb-2">
+  &#9989; {{ included | length }} tech entr{{ 'y' if included | length == 1 else 'ies' }} will be auto-included
+</p>
+<ul class="flex flex-col gap-1">
+  {% for e in entries %}
+  {% set clean = e.issue | strip_wo_prefix %}
+  <li class="text-xs leading-snug {{ 'text-gray-300 line-through' if e.excluded else 'text-gray-700' }}">
+    <span class="font-black {{ 'text-gray-400' if e.excluded else 'text-gray-900' }}">{{ e.unit }}:</span>
+    {{ clean | truncate(72, true, '…') }}{% if e.wo_number and not e.excluded %} <span class="text-gray-400">(WO #{{ e.wo_number }})</span>{% endif %}
+    {% if e.excluded %}<span class="text-red-400 font-semibold">&nbsp;&#128683; excluded</span>{% endif %}
+  </li>
+  {% endfor %}
+</ul>
+<p class="text-xs text-gray-400 italic mt-2">Any new entries logged after this page loaded are also included at generate time.</p>
+{% else %}
+<p class="text-xs text-gray-400 italic">No tech entries yet — will show "None this shift." in report.</p>
+{% endif %}
