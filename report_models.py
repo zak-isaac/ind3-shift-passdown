@@ -16,8 +16,9 @@ class OosUnit(BaseModel):
 
 class RewrittenHappening(BaseModel):
     title: str        # asset ID
-    paragraph: str    # technician's summary note
-    tech_name: str = ""  # who logged it (empty on old saved reports)
+    paragraph: str    # technician's summary note (no WO prefix)
+    wo_number: str = ""  # WO number for the report line, empty for manual entries
+    tech_name: str = ""  # who logged it
 
 
 class ReportData(BaseModel):

@@ -24,8 +24,6 @@
       <span class="text-xs text-gray-400 rel-time" data-iso="{{ e.created_at }}"></span>
       <span class="text-gray-300 text-xs select-none">·</span>
       <span class="text-xs font-black text-gray-400 font-mono">{{ e.created_at | fmt_time }}</span>
-
-      <!-- Unit badge -->
       <span class="ml-auto bg-gray-100 text-gray-700 text-xs font-black px-2.5 py-0.5 rounded-lg font-mono feed-unit shrink-0">
         {{ e.unit }}
       </span>
@@ -41,47 +39,59 @@
 
   </div>
 
-  <!-- Right: MST controls -->
-  <div class="shrink-0 flex flex-col items-end justify-between px-3 py-3 gap-2">
+  <!-- Right: MST controls (compact icon buttons) -->
+  <div class="shrink-0 flex flex-col items-end justify-between px-2 py-2 gap-1.5">
 
-    <span class="text-xs font-bold px-2 py-1 rounded-lg whitespace-nowrap
+    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap
       {{ 'bg-red-100 text-red-700' if is_down else ('bg-yellow-100 text-yellow-800' if is_deg else 'bg-green-50 text-green-700') }}">
       {{ 'Down' if is_down else ('Degraded' if is_deg else 'Monitor') }}
     </span>
 
-    <!-- Exclude from report toggle -->
+    <!-- Edit -->
+    <button
+      hx-get="/lead/entry/{{ e.id }}/edit-form"
+      hx-target="#feed-entry-{{ e.id }}"
+      hx-swap="outerHTML"
+      title="Edit entry"
+      class="text-[10px] px-1.5 py-0.5 rounded border border-gray-200 text-gray-400 hover:border-blue-400 hover:text-blue-500 transition">
+      &#9998;
+    </button>
+
+    <!-- Exclude -->
     <button
       hx-post="/lead/entry/{{ e.id }}/exclude"
       hx-vals='{"excluded": {{ 0 if e.excluded else 1 }}}'
       hx-target="#feed-entry-{{ e.id }}"
       hx-swap="outerHTML"
       hx-confirm="{{ 'Re-include this entry?' if e.excluded else 'Exclude from report?' }}"
-      class="text-[11px] font-bold px-2 py-0.5 rounded-lg border transition
+      title="{{ 'Re-include' if e.excluded else 'Exclude from report' }}"
+      class="text-[10px] px-1.5 py-0.5 rounded border transition
              {{ 'bg-red-50 border-red-300 text-red-600' if e.excluded
-                else 'bg-white border-gray-200 text-gray-400 hover:border-red-300 hover:text-red-500' }}">
-      &#128683; {{ 'Excluded' if e.excluded else 'Exclude' }}
+                else 'border-gray-200 text-gray-400 hover:border-red-300 hover:text-red-500' }}">
+      &#128683;
     </button>
 
-    <!-- Carry-over toggle -->
+    <!-- Carry-over -->
     <button
       hx-post="/lead/entry/{{ e.id }}/carry-over"
       hx-vals='{"state": {{ 0 if e.carry_over else 1 }}}'
       hx-swap="none"
-      onclick="this.classList.toggle('co-on'); this.textContent = this.classList.contains('co-on') ? '📌 On' : '📌 Off';"
-      class="carry-over-btn text-[11px] font-bold px-2 py-0.5 rounded-lg border transition
-             {{ 'bg-orange-100 border-orange-300 text-orange-700 co-on' if e.carry_over
-                else 'bg-white border-gray-200 text-gray-400 hover:border-orange-300 hover:text-orange-500' }}">
-      &#128204; {{ 'On' if e.carry_over else 'Off' }}
+      onclick="this.classList.toggle('co-on'); this.title = this.classList.contains('co-on') ? 'Carry-over ON' : 'Carry-over OFF';"
+      title="{{ 'Carry-over ON' if e.carry_over else 'Carry-over OFF' }}"
+      class="carry-over-btn text-[10px] px-1.5 py-0.5 rounded border transition
+             {{ 'bg-orange-100 border-orange-300 text-orange-600 co-on' if e.carry_over
+                else 'border-gray-200 text-gray-400 hover:border-orange-300 hover:text-orange-500' }}">
+      &#128204;
     </button>
 
-    <!-- Delete permanently -->
+    <!-- Delete -->
     <button
       hx-delete="/lead/entry/{{ e.id }}"
       hx-target="#feed-entry-{{ e.id }}"
       hx-swap="outerHTML"
-      hx-confirm="Permanently delete this entry? Cannot be undone."
-      class="text-[11px] font-bold px-2 py-0.5 rounded-lg border border-gray-200 text-gray-300
-             hover:border-red-400 hover:text-red-500 transition">
+      hx-confirm="Permanently delete this entry?"
+      title="Delete permanently"
+      class="text-[10px] px-1.5 py-0.5 rounded border border-gray-200 text-gray-300 hover:border-red-400 hover:text-red-500 transition">
       &#128465;
     </button>
 

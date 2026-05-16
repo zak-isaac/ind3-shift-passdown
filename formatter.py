@@ -75,7 +75,9 @@ def format_html_preview(data: ReportData) -> str:
             f'padding-bottom:10px;border-bottom:1px solid #eee;">'
             f'<span style="flex-shrink:0;font-weight:900;color:#000;'
             f'min-width:60px;font-size:14px;">{h.title}</span>'
-            f'<span style="flex:1;color:#111;line-height:1.6;">{h.paragraph}</span>'
+            f'<span style="flex:1;color:#111;line-height:1.6;">'
+            f'{h.title}: {h.paragraph}. {"(WO #" + h.wo_number + ")." if h.wo_number else ""}'
+            f'</span>'
             f'</li>'
             for h in data.happenings
         )
@@ -168,7 +170,8 @@ def format_email(data: ReportData) -> str:
     if data.pm_count:
         h_lines.append(f"  •  {data.pm_count} PM{'s' if data.pm_count != 1 else ''} completed")
     for h in data.happenings:
-        h_lines.append(f"  •  {h.title}  —  {h.paragraph}")
+        wo = f" (WO #{h.wo_number})." if h.wo_number else "."
+        h_lines.append(f"  \u2022  {h.title}: {h.paragraph}.{wo}")
     secs.append(_txt_sec("Shift Happenings",
         h_lines or ["  No shift happenings recorded."]))
 

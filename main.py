@@ -1020,6 +1020,19 @@ async def shift_history(request: Request):
     )
 
 
+@app.get("/analytics", response_class=HTMLResponse)
+async def analytics_dashboard(request: Request):
+    if not _is_lead_authed(request):
+        return _lead_redirect("/analytics")
+    import json as _json_mod
+    data = db.get_analytics()
+    return templates.TemplateResponse(
+        request, "analytics.html",
+        {"data": data, "data_json": _json_mod.dumps(data)}
+    )
+
+
+
 @app.get("/history/shift/{shift_id}", response_class=HTMLResponse)
 async def shift_report_view(request: Request, shift_id: int):
     if not _is_lead_authed(request):
@@ -1154,6 +1167,63 @@ async def lead_delete_entry(
         raise HTTPException(status_code=403)
     db.delete_entry(entry_id)
     return HTMLResponse("")  # target row gets removed by HTMX hx-swap outerHTML
+
+
+# ── MST inline entry edit ────────────────────────────────────────────────────────
+
+@app.get("/lead/entry/{entry_id}/edit-form", response_class=HTMLResponse)
+async def lead_entry_edit_form(request: Request, entry_id: int):
+    if not _is_lead_authed(request):
+        raise HTTPException(status_code=403)
+    shift = db.get_active_shift()
+    if not shift:
+        raise HTTPException(status_code=404)
+    entries = db.get_entries(shift["id"])
+    entry = next((e for e in entries if e["id"] == entry_id), None)
+    if not entry:
+        raise HTTPException(status_code=404)
+    return templates.TemplateResponse(
+        request, "partials/live_feed_row_edit.html", {"e": entry}
+    )
+
+
+@app.get("/lead/entry/{entry_id}/edit-form/cancel", response_class=HTMLResponse)
+async def lead_entry_edit_cancel(request: Request, entry_id: int):
+    """Cancel edit — re-render the normal read-only row."""
+    if not _is_lead_authed(request):
+        raise HTTPException(status_code=403)
+    shift = db.get_active_shift()
+    if not shift:
+        raise HTTPException(status_code=404)
+    entries = db.get_entries(shift["id"])
+    entry = next((e for e in entries if e["id"] == entry_id), None)
+    if not entry:
+        raise HTTPException(status_code=404)
+    return templates.TemplateResponse(
+        request, "partials/live_feed_row.html", {"e": entry}
+    )
+
+
+@app.post("/lead/entry/{entry_id}/update", response_class=HTMLResponse)
+async def lead_entry_update(
+    request: Request,
+    entry_id: int,
+    issue: str = Form(...),
+):
+    """MST updates the issue text of an entry in place."""
+    if not _is_lead_authed(request):
+        raise HTTPException(status_code=403)
+    shift = db.get_active_shift()
+    if not shift:
+        raise HTTPException(status_code=404)
+    db.update_entry_issue(entry_id, issue.strip())
+    entries = db.get_entries(shift["id"])
+    entry = next((e for e in entries if e["id"] == entry_id), None)
+    if not entry:
+        return HTMLResponse("")
+    return templates.TemplateResponse(
+        request, "partials/live_feed_row.html", {"e": entry}
+    )
 
 
 
@@ -1558,16 +1628,24 @@ async def lead_generate(
     # ── Pull FRESH entries straight from DB — no rewriting, no templates.
     # Show exactly what the technician typed: asset ID + their summary + their name.
     db_entries = db.get_entries(shift_id)
-    happenings: list[RewrittenHappening] = [
-        RewrittenHappening(
+    # Deduplicate by WO number: same WO from multiple techs → one report line
+    seen_wo: set[str] = set()
+    happenings: list[RewrittenHappening] = []
+    for e in db_entries:
+        if e.get("excluded"):
+            continue
+        wo = e.get("wo_number", "")
+        if wo and wo in seen_wo:
+            continue   # already have this WO in the report
+        if wo:
+            seen_wo.add(wo)
+        clean = _WO_PREFIX_RE.sub('', e["issue"]).strip().rstrip(".")
+        happenings.append(RewrittenHappening(
             title=e["unit"],
-            paragraph=_WO_PREFIX_RE.sub('', e["issue"]).strip()
-                      + (f" (WO #{e['wo_number']})" if e.get("wo_number") else ""),
+            paragraph=clean,
+            wo_number=wo,
             tech_name=e.get("tech_name", ""),
-        )
-        for e in db_entries
-        if (e["unit"].strip() or e["issue"].strip()) and not e.get("excluded")
-    ]
+        ))
 
     # Append any MST-authored extra happenings from the form
     for t, n in zip(extra_title, extra_note):

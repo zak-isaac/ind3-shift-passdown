@@ -250,6 +250,97 @@ def list_past_shifts_with_counts(limit: int = 50) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def get_analytics() -> dict:
+    """Return all data needed for the weekly analytics dashboard."""
+    with _conn() as c:
+        # Top 15 most-worked assets (all time, non-PM, non-excluded)
+        top_assets = c.execute("""
+            SELECT unit, COUNT(*) AS cnt
+            FROM entries
+            WHERE unit != '' AND source != 'pm' AND excluded = 0
+            GROUP BY unit ORDER BY cnt DESC LIMIT 15
+        """).fetchall()
+
+        # Assets appearing in multiple DISTINCT shifts (repeat offenders)
+        repeat_assets = c.execute("""
+            SELECT unit, COUNT(DISTINCT shift_id) AS shift_cnt, COUNT(*) AS total_wo
+            FROM entries
+            WHERE unit != '' AND source != 'pm' AND excluded = 0
+            GROUP BY unit HAVING shift_cnt > 1
+            ORDER BY shift_cnt DESC, total_wo DESC LIMIT 10
+        """).fetchall()
+
+        # WO count per shift (last 30 shifts, non-PM)
+        wo_by_shift = c.execute("""
+            SELECT s.date, s.shift_type, COUNT(e.id) AS wo_count,
+                   SUM(CASE WHEN e.priority='down' THEN 1 ELSE 0 END) AS down_count
+            FROM shifts s
+            LEFT JOIN entries e ON e.shift_id = s.id
+                AND e.source != 'pm' AND e.excluded = 0
+            WHERE s.is_active = 0
+            GROUP BY s.id ORDER BY s.id DESC LIMIT 30
+        """).fetchall()
+
+        # PM count per shift (last 30)
+        pm_by_shift = c.execute("""
+            SELECT s.date, s.shift_type, COUNT(p.id) AS pm_count
+            FROM shifts s
+            LEFT JOIN pm_wos p ON p.shift_id = s.id
+            WHERE s.is_active = 0
+            GROUP BY s.id ORDER BY s.id DESC LIMIT 30
+        """).fetchall()
+
+        # Priority breakdown totals
+        priority_totals = c.execute("""
+            SELECT priority, COUNT(*) AS cnt FROM entries
+            WHERE excluded = 0 AND source != 'pm'
+            GROUP BY priority
+        """).fetchall()
+
+        # Top technicians by entry count
+        top_techs = c.execute("""
+            SELECT tech_name, COUNT(*) AS cnt
+            FROM entries WHERE excluded = 0
+            GROUP BY tech_name ORDER BY cnt DESC LIMIT 10
+        """).fetchall()
+
+        # Total shift & entry counts
+        totals = c.execute("""
+            SELECT
+                COUNT(DISTINCT s.id)  AS total_shifts,
+                COUNT(DISTINCT e.id)  AS total_entries,
+                (SELECT COUNT(*) FROM pm_wos) AS total_pms
+            FROM shifts s
+            LEFT JOIN entries e ON e.shift_id = s.id
+        """).fetchone()
+
+    return {
+        "top_assets":      [dict(r) for r in top_assets],
+        "repeat_assets":   [dict(r) for r in repeat_assets],
+        "wo_by_shift":     [dict(r) for r in reversed(wo_by_shift)],
+        "pm_by_shift":     [dict(r) for r in reversed(pm_by_shift)],
+        "priority_totals": {r["priority"]: r["cnt"] for r in [dict(r) for r in priority_totals]},
+        "top_techs":       [dict(r) for r in top_techs],
+        "totals":          dict(totals) if totals else {},
+    }
+
+    """Past shifts with entry + report counts — orphaned shifts (no entries, no reports) excluded."""
+    with _conn() as c:
+        rows = c.execute("""
+            SELECT s.id, s.date, s.shift_type, s.lead_name,
+                   s.created_at, s.is_active,
+                   COUNT(DISTINCT e.id)  AS entry_count,
+                   COUNT(DISTINCT r.id)  AS report_count
+            FROM shifts s
+            LEFT JOIN entries e ON e.shift_id = s.id
+            LEFT JOIN reports r ON r.shift_id = s.id
+            GROUP BY s.id
+            HAVING entry_count > 0 OR report_count > 0
+            ORDER BY s.id DESC LIMIT ?
+        """, (limit,)).fetchall()
+    return [dict(r) for r in rows]
+
+
 def purge_orphaned_shifts() -> int:
     """Delete inactive shifts that have zero entries and zero reports.
     These were started but abandoned before PIN verification under the old flow.
@@ -462,6 +553,12 @@ def set_entry_excluded(entry_id: int, excluded: bool) -> None:
     """MST-only: mark an entry as excluded (hidden) from the generated report."""
     with _conn() as c:
         c.execute("UPDATE entries SET excluded=? WHERE id=?", (1 if excluded else 0, entry_id))
+
+
+def update_entry_issue(entry_id: int, issue: str) -> None:
+    """MST-only: overwrite the issue text of an entry."""
+    with _conn() as c:
+        c.execute("UPDATE entries SET issue=? WHERE id=?", (issue, entry_id))
 
 
 

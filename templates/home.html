@@ -96,7 +96,7 @@
                 onchange="onDateOrShiftChange()"
                 class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-wm-blue focus:ring-2 focus:ring-blue-200 outline-none transition">
                 <option value="S1">S1 &mdash; 5:30 AM &ndash; 4:00 PM</option>
-                <option value="S2">S2 &mdash; 5:30 PM &ndash; 4:00 AM</option>
+                <option value="S2">S2 &mdash; 12:00 PM &ndash; 10:30 PM</option>
                 <option value="S3">S3 &mdash; 8:30 PM &ndash; 7:00 AM</option>
                 <option value="S4">S4 &mdash; 5:30 AM &ndash; 6:00 PM</option>
                 <option value="S5">S5 &mdash; 5:30 PM &ndash; 6:00 AM</option>
@@ -500,7 +500,7 @@
   // Each shift: { id, pyDays (start days, 0=Mon), startMin, endMin (may exceed 1440 = next day) }
   const SHIFT_WINDOWS = [
     { id: 'S1', startDays:[0,1,2,3], startMin: 330,  endMin: 960  },  // 5:30–16:00 same day
-    { id: 'S2', startDays:[0,1,2,3], startMin: 1050, endMin: 1680 },  // 17:30–4:00 next
+    { id: 'S2', startDays:[0,1,2,3], startMin: 720,  endMin: 1350 },  // 12:00–22:30 same day
     { id: 'S3', startDays:[0,1,2,3], startMin: 1230, endMin: 1860 },  // 20:30–7:00 next
     { id: 'S4', startDays:[4,5,6],   startMin: 330,  endMin: 1080 },  // 5:30–18:00 same day
     { id: 'S5', startDays:[4,5,6],   startMin: 1050, endMin: 1800 },  // 17:30–6:00 next

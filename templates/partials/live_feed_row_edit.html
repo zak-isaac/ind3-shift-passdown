@@ -1,0 +1,46 @@
+<!-- partials/live_feed_row_edit.html — inline edit form for MST -->
+{% set is_down = e.priority == 'down' %}
+{% set is_deg  = e.priority == 'degraded' %}
+
+<div id="feed-entry-{{ e.id }}"
+     class="log-row flex items-stretch bg-blue-50 border-l-4 border-wm-blue"
+     data-entry
+     data-unit="{{ e.unit | lower }}"
+     data-tech="{{ e.tech_name | lower }}"
+     data-iso="{{ e.created_at }}">
+
+  <div class="w-1 shrink-0 {{ 'bg-red-500' if is_down else ('bg-yellow-400' if is_deg else 'bg-green-500') }}"></div>
+
+  <div class="flex-1 min-w-0 px-4 py-3">
+    <p class="text-xs font-black text-wm-blue mb-2">
+      &#9998; Editing: <span class="font-mono">{{ e.unit }}</span>
+      &bull; {{ e.tech_name }} &bull; {{ e.created_at | fmt_time }}
+    </p>
+
+    <form
+      hx-post="/lead/entry/{{ e.id }}/update"
+      hx-target="#feed-entry-{{ e.id }}"
+      hx-swap="outerHTML"
+      class="flex flex-col gap-2">
+
+      <textarea name="issue" rows="3"
+        class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm
+               focus:border-wm-blue focus:ring-2 focus:ring-blue-100 outline-none resize-none">{{ e.issue | strip_wo_prefix }}</textarea>
+
+      <div class="flex gap-2 items-center">
+        <button type="submit"
+          class="bg-wm-blue text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-blue-700 transition">
+          &#10003; Save
+        </button>
+        <button type="button"
+          hx-get="/lead/entry/{{ e.id }}/edit-form/cancel"
+          hx-target="#feed-entry-{{ e.id }}"
+          hx-swap="outerHTML"
+          class="text-gray-500 text-xs font-bold px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 transition">
+          &#10005; Cancel
+        </button>
+        <span class="text-xs text-gray-400 ml-auto">WO #{{ e.wo_number }} &bull; {{ e.unit }}</span>
+      </div>
+    </form>
+  </div>
+</div>
