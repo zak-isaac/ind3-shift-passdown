@@ -88,8 +88,15 @@
 
 <main class="flex-1 min-h-0 flex flex-row gap-3 px-4 py-3 max-w-7xl mx-auto w-full">
 
-  <!-- LEFT: CMMS import (fixed narrow width) -->
-  <div class="w-72 shrink-0 flex flex-col gap-3">
+  <!-- LEFT: CMMS import (fixed narrow width, scrollable) -->
+  <div class="w-72 shrink-0 flex flex-col gap-3 overflow-y-auto pr-1" style="max-height:calc(100vh - 80px);">
+    <style>
+      /* Scrollbar styling for left CMMS panel */
+      .w-72::-webkit-scrollbar { width: 5px; }
+      .w-72::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+      .w-72::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+      .w-72::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
   <!-- LOG SHIFT HAPPENING FORM — hidden, re-enable by removing 'hidden' -->
   <div class="hidden bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex flex-col flex-1">
     <h2 class="text-wm-dark font-bold text-sm mb-3 flex items-center gap-2">

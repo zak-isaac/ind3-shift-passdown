@@ -211,12 +211,15 @@
           <input type="file" name="pm_file" required
             accept=".pdf,.xlsx,.xls,.csv,.png,.jpg,.jpeg"
             class="text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg
-                   file:border-0 file:text-xs file:font-bold file:bg-blue-600 file:text-white
+                   file:border-0 file:text-xs file:font-bold file:bg-wm-blue file:text-white
                    file:cursor-pointer hover:file:bg-blue-700 cursor-pointer" />
         </label>
         <button type="submit"
-          class="w-fit flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700
-                 text-white text-xs font-bold rounded-lg transition">
+          style="background:#0053e2;color:#fff;font-weight:700;font-size:0.75rem;
+                 padding:0.5rem 1rem;border-radius:0.5rem;border:none;cursor:pointer;
+                 display:inline-flex;align-items:center;gap:0.4rem;width:fit-content;"
+          onmouseover="this.style.background='#003db5'"
+          onmouseout="this.style.background='#0053e2'">
           &#128228; Upload PM Report
         </button>
       </form>
