@@ -220,6 +220,16 @@
         </span>
       </button>
     </form>
+
+    <!-- Upload status banner — hidden until upload starts -->
+    <div id="upload-status" class="hidden mt-3 rounded-xl border px-4 py-3 flex items-center gap-3">
+      <svg id="upload-status-spin" class="animate-spin h-5 w-5 text-wm-blue shrink-0" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+      </svg>
+      <span id="upload-status-text" class="text-sm font-bold text-wm-blue">Uploading file&hellip;</span>
+    </div>
+
     <div id="cmms-result" class="mt-3 overflow-hidden"></div>
   </div>
 
@@ -426,22 +436,32 @@
   // ── CMMS upload button two-phase text ─────────────────────────────
   let _importTimer = null;
 
+  function _setUploadStatus(msg) {
+    const banner = document.getElementById('upload-status');
+    const text   = document.getElementById('upload-status-text');
+    if (!banner || !text) return;
+    if (!msg) { banner.classList.add('hidden'); return; }
+    banner.className = 'mt-3 rounded-xl border px-4 py-3 flex items-center gap-3 bg-blue-50 border-blue-200';
+    text.textContent = msg;
+  }
+
   function _cmmsUploadStart() {
+    _setUploadStatus('\uD83D\uDCE4 Uploading file\u2026');
     const txt = document.getElementById('cmms-spinner-text');
-    if (txt) txt.textContent = 'Uploading…';
-    // After ~1.8s (file sent), switch to the processing label
+    if (txt) txt.textContent = 'Uploading\u2026';
     _importTimer = setTimeout(() => {
-      if (txt) txt.textContent = 'Importing from Cetaris…';
+      _setUploadStatus('\u2699\uFE0F Importing from Cetaris\u2026');
+      const txt2 = document.getElementById('cmms-spinner-text');
+      if (txt2) txt2.textContent = 'Importing\u2026';
     }, 1800);
   }
 
   function _cmmsUploadDone() {
     clearTimeout(_importTimer);
-    const txt = document.getElementById('cmms-spinner-text');
-    if (txt) txt.textContent = 'Uploading…';
+    _setUploadStatus('\u2705 Done! Reloading\u2026');
     const fi = document.getElementById('cmms-file-input');
     if (fi) fi.value = '';
-    // Show the result for 2 seconds so the tech can read it, then reload fresh
+    // Show the result + done banner briefly, then reload clean
     setTimeout(() => window.location.reload(), 2000);
   }
 </script>
