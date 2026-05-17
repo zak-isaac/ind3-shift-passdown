@@ -1578,26 +1578,127 @@ async def admin_save_email_settings(
     return RedirectResponse("/admin?msg=Email+settings+saved", status_code=303)
 
 
-@app.post("/admin/email-test")
+@app.get("/admin/email-preview", response_class=HTMLResponse)
+async def admin_email_preview(request: Request):
+    """Live preview of the passdown email format with sample data."""
+    if not _is_lead_authed(request):
+        return _lead_redirect("/admin")
+    from report_models import RewrittenHappening, OosUnit
+    sample = ReportData(
+        date=datetime.now().strftime("%Y-%m-%d"),
+        shift_type="S2",
+        lead_name="Isaac S.",
+        dc_number=DC_NUMBER,
+        vendors=[],
+        happenings=[
+            RewrittenHappening(title="Shift Happenings",
+                paragraph="Worked on scheduled PMs."),
+            RewrittenHappening(title="BALER0005",
+                paragraph="An ABM associate requested help to secure the bale. Only 2 wires were fastened. They may need help with the next bale as well."),
+            RewrittenHappening(title="TSP0004",
+                paragraph="Test-drove the equipment in different environments to reproduce the error, but it did not occur. Further troubleshooting is required."),
+            RewrittenHappening(title="Training",
+                paragraph="Boom lift training session for Jonah."),
+        ],
+        ro=[],
+        rts=[],
+        oos=[
+            OosUnit(unit="M2785"), OosUnit(unit="WAV0015"), OosUnit(unit="TK51"),
+            OosUnit(unit="RTU-S-02"), OosUnit(unit="CHAR0020"), OosUnit(unit="TSP0004"),
+        ],
+        pm_count=4,
+    )
+    body    = format_email_passdown(sample)
+    escaped = body.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    from_addr = outlook_sender.get_sender_address() or "your-outlook-account@walmart.com"
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Email Preview — IND3 Passdown</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-start justify-center py-12 px-4">
+  <div class="w-full max-w-2xl">
+    <div class="flex items-center justify-between mb-4">
+      <h1 class="text-lg font-black text-gray-800">&#128233; Email Preview</h1>
+      <a href="/admin" class="text-sm text-blue-600 hover:underline">&larr; Back to Admin</a>
+    </div>
+    <div class="text-xs text-gray-500 mb-2">This is exactly what recipients see when a shift closes.</div>
+
+    <!-- Fake email client chrome -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+      <div class="bg-gray-50 border-b border-gray-200 px-6 py-4">
+        <div class="flex flex-col gap-1 text-sm">
+          <div class="flex gap-2">
+            <span class="text-gray-400 w-12 shrink-0">From:</span>
+            <span class="font-semibold text-gray-800">IND3 Shift Passdown &lt;{from_addr}&gt;</span>
+          </div>
+          <div class="flex gap-2">
+            <span class="text-gray-400 w-12 shrink-0">To:</span>
+            <span class="text-gray-700">{db.get_setting('email_to', 'mt7-60@wal-mart.com')}</span>
+          </div>
+          <div class="flex gap-2">
+            <span class="text-gray-400 w-12 shrink-0">Subject:</span>
+            <span class="font-semibold text-gray-800">IND3 Passdown – S2 Shift – Isaac S. – {sample.date}</span>
+          </div>
+        </div>
+      </div>
+      <div class="px-6 py-6">
+        <pre class="font-sans text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{escaped}</pre>
+        <div class="mt-6 pt-4 border-t border-gray-100 text-xs text-gray-400 italic">
+          [Your Outlook signature appears here automatically]
+        </div>
+      </div>
+    </div>
+
+    <!-- Data flow explainer -->
+    <div class="mt-8 bg-white rounded-2xl shadow border border-gray-200 p-6">
+      <h2 class="font-black text-gray-800 mb-4">&#128196; How the data gets filled in</h2>
+      <ol class="space-y-4 text-sm text-gray-700">
+        <li class="flex gap-3">
+          <span class="bg-blue-100 text-blue-700 font-black rounded-full w-6 h-6 flex items-center justify-center shrink-0 text-xs">1</span>
+          <div><strong>MST logs into the tablet/laptop</strong> &mdash; they scan or type their badge ID. The system starts a shift record with their name, shift type, and date.</div>
+        </li>
+        <li class="flex gap-3">
+          <span class="bg-blue-100 text-blue-700 font-black rounded-full w-6 h-6 flex items-center justify-center shrink-0 text-xs">2</span>
+          <div><strong>Tech fills in entries during shift</strong> &mdash; unit ID, what the issue was, what they did, what the result was. Each entry is saved to the database instantly.</div>
+        </li>
+        <li class="flex gap-3">
+          <span class="bg-blue-100 text-blue-700 font-black rounded-full w-6 h-6 flex items-center justify-center shrink-0 text-xs">3</span>
+          <div><strong>Lead reviews &amp; generates report</strong> &mdash; the lead hits &ldquo;Generate Report&rdquo; which rewrites all the raw entries into clean professional paragraphs. They can edit before saving.</div>
+        </li>
+        <li class="flex gap-3">
+          <span class="bg-blue-100 text-blue-700 font-black rounded-full w-6 h-6 flex items-center justify-center shrink-0 text-xs">4</span>
+          <div><strong>MST hits &ldquo;End Shift&rdquo;</strong> &mdash; the report is finalized, the shift is closed, and this email fires automatically to everyone in the recipients list. Outlook sends it in the background.</div>
+        </li>
+        <li class="flex gap-3">
+          <span class="bg-green-100 text-green-700 font-black rounded-full w-6 h-6 flex items-center justify-center shrink-0 text-xs">✓</span>
+          <div><strong>Management gets the email</strong> &mdash; formatted exactly as shown above, with the Outlook signature appended automatically. No MST has to type or send anything manually.</div>
+        </li>
+      </ol>
+    </div>
+  </div>
+</body>
+</html>"""
+    return HTMLResponse(html)
+
+
+
 async def admin_test_email(request: Request):
     if not _is_lead_authed(request):
         return _lead_redirect("/admin")
     to_raw  = db.get_setting("email_to", "").strip()
     to_list = [a.strip() for a in to_raw.split(",") if a.strip()]
     if not to_list:
-        return RedirectResponse("/admin?err=Set+recipient+addresses+first", status_code=303)
-    if not _smtp_signed_in():
-        return RedirectResponse("/admin?err=Sign+in+to+enable+email+first", status_code=303)
+        return RedirectResponse("/admin?err=Add+recipients+first", status_code=303)
     from_name = db.get_setting("email_from_name", "IND3 Shift Passdown").strip()
     try:
-        await asyncio.to_thread(
-            emailer.send_passdown,
+        await outlook_sender.send_email(
+            to_list,
             "IND3 Passdown — Test Email ✅",
-            "This is a test email from the IND3 Shift Passdown system. Email is working!",
-            from_addr=_smtp_session["email"],
+            "This is a test email from the IND3 Shift Passdown system.\n\nEmail is working! 🐾",
             from_name=from_name,
-            to_addrs=to_list,
-            password=_smtp_session["password"],
         )
         return RedirectResponse("/admin?msg=Test+email+sent+%E2%9C%85", status_code=303)
     except Exception as exc:

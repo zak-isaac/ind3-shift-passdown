@@ -41,6 +41,19 @@ def is_outlook_available() -> bool:
         return False
 
 
+def get_sender_address() -> str:
+    """Return the primary SMTP address of the logged-in Outlook account."""
+    try:
+        result = subprocess.run(
+            ["powershell", "-NonInteractive", "-Command",
+             "(New-Object -ComObject Outlook.Application).Session.CurrentUser.AddressEntry.GetExchangeUser().PrimarySmtpAddress"],
+            capture_output=True, text=True, timeout=8,
+        )
+        return result.stdout.strip() if result.returncode == 0 else ""
+    except Exception:
+        return ""
+
+
 async def send_email(
     to_addrs: list[str],
     subject: str,
