@@ -537,19 +537,20 @@
         <p class="text-red-700 font-black text-sm uppercase tracking-widest">Danger Zone</p>
       </div>
       <p class="text-red-600 text-xs leading-relaxed">
-        Ending the shift will lock all entries, generate the final passdown report, and send it to the email list.
+        Ending the shift will lock all entries and finalize the passdown report.
+        Use the <strong>Send Email</strong> button in the report card to send it out.
         <strong>This cannot be undone.</strong>
       </p>
       <form method="POST" action="/shift/end">
         <input type="hidden" name="shift_id" value="{{ shift.id }}" />
         <button type="submit"
-          onclick="return confirm('&#9888; End this shift?\n\nThis will lock all entries and send the final passdown report.\n\nAre you sure?')"
+          onclick="return confirm('&#9888; End this shift?\n\nThis will lock all entries. Use the Send Email button to send the report.\n\nAre you sure?')"
           class="w-full flex items-center justify-center gap-3
                  bg-red-600 hover:bg-red-700 active:bg-red-800
               text-white font-black py-4 rounded-xl transition
                  shadow-lg focus:outline-none focus:ring-4 focus:ring-red-300
                  border-b-4 border-red-800 text-lg tracking-wide">
-          &#128274;&nbsp; END SHIFT &amp; SEND REPORT
+          &#128274;&nbsp; END SHIFT
         </button>
       </form>
     </div>

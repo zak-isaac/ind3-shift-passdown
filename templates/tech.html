@@ -260,6 +260,7 @@
       hx-get="/tech/my-entries?shift_id={{ shift.id }}&tech_name={{ tech_name | urlencode }}"
       hx-trigger="refresh"
       hx-swap="innerHTML"
+      style="max-height:calc(100vh - 260px);overflow-y:auto;padding-right:4px;"
     >
       {% include 'partials/my_entries.html' %}
     </div>

@@ -1816,7 +1816,9 @@ async def report_email_preview(request: Request, report_id: int):
 
     return templates.TemplateResponse(
         request, "partials/email_preview_modal.html",
-        {"report_id": report_id, "subject": subj, "html_body": html_body},
+        {"report_id": report_id, "subject": subj,
+         "html_body": html_body,
+         "email_to": db.get_setting("email_to", "").strip()},
     )
 
 
@@ -1853,6 +1855,61 @@ async def report_send_email(
         return HTMLResponse(
             f'<p class="text-red-600 font-bold text-sm">&#10060; Send failed: {exc}</p>'
         )
+
+
+@app.get("/report/{report_id}/print", response_class=HTMLResponse)
+async def report_print_view(request: Request, report_id: int):
+    """Printable / save-as-PDF version — renders the email HTML in a full page.
+    Open in browser → Ctrl+P → Save as PDF for a pixel-perfect match with the email.
+    """
+    rec = db.get_report(report_id)
+    if not rec:
+        raise HTTPException(404, "Report not found")
+    shift_id   = rec["shift_id"]
+    shift      = db.get_shift(shift_id)
+    loto       = db.get_loto(shift_id)
+    email_data = (
+        ReportData.model_validate_json(rec["report_json"])
+        if rec.get("report_json") else None
+    )
+    html_body = format_email_passdown_html(
+        email_data,
+        loto_missing=loto.get("loto_missing_keys", ""),
+        pending_pms=db.get_pending_pms(shift_id),
+    ) if email_data else rec["content"]
+    # Strip outer html/body tags so we can wrap with print styles
+    inner = html_body
+    for tag in ("<html>", "</html>"):
+        inner = inner.replace(tag, "")
+    import re as _re
+    inner = _re.sub(r"<body[^>]*>", "", inner).replace("</body>", "")
+
+    title = f"{shift['shift_type']} Passdown – {shift['date']}" if shift else "Passdown Report"
+    return HTMLResponse(
+        f"""<!DOCTYPE html><html lang='en'><head>
+<meta charset='UTF-8'><title>{title}</title>
+<style>
+  * {{ box-sizing:border-box; }}
+  body {{ font-family:Calibri,Arial,sans-serif;font-size:14px;color:#111;
+          max-width:740px;margin:32px auto;padding:0 24px;line-height:1.6; }}
+  @media print {{
+    body {{ margin:0;padding:16px; }}
+    .no-print {{ display:none; }}
+  }}
+  .print-bar {{ background:#0053e2;color:#fff;padding:12px 20px;margin:-24px -24px 24px;
+                display:flex;justify-content:space-between;align-items:center; }}
+  .print-bar h1 {{ margin:0;font-size:15px; }}
+  .print-bar button {{ background:#fff;color:#0053e2;border:none;font-weight:700;
+                       padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px; }}
+</style>
+</head><body>
+<div class='print-bar no-print'>
+  <h1>&#127944; {title}</h1>
+  <button onclick='window.print()'>&#128438; Print / Save as PDF</button>
+</div>
+{inner}
+</body></html>"""
+    )
 
 
 @app.get("/admin/email-preview", response_class=HTMLResponse)
