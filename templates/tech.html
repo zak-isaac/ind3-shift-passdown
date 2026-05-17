@@ -220,7 +220,7 @@
         </span>
       </button>
     </form>
-    <div id="cmms-result" class="mt-3"></div>
+    <div id="cmms-result" class="mt-3 overflow-hidden"></div>
   </div>
 
   </div><!-- /left col -->
@@ -241,7 +241,7 @@
     <div
       id="my-entries"
       hx-get="/tech/my-entries?shift_id={{ shift.id }}&tech_name={{ tech_name | urlencode }}"
-      hx-trigger="refresh, every 15s"
+      hx-trigger="refresh"
       hx-swap="innerHTML"
     >
       {% include 'partials/my_entries.html' %}
@@ -411,6 +411,7 @@
       ws = new WebSocket(`${proto}://${location.host}/ws/feed`);
       ws.onmessage = (evt) => {
         const msg = JSON.parse(evt.data);
+        // Page reloads after own uploads; WS still useful for cross-device awareness
         if (msg.type === 'cmms_import' || msg.type === 'new_entry') {
           htmx.trigger(document.getElementById('my-entries'), 'refresh');
         }
@@ -437,11 +438,11 @@
   function _cmmsUploadDone() {
     clearTimeout(_importTimer);
     const txt = document.getElementById('cmms-spinner-text');
-    if (txt) txt.textContent = 'Uploading…';  // reset for next time
+    if (txt) txt.textContent = 'Uploading…';
     const fi = document.getElementById('cmms-file-input');
     if (fi) fi.value = '';
-    // Immediately pull fresh entries from the server
-    htmx.trigger(document.getElementById('my-entries'), 'refresh');
+    // Show the result for 2 seconds so the tech can read it, then reload fresh
+    setTimeout(() => window.location.reload(), 2000);
   }
 </script>
 </body>
