@@ -29,7 +29,7 @@ def _outlook_ready() -> bool:
         _OUTLOOK_OK = outlook_sender.is_outlook_available()
     return _OUTLOOK_OK
 from report_models import OosUnit, ReportData, RewrittenHappening, HappeningInput
-from formatter import format_html_preview, format_email
+from formatter import format_html_preview, format_email, format_email_passdown
 from rewriter import rewrite_all
 from cetaris_parser import parse_cetaris, ParseResult
 from summarizer import summarize_remarks
@@ -562,37 +562,42 @@ async def shift_end(request: Request, shift_id: int = Form(...)):
     last = db.get_last_report_for_shift(shift_id)
     if last:
         content = last["content"]
+        # Reconstruct ReportData from stored JSON for clean email formatting
+        email_data = (
+            ReportData.model_validate_json(last["report_json"])
+            if last.get("report_json") else None
+        )
     else:
         raw_entries = db.get_entries(shift_id)
         happenings_input = [
             HappeningInput(
-                title=f"{e['unit']} – {e['issue'][:50]}",
+                title=f"{e['unit']} \u2013 {e['issue'][:50]}",
                 raw_note=f"{e['issue']}. {e['action']}. {e['result']}.",
             )
             for e in raw_entries
         ]
         rewritten = rewrite_all(happenings_input)
-        data = ReportData(
+        email_data = ReportData(
             date=shift["date"],
             shift_type=shift["shift_type"],
             lead_name=shift["lead_name"],
             dc_number=DC_NUMBER,
-            happenings=rewritten,          # ← was 'happenings' (NameError)
+            happenings=rewritten,
         )
-        content = format_email(data)
-        db.save_report(shift_id, content, data.model_dump_json())
+        content = format_email(email_data)
+        db.save_report(shift_id, content, email_data.model_dump_json())
 
     db.close_shift(shift_id)
 
-    # —— Fire-and-forget passdown email ———————————————————————————
+    # —— Fire-and-forget passdown email —————————————————————————————————
     if db.get_setting("email_to", "").strip() and _outlook_ready():
         subj = (
             f"IND3 Passdown – {shift['shift_type']} Shift – "
             f"{shift['lead_name']} – {shift['date']}"
         )
-        asyncio.create_task(_send_passdown_email(subj, content))
-    else:
-        print("[email] not signed in or no recipients — skipping", flush=True)
+        # Use clean passdown format if we have structured data; fall back to content
+        email_body = format_email_passdown(email_data) if email_data else content
+        asyncio.create_task(_send_passdown_email(subj, email_body))
 
     carry_overs = db.get_carry_over_entries(current_shift_id=shift_id)
     shift_notes = db.get_shift_notes(shift_id)

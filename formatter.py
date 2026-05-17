@@ -121,7 +121,75 @@ def format_html_preview(data: ReportData) -> str:
     )
 
 
-# ── Plain-text / TXT download ─────────────────────────────────────────────────
+# ── Passdown email (clean bullet format) ────────────────────────────────────────
+
+def format_email_passdown(data: ReportData) -> str:
+    """Clean bullet-point passdown email matching the standard IND3 format.
+
+    Example output:
+        D2 End of Shift Passdown
+
+        Vendors
+        • None
+
+        Shift Happenings
+        • Worked on scheduled PMs.
+        • BALER0005: ABM requested help securing the bale...
+
+        PM's Needing to be Completed
+        • None
+
+        Out of Service — Returned to Service (RTS)
+        • None
+
+        Current Out of Service
+        • M2785
+        • WAV0015
+
+        All LOTO Keys verified
+    """
+    def _bullets(items: list[str]) -> str:
+        return "\n".join(f"\u2022 {i}" for i in items) if items else "\u2022 None"
+
+    # ── Header ──
+    lines: list[str] = [
+        f"{data.shift_type} End of Shift Passdown",
+        "",
+    ]
+
+    # ── Vendors ──
+    lines += ["Vendors", _bullets(data.vendors), ""]
+
+    # ── Shift Happenings ──
+    h_items: list[str] = []
+    if data.pm_count:
+        label = f"{data.pm_count} PM{'s' if data.pm_count != 1 else ''} completed this shift"
+        h_items.append(label)
+    for h in data.happenings:
+        # Use unit prefix if title looks like a unit code, else just the paragraph
+        prefix = h.title.split("\u2013")[0].split("-")[0].strip()
+        if prefix and not any(c in prefix for c in (" ", ",")):
+            h_items.append(f"{prefix}: {h.paragraph}")
+        else:
+            h_items.append(h.paragraph)
+    lines += ["Shift Happenings", _bullets(h_items), ""]
+
+    # ── PM's Needing to be Completed (Reliable Operations) ──
+    lines += ["PM's Needing to be Completed", _bullets(list(data.ro)), ""]
+
+    # ── Out of Service — RTS ──
+    lines += ["Out of Service \u2014 Returned to Service (RTS)", _bullets(list(data.rts)), ""]
+
+    # ── Current Out of Service ──
+    oos_names = [o.unit for o in data.oos]
+    lines += ["Current Out of Service", _bullets(oos_names), ""]
+
+    # ── Footer ──
+    lines.append("All LOTO Keys verified")
+
+    return "\n".join(lines)
+
+
 
 W  = 64                        # report column width
 _DIV = "=" * W
