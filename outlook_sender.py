@@ -11,7 +11,12 @@ import os
 
 
 def _build_ps_script(to_addrs: list[str], subject: str, from_name: str, reply_to: str) -> str:
-    """Build a PowerShell script that sends via Outlook COM."""
+    """Build a PowerShell script that sends via Outlook COM.
+
+    Strategy: create a blank MailItem first (Outlook auto-inserts the default
+    signature into HTMLBody), then inject our passdown content at the very top
+    of that body so the signature is preserved beneath it.
+    """
     to_str = "; ".join(to_addrs)
     subj   = subject.replace("'", "''")
     reply  = reply_to.replace("'", "''")
@@ -21,7 +26,26 @@ $ol   = New-Object -ComObject Outlook.Application
 $mail = $ol.CreateItem(0)
 $mail.To      = '{to_str}'
 $mail.Subject = '{subj}'
-$mail.HTMLBody = [System.IO.File]::ReadAllText($env:PASSDOWN_BODY_FILE)
+
+# Read our passdown HTML
+$ourFull = [System.IO.File]::ReadAllText($env:PASSDOWN_BODY_FILE)
+
+# Strip outer <html>/<body> wrappers so we get just the inner content
+$ourInner = [System.Text.RegularExpressions.Regex]::Replace(
+    $ourFull, '(?is)<html[^>]*>.*?<body[^>]*>', '')
+$ourInner = [System.Text.RegularExpressions.Regex]::Replace(
+    $ourInner, '(?is)</body>.*?</html>', '')
+
+# Outlook auto-filled HTMLBody with the default MST signature.
+# We inject our content right after the opening <body> tag.
+$sigBody = $mail.HTMLBody
+$injected = [System.Text.RegularExpressions.Regex]::Replace(
+    $sigBody,
+    '(?i)(<body[^>]*>)',
+    "`$1`n$ourInner`n<hr style='border:none;border-top:1px solid #e5e7eb;margin:16px 0;'>`n"
+)
+$mail.HTMLBody = $injected
+
 if ('{reply}') {{
     $mail.ReplyRecipients.Add('{reply}') | Out-Null
 }}
