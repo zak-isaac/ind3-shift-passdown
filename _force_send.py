@@ -26,7 +26,7 @@ def main():
         (shift_id,)
     ).fetchone()
 
-    from formatter import format_email_passdown
+    from formatter import format_email_passdown_html
     from report_models import ReportData, RewrittenHappening, OosUnit
     import db as _db
 
@@ -68,8 +68,17 @@ def main():
     print(f"[report] happenings={len(data.happenings)} oos={len(data.oos)} rts={len(data.rts)}")
 
     # ── Format ─────────────────────────────────────────────────────────────────
-    body    = format_email_passdown(data)
-    subject = f"IND3 Passdown – {shift['shift_type']} Shift – {shift['lead_name']} – {shift['date']}"
+    loto_row = con.execute(
+        "SELECT loto_verified, loto_missing_keys FROM shifts WHERE id=?", (shift_id,)
+    ).fetchone()
+    loto_missing = loto_row["loto_missing_keys"] if loto_row else ""
+    pending_pms  = [dict(r) for r in con.execute(
+        "SELECT * FROM pending_pms WHERE shift_id=? ORDER BY asset_num, pm_due_date",
+        (shift_id,)
+    ).fetchall()]
+
+    body    = format_email_passdown_html(data, loto_missing=loto_missing, pending_pms=pending_pms or None)
+    subject = f"IND3 Passdown - {shift['shift_type']} Shift - {shift['lead_name']} - {shift['date']}"
 
     # ── Recipients ─────────────────────────────────────────────────────────────
     settings_row = con.execute(
@@ -85,9 +94,7 @@ def main():
         return
 
     print(f"[email] sending to {to_list} as '{from_name}'")
-    print("-" * 60)
-    print(body.encode('ascii', 'replace').decode('ascii'))
-    print("-" * 60)
+    print(f"[email] HTML body: {len(body)} chars | {len(pending_pms)} pending PMs | loto_missing='{loto_missing}'")
 
     import outlook_sender
     asyncio.run(outlook_sender.send_email(
