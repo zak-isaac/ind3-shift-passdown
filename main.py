@@ -118,11 +118,16 @@ async def _send_passdown_email(subject: str, body: str) -> None:
     to_raw    = db.get_setting("email_to", "").strip()
     to_list   = [a.strip() for a in to_raw.split(",") if a.strip()]
     from_name = db.get_setting("email_from_name", "IND3 Shift Passdown").strip()
+    reply_to  = db.get_setting("email_reply_to", "").strip() or (to_list[0] if to_list else "")
     if not to_list:
         print("[email] no recipients — skipping", flush=True)
         return
     try:
-        await outlook_sender.send_email(to_list, subject, body, from_name=from_name)
+        await outlook_sender.send_email(
+            to_list, subject, body,
+            from_name=from_name,
+            reply_to=reply_to,
+        )
         print(f"[email] sent via Outlook → {to_list}", flush=True)
     except Exception as exc:
         print(f"[email] Outlook send failed: {exc}", flush=True)
@@ -1610,7 +1615,9 @@ async def admin_email_preview(request: Request):
     )
     body    = format_email_passdown(sample)
     escaped = body.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    from_addr = outlook_sender.get_sender_address() or "your-outlook-account@walmart.com"
+    from_addr = outlook_sender.get_sender_address() or ""
+    reply_to  = db.get_setting("email_reply_to", "").strip() or db.get_setting("email_to", "").split(",")[0].strip()
+    from_name = db.get_setting("email_from_name", "IND3 Shift Passdown").strip()
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1631,11 +1638,15 @@ async def admin_email_preview(request: Request):
       <div class="bg-gray-50 border-b border-gray-200 px-6 py-4">
         <div class="flex flex-col gap-1 text-sm">
           <div class="flex gap-2">
-            <span class="text-gray-400 w-12 shrink-0">From:</span>
-            <span class="font-semibold text-gray-800">IND3 Shift Passdown &lt;{from_addr}&gt;</span>
+            <span class="text-gray-400 w-16 shrink-0">From:</span>
+            <span class="font-semibold text-gray-800">{from_name}</span>
           </div>
           <div class="flex gap-2">
-            <span class="text-gray-400 w-12 shrink-0">To:</span>
+            <span class="text-gray-400 w-16 shrink-0">Reply-To:</span>
+            <span class="text-gray-700">{reply_to or 'same as recipients'}</span>
+          </div>
+          <div class="flex gap-2">
+            <span class="text-gray-400 w-16 shrink-0">To:</span>
             <span class="text-gray-700">{db.get_setting('email_to', 'mt7-60@wal-mart.com')}</span>
           </div>
           <div class="flex gap-2">
@@ -1693,12 +1704,14 @@ async def admin_test_email(request: Request):
     if not to_list:
         return RedirectResponse("/admin?err=Add+recipients+first", status_code=303)
     from_name = db.get_setting("email_from_name", "IND3 Shift Passdown").strip()
+    reply_to  = db.get_setting("email_reply_to", "").strip() or (to_list[0] if to_list else "")
     try:
         await outlook_sender.send_email(
             to_list,
             "IND3 Passdown — Test Email ✅",
             "This is a test email from the IND3 Shift Passdown system.\n\nEmail is working! 🐾",
             from_name=from_name,
+            reply_to=reply_to,
         )
         return RedirectResponse("/admin?msg=Test+email+sent+%E2%9C%85", status_code=303)
     except Exception as exc:

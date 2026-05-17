@@ -10,12 +10,11 @@ import tempfile
 import os
 
 
-def _build_ps_script(to_addrs: list[str], subject: str, body: str, from_name: str) -> str:
+def _build_ps_script(to_addrs: list[str], subject: str, from_name: str, reply_to: str) -> str:
     """Build a PowerShell script that sends via Outlook COM."""
-    # Write body to a temp file to avoid any escaping nightmares with long text
     to_str = "; ".join(to_addrs)
-    # Escape only what's needed inline (subject is usually short)
-    subj = subject.replace("'", "''")
+    subj   = subject.replace("'", "''")
+    reply  = reply_to.replace("'", "''")
     return f"""
 $ErrorActionPreference = 'Stop'
 $ol   = New-Object -ComObject Outlook.Application
@@ -23,6 +22,9 @@ $mail = $ol.CreateItem(0)
 $mail.To      = '{to_str}'
 $mail.Subject = '{subj}'
 $mail.Body    = [System.IO.File]::ReadAllText($env:PASSDOWN_BODY_FILE)
+if ('{reply}') {{
+    $mail.ReplyRecipients.Add('{reply}') | Out-Null
+}}
 $mail.Send()
 Write-Host 'OK'
 """
@@ -59,21 +61,20 @@ async def send_email(
     subject: str,
     body: str,
     from_name: str = "IND3 Shift Passdown",
+    reply_to: str = "",
 ) -> None:
     """Send an email via Outlook COM. Raises RuntimeError on failure."""
 
     def _send():
-        # Write body to a temp file — avoids all escaping issues with long text
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".txt", delete=False, encoding="utf-8"
         ) as f:
             f.write(body)
             tmp_path = f.name
-
         try:
             env = os.environ.copy()
             env["PASSDOWN_BODY_FILE"] = tmp_path
-            script = _build_ps_script(to_addrs, subject, body, from_name)
+            script = _build_ps_script(to_addrs, subject, from_name, reply_to)
             result = subprocess.run(
                 ["powershell", "-NonInteractive", "-Command", script],
                 capture_output=True, text=True, timeout=30, env=env,
