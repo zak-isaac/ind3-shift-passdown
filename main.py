@@ -17,14 +17,16 @@ import httpx
 import associates as assoc_mod
 import db
 import emailer
+import ms_auth
 import registry
 
-# ── In-memory SMTP session (password never written to disk or DB) ─────────────
-# Cleared on server restart — user signs in again via Admin panel.
+# ── Legacy SMTP session (fallback if user prefers not to use Microsoft OAuth) ────
 _smtp_session: dict = {"email": "", "password": ""}
-
 def _smtp_signed_in() -> bool:
     return bool(_smtp_session["email"] and _smtp_session["password"])
+
+def _any_email_configured() -> bool:
+    return bool(ms_auth.signed_in_as() or _smtp_signed_in())
 from report_models import OosUnit, ReportData, RewrittenHappening, HappeningInput
 from formatter import format_html_preview, format_email
 from rewriter import rewrite_all
@@ -111,28 +113,38 @@ async def _notify_teams(priority: str, tech: str, unit: str, issue: str) -> None
 
 # ── Email helper ────────────────────────────────────────────────────────────────────────
 async def _send_passdown_email(subject: str, body: str) -> None:
-    """Fire-and-forget: send via in-memory SMTP session or .env fallback."""
+    """Fire-and-forget: Graph API first (OAuth), SMTP session fallback."""
     to_raw  = db.get_setting("email_to", "").strip()
     to_list = [a.strip() for a in to_raw.split(",") if a.strip()]
     if not to_list:
-        print("[email] no recipients set — skipping", flush=True)
+        print("[email] no recipients — skipping", flush=True)
         return
-    # Use whichever from-address is available
-    from_addr = _smtp_session["email"] or db.get_setting("email_from", "").strip()
-    password  = _smtp_session["password"] or os.environ.get("PASSDOWN_EMAIL_PASS", "").strip()
-    if not (from_addr and password):
-        print("[email] not signed in — skipping passdown email", flush=True)
-        return
-    try:
-        await asyncio.to_thread(
-            emailer.send_passdown, subject, body,
-            from_addr=from_addr,
-            to_addrs=to_list,
-            password=password,
-        )
-        print(f"[email] sent → {to_list}", flush=True)
-    except Exception as exc:
-        print(f"[email] send failed: {exc}", flush=True)
+
+    client_id = db.get_setting("ms_client_id", "").strip()
+
+    # —— Try Microsoft Graph (OAuth, no password) ———————————————————
+    if ms_auth.signed_in_as() and client_id:
+        try:
+            await ms_auth.send_email(client_id, to_list, subject, body)
+            print(f"[email] sent via Graph → {to_list}", flush=True)
+            return
+        except Exception as exc:
+            print(f"[email] Graph failed: {exc} — falling back to SMTP", flush=True)
+
+    # —— SMTP session fallback —————————————————————————————————
+    if _smtp_signed_in():
+        try:
+            await asyncio.to_thread(
+                emailer.send_passdown, subject, body,
+                from_addr=_smtp_session["email"],
+                to_addrs=to_list,
+                password=_smtp_session["password"],
+            )
+            print(f"[email] sent via SMTP → {to_list}", flush=True)
+        except Exception as exc:
+            print(f"[email] SMTP failed: {exc}", flush=True)
+    else:
+        print("[email] no email method configured — skipping", flush=True)
 
 
 # ── Tech auth helpers ───────────────────────────────────────────────────────────────
@@ -592,7 +604,7 @@ async def shift_end(request: Request, shift_id: int = Form(...)):
     db.close_shift(shift_id)
 
     # —— Fire-and-forget passdown email ———————————————————————————
-    if db.get_setting("email_to", "").strip() and _smtp_signed_in():
+    if db.get_setting("email_to", "").strip() and _any_email_configured():
         subj = (
             f"IND3 Passdown – {shift['shift_type']} Shift – "
             f"{shift['lead_name']} – {shift['date']}"
@@ -1508,7 +1520,9 @@ async def admin_get(request: Request):
         "roster_count":      len(_ROSTER),
         "teams_webhook_url": db.get_setting("teams_webhook_url", ""),
         "email_to":          db.get_setting("email_to", ""),
-        "smtp_email":        _smtp_session["email"],   # empty if not signed in
+        "ms_account":        ms_auth.signed_in_as(),
+        "ms_client_id":      db.get_setting("ms_client_id", ""),
+        "smtp_email":        _smtp_session["email"],
         "msg":        request.query_params.get("msg", ""),
         "err":        request.query_params.get("err", ""),
         "is_manager": is_mgr,
@@ -1612,41 +1626,30 @@ async def admin_email_signin(
     email:    str = Form(""),
     password: str = Form(""),
 ):
-    """Test SMTP creds immediately; store in memory only if they work."""
     if not _is_lead_authed(request):
         return HTMLResponse("Unauthorized", status_code=401)
     email    = email.strip()
     password = password.strip()
     if not email or not password:
         return HTMLResponse(
-            '<p class="text-red-600 text-sm font-bold">&#10060; Email and password are required.</p>',
-            status_code=200,
+            '<p class="text-red-600 text-sm font-bold">&#10060; Email and password are required.</p>'
         )
-    # Test the connection before storing anything
     try:
         await asyncio.to_thread(
             emailer.send_passdown,
             "IND3 Passdown — Sign-in Test ✅",
             "Sign-in successful! Your account is connected to the IND3 Passdown system.",
-            from_addr=email,
-            to_addrs=[email],
-            password=password,        # pass directly — env var not set yet
+            from_addr=email, to_addrs=[email], password=password,
         )
     except Exception as exc:
         return HTMLResponse(
-            f'<p class="text-red-600 text-sm font-bold">&#10060; {exc}</p>',
-            status_code=200,
+            f'<p class="text-red-600 text-sm font-bold">&#10060; {exc}</p>'
         )
-    # Connection worked — store in memory
     _smtp_session["email"]    = email
     _smtp_session["password"] = password
-    # Also update emailer’s env-var so send_passdown() picks up the password
-    os.environ["PASSDOWN_EMAIL_PASS"] = password
-    os.environ["PASSDOWN_EMAIL_FROM"] = email
     return HTMLResponse(
-        f'<p class="text-green-700 text-sm font-bold">&#9989; Signed in as {email}. Test email sent!</p>'
-        '<script>setTimeout(()=>location.reload(),1500)</script>',
-        status_code=200,
+        f'<p class="text-green-700 text-sm font-bold">&#9989; Signed in as {email}!</p>'
+        '<script>setTimeout(()=>location.reload(),1200)</script>'
     )
 
 
@@ -1654,10 +1657,52 @@ async def admin_email_signin(
 async def admin_email_signout(request: Request):
     if not _is_lead_authed(request):
         return _lead_redirect("/admin")
-    _smtp_session["email"]    = ""
+    _smtp_session["email"] = ""
     _smtp_session["password"] = ""
-    os.environ.pop("PASSDOWN_EMAIL_PASS", None)
+    ms_auth.sign_out()
     return RedirectResponse("/admin?msg=Signed+out", status_code=303)
+
+
+@app.post("/admin/microsoft-connect")
+async def admin_ms_connect(request: Request, client_id: str = Form("")):
+    """Save Client ID and redirect to Microsoft login."""
+    if not _is_lead_authed(request):
+        return _lead_redirect("/admin")
+    cid = client_id.strip() or db.get_setting("ms_client_id", "").strip()
+    if not cid:
+        return RedirectResponse("/admin?err=Paste+your+Client+ID+first", status_code=303)
+    db.set_setting("ms_client_id", cid)
+    redirect_uri = str(request.base_url).rstrip("/") + "/admin/microsoft-callback"
+    auth_url, _state = ms_auth.build_auth_url(cid, redirect_uri)
+    return RedirectResponse(auth_url, status_code=303)
+
+
+@app.get("/admin/microsoft-callback")
+async def admin_ms_callback(
+    request: Request,
+    code:    str = "",
+    state:   str = "",
+    error:   str = "",
+    error_description: str = "",
+):
+    """Microsoft redirects here after login."""
+    if not _is_lead_authed(request):
+        return _lead_redirect("/admin")
+    if error:
+        from urllib.parse import quote
+        msg = error_description or error
+        return RedirectResponse(f"/admin?err={quote(msg)}", status_code=303)
+    client_id    = db.get_setting("ms_client_id", "")
+    redirect_uri = str(request.base_url).rstrip("/") + "/admin/microsoft-callback"
+    try:
+        account = await ms_auth.handle_callback(client_id, code, state, redirect_uri)
+        from urllib.parse import quote
+        return RedirectResponse(
+            f"/admin?msg={quote(f'Signed in as {account} ✅')}", status_code=303
+        )
+    except Exception as exc:
+        from urllib.parse import quote
+        return RedirectResponse(f"/admin?err={quote(str(exc))}", status_code=303)
 
 
 @app.post("/admin/email-test")
@@ -1667,18 +1712,22 @@ async def admin_test_email(request: Request):
     to_raw  = db.get_setting("email_to", "").strip()
     to_list = [a.strip() for a in to_raw.split(",") if a.strip()]
     if not to_list:
-        return RedirectResponse("/admin?err=Set+recipient+addresses+first", status_code=303)
-    if not _smtp_signed_in():
-        return RedirectResponse("/admin?err=Sign+in+with+your+Microsoft+account+first", status_code=303)
+        return RedirectResponse("/admin?err=Add+recipients+first", status_code=303)
+    if not _any_email_configured():
+        return RedirectResponse("/admin?err=Sign+in+with+Microsoft+first", status_code=303)
+    subject = "IND3 Passdown — Test Email ✅"
+    body    = "This is a test email from the IND3 Shift Passdown system. Email is working!"
     try:
-        await asyncio.to_thread(
-            emailer.send_passdown,
-            "IND3 Passdown — Test Email ✅",
-            "This is a test email from the IND3 Shift Passdown system.\n\nEmail notifications are working!",
-            from_addr=_smtp_session["email"],
-            to_addrs=to_list,
-            password=_smtp_session["password"],
-        )
+        client_id = db.get_setting("ms_client_id", "")
+        if ms_auth.signed_in_as() and client_id:
+            await ms_auth.send_email(client_id, to_list, subject, body)
+        else:
+            await asyncio.to_thread(
+                emailer.send_passdown, subject, body,
+                from_addr=_smtp_session["email"],
+                to_addrs=to_list,
+                password=_smtp_session["password"],
+            )
         return RedirectResponse("/admin?msg=Test+email+sent+%E2%9C%85", status_code=303)
     except Exception as exc:
         from urllib.parse import quote
