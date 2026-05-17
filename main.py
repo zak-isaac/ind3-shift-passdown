@@ -2431,16 +2431,22 @@ async def lead_generate(
 
 @app.get("/report/{report_id}/docx")
 async def download_docx(report_id: int):
+    """Serve email HTML as .doc — Word opens it natively, looks identical to the email."""
     rec = db.get_report(report_id)
     if not rec or not rec.get("report_json"):
         raise HTTPException(status_code=404, detail="Report data not found")
     data  = ReportData.model_validate_json(rec["report_json"])
     loto  = db.get_loto(rec["shift_id"])
     pms   = db.get_pending_pms(rec["shift_id"])
-    fname = f"passdown_{rec['generated_at'].replace(' ', '_').replace(':', '-')}.docx"
+    html_body = format_email_passdown_html(
+        data,
+        loto_missing=loto.get("loto_missing_keys", ""),
+        pending_pms=pms or None,
+    )
+    fname = f"passdown_{rec['generated_at'].replace(' ', '_').replace(':', '-')}.doc"
     return Response(
-        content=export_docx(data, pending_pms=pms or None, loto_missing=loto.get("loto_missing_keys","")),
-        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        content=html_body.encode("utf-8"),
+        media_type="application/msword",
         headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
 
