@@ -1043,7 +1043,8 @@ async def lead_page(request: Request, status: str = "", shift_id: int = 0):
     response = templates.TemplateResponse(
         request, "lead.html",
         {"shift": shift, "shifts": shifts, "entries": entries, "status": status,
-         "assets": _ASSETS, "carry_overs": carry_overs, "shift_notes": shift_notes}
+         "assets": _ASSETS, "carry_overs": carry_overs, "shift_notes": shift_notes,
+         "shift_id": shift["id"]}
     )
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     response.headers["Pragma"] = "no-cache"

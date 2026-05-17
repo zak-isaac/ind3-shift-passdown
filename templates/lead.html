@@ -96,13 +96,8 @@
   </div>
   {% endif %}
 
-  <!-- CARRY-OVERS FROM PREVIOUS SHIFT (live panel, refreshes after actions) -->
-  <div id="carry-overs-panel"
-       hx-get="/lead/carry-overs?shift_id={{ shift.id }}"
-       hx-trigger="load"
-       hx-swap="outerHTML"
-       class="lg:col-span-5">
-  </div>
+  <!-- CARRY-OVERS FROM PREVIOUS SHIFT (server-side render + HTMX refresh after actions) -->
+  {% include "partials/carry_overs_panel.html" %}
 
   <!-- NEW ENTRY TOAST -->
   <div id="new-entry-toast"
