@@ -67,9 +67,4 @@
 </div>
 {% endif %}
 
-{# OOB swap: refresh #my-entries on tech dashboard after upload #}
-{% if include_entries_oob %}
-<div id="my-entries" hx-swap-oob="innerHTML">
-  {% include "partials/my_entries.html" %}
-</div>
-{% endif %}
+{# entries-updated HX-Trigger header drives the #my-entries refresh — no OOB swap needed #}

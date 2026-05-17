@@ -241,7 +241,7 @@
     <div
       id="my-entries"
       hx-get="/tech/my-entries?shift_id={{ shift.id }}&tech_name={{ tech_name | urlencode }}"
-      hx-trigger="refresh"
+      hx-trigger="refresh, entries-updated from:body, every 10s"
       hx-swap="innerHTML"
     >
       {% include 'partials/my_entries.html' %}
@@ -413,7 +413,7 @@
         const msg = JSON.parse(evt.data);
         // Refresh my entries whenever any import/entry event comes through
         if (msg.type === 'cmms_import' || msg.type === 'new_entry') {
-          htmx.trigger(document.getElementById('my-entries'), 'refresh');
+          document.body.dispatchEvent(new Event('entries-updated'));
         }
       };
       ws.onclose = () => { setTimeout(connect, 3000); };
@@ -442,8 +442,9 @@
     // Reset file input so same file can be re-submitted
     const fi = document.getElementById('cmms-file-input');
     if (fi) fi.value = '';
-    // Belt-and-suspenders: also trigger the HTMX refresh on my-entries
-    htmx.trigger(document.getElementById('my-entries'), 'refresh');
+    // Scroll the entries panel into view so the tech sees the update
+    const panel = document.getElementById('my-entries');
+    if (panel) panel.closest('.bg-white') ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 </script>
 </body>

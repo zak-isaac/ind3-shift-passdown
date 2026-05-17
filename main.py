@@ -816,7 +816,7 @@ async def _process_cmms_upload(
     # For tech uploads: also send an OOB swap to refresh #my-entries
     entries = db.get_entries(shift_id) if include_entries_oob else []
 
-    return templates.TemplateResponse(
+    resp = templates.TemplateResponse(
         request, "partials/cmms_import_result.html",
         {
             "imported":          imported,
@@ -829,6 +829,10 @@ async def _process_cmms_upload(
             "tech_name":         uploader_name,
         },
     )
+    # Tell the tech page to immediately refresh #my-entries (server-authoritative)
+    if include_entries_oob:
+        resp.headers["HX-Trigger"] = "entries-updated"
+    return resp
 
 
 @app.post("/tech/cmms-upload", response_class=HTMLResponse)
