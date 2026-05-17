@@ -174,7 +174,7 @@
         </summary>
         <div class="px-4 pb-4 flex flex-col gap-3">
 
-          <!-- File list -->
+          <!-- File list + parsed PM table -->
           <div id="pm-file-list"
             hx-get="/lead/pm-files?shift_id={{ shift.id }}"
             hx-trigger="load"
@@ -209,9 +209,9 @@
         <summary class="px-4 py-3 font-semibold text-sm text-wm-dark cursor-pointer select-none">
           &#128273; LOTO Key Verification
           {% if loto.loto_verified %}
-          <span class="ml-2 text-xs font-bold text-green-600">&#10003; Verified</span>
+          <span id="loto-badge" class="ml-2 text-xs font-bold text-green-600">&#10003; Verified</span>
           {% else %}
-          <span class="ml-2 text-xs font-bold text-yellow-600">Pending</span>
+          <span id="loto-badge" class="ml-2 text-xs font-bold text-yellow-600">Pending</span>
           {% endif %}
         </summary>
         <div class="px-4 pb-4 flex flex-col gap-3">

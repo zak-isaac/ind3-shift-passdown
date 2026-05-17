@@ -180,6 +180,20 @@ def init_db() -> None:
             )
         """)
 
+        # Pending PM rows (parsed from uploaded Cetaris PM report)
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS pending_pms (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                shift_id     INTEGER NOT NULL REFERENCES shifts(id),
+                wo_number    TEXT NOT NULL,
+                wo_date      TEXT NOT NULL DEFAULT '',
+                pm_due_date  TEXT NOT NULL DEFAULT '',
+                promise_date TEXT NOT NULL DEFAULT '',
+                asset_num    TEXT NOT NULL DEFAULT '',
+                uploaded_at  TEXT NOT NULL
+            )
+        """)
+
         # NOTE: entries are intentionally kept forever for cross-shift history.
 
 
@@ -293,6 +307,31 @@ def delete_pm_file(file_id: int) -> Optional[str]:
             c.execute("DELETE FROM pm_files WHERE id=?", (file_id,))
             return row[0]
     return None
+
+
+# ── Pending PMs (parsed from Cetaris export) ────────────────────────────────────
+
+def save_pending_pms(shift_id: int, rows: list[dict]) -> None:
+    """Replace all pending PM rows for this shift with fresh parsed data."""
+    with _conn() as c:
+        c.execute("DELETE FROM pending_pms WHERE shift_id=?", (shift_id,))
+        now = _now()
+        c.executemany(
+            "INSERT INTO pending_pms"
+            " (shift_id, wo_number, wo_date, pm_due_date, promise_date, asset_num, uploaded_at)"
+            " VALUES (?,?,?,?,?,?,?)",
+            [(shift_id, r["wo_number"], r["wo_date"], r["pm_due_date"],
+              r["promise_date"], r["asset_num"], now) for r in rows],
+        )
+
+
+def get_pending_pms(shift_id: int) -> list[dict]:
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT * FROM pending_pms WHERE shift_id=? ORDER BY asset_num, pm_due_date",
+            (shift_id,)
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
     with _conn() as c:

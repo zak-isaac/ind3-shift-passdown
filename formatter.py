@@ -190,7 +190,7 @@ def format_email_passdown(data: ReportData) -> str:
     return "\n".join(lines)
 
 
-def format_email_passdown_html(data: ReportData, loto_missing: str = "") -> str:
+def format_email_passdown_html(data: ReportData, loto_missing: str = "", pending_pms: list[dict] | None = None) -> str:
     """HTML passdown email — bold titles, bullet list, Outlook-safe inline styles."""
 
     def _bullets(items: list[str]) -> str:
@@ -218,6 +218,35 @@ def format_email_passdown_html(data: ReportData, loto_missing: str = "") -> str:
     if loto_missing:
         loto_html += f"<p style='color:#c00;margin:2px 0;'><strong>Missing keys:</strong> {loto_missing}</p>"
 
+    pm_table_html = ""
+    if pending_pms:
+        from datetime import date as _date
+        today = _date.today().strftime("%m/%d/%Y")
+        th_s = "padding:6px 10px;text-align:left;font-size:12px;font-weight:bold;background:#f3f4f6;border-bottom:2px solid #e5e7eb;"
+        td_s = "padding:6px 10px;font-size:12px;border-bottom:1px solid #f0f0f0;"
+        rows_html = "".join(
+            "<tr style='background:{bg};'>".format(
+                bg="#fef08a" if today in r.get("pm_due_date", "") else "#ffffff"
+            ) +
+            f"<td style='{td_s}'>{r.get('wo_number','')}</td>"
+            f"<td style='{td_s}'><strong>{r.get('asset_num','')}</strong></td>"
+            f"<td style='{td_s}'><strong>{r.get('pm_due_date','')}</strong></td>"
+            f"<td style='{td_s}'>{r.get('promise_date','')}</td>"
+            f"<td style='{td_s};color:#888;'>{r.get('wo_date','')}</td></tr>"
+            for r in pending_pms
+        )
+        pm_table_html = (
+            f"<p style='margin:18px 0 6px;'><strong>PM&#8217;s Needing to be Completed</strong> "
+            f"<span style='font-size:11px;color:#666;'>({len(pending_pms)} open — "
+            f"<span style='background:#fef08a;padding:1px 4px;'>yellow</span> = due today)</span></p>"
+            f"<table style='width:100%;border-collapse:collapse;font-family:Calibri,Arial,sans-serif;'>"
+            f"<thead><tr>"
+            f"<th style='{th_s}'>WO #</th><th style='{th_s}'>Asset</th>"
+            f"<th style='{th_s}'>PM Due</th><th style='{th_s}'>Promise</th>"
+            f"<th style='{th_s}'>WO Date</th></tr></thead>"
+            f"<tbody>{rows_html}</tbody></table>"
+        )
+
     return (
         "<html><body style='font-family:Calibri,Arial,sans-serif;font-size:14px;color:#111;max-width:680px;line-height:1.5;'>"
         f"<p style='margin:0 0 16px;font-size:15px;'><strong>{data.shift_type} End of Shift Passdown</strong></p>"
@@ -227,6 +256,7 @@ def format_email_passdown_html(data: ReportData, loto_missing: str = "") -> str:
         + _section("Out of Service \u2014 Returned to Service (RTS)", list(data.rts))
         + _section("Current Out of Service", [o.unit for o in data.oos])
         + loto_html
+        + pm_table_html
         + "</body></html>"
     )
 
