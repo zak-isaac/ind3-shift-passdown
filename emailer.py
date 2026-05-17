@@ -40,8 +40,9 @@ def send_passdown(
     body: str,
     *,
     from_addr: str = "",
+    from_name: str = "IND3 Shift Passdown",
     to_addrs: list[str] | None = None,
-    password: str = "",          # optional override — falls back to env var
+    password: str = "",
 ) -> None:
     """Send *body* (plain-text passdown) to recipients."""
     _from = from_addr or _cfg("PASSDOWN_EMAIL_FROM")
@@ -57,7 +58,7 @@ def send_passdown(
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"]    = _from
+    msg["From"]    = f"{from_name} <{_from}>"   # ← shows display name in inbox
     msg["To"]      = ", ".join(_to)
     msg.attach(MIMEText(body, "plain", "utf-8"))
 

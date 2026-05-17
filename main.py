@@ -114,8 +114,9 @@ async def _notify_teams(priority: str, tech: str, unit: str, issue: str) -> None
 # ── Email helper ────────────────────────────────────────────────────────────────────────
 async def _send_passdown_email(subject: str, body: str) -> None:
     """Fire-and-forget: Graph API first (OAuth), SMTP session fallback."""
-    to_raw  = db.get_setting("email_to", "").strip()
-    to_list = [a.strip() for a in to_raw.split(",") if a.strip()]
+    to_raw    = db.get_setting("email_to", "").strip()
+    to_list   = [a.strip() for a in to_raw.split(",") if a.strip()]
+    from_name = db.get_setting("email_from_name", "IND3 Shift Passdown").strip()
     if not to_list:
         print("[email] no recipients — skipping", flush=True)
         return
@@ -125,7 +126,7 @@ async def _send_passdown_email(subject: str, body: str) -> None:
     # —— Try Microsoft Graph (OAuth, no password) ———————————————————
     if ms_auth.signed_in_as() and client_id:
         try:
-            await ms_auth.send_email(client_id, to_list, subject, body)
+            await ms_auth.send_email(client_id, to_list, subject, body, from_name=from_name)
             print(f"[email] sent via Graph → {to_list}", flush=True)
             return
         except Exception as exc:
@@ -137,6 +138,7 @@ async def _send_passdown_email(subject: str, body: str) -> None:
             await asyncio.to_thread(
                 emailer.send_passdown, subject, body,
                 from_addr=_smtp_session["email"],
+                from_name=from_name,
                 to_addrs=to_list,
                 password=_smtp_session["password"],
             )
@@ -1520,6 +1522,7 @@ async def admin_get(request: Request):
         "roster_count":      len(_ROSTER),
         "teams_webhook_url": db.get_setting("teams_webhook_url", ""),
         "email_to":          db.get_setting("email_to", ""),
+        "email_from_name":   db.get_setting("email_from_name", "IND3 Shift Passdown"),
         "ms_account":        ms_auth.signed_in_as(),
         "ms_client_id":      db.get_setting("ms_client_id", ""),
         "smtp_email":        _smtp_session["email"],
@@ -1582,14 +1585,14 @@ async def admin_save_teams_webhook(request: Request, webhook_url: str = Form("")
 
 @app.post("/admin/email-settings")
 async def admin_save_email_settings(
-    request:    Request,
-    email_from: str = Form(""),
-    email_to:   str = Form(""),
+    request:         Request,
+    email_from_name: str = Form("IND3 Shift Passdown"),
+    email_to:        str = Form(""),
 ):
     if not _is_lead_authed(request):
         return _lead_redirect("/admin")
-    db.set_setting("email_from", email_from.strip())
-    db.set_setting("email_to",   email_to.strip())
+    db.set_setting("email_from_name", email_from_name.strip() or "IND3 Shift Passdown")
+    db.set_setting("email_to",        email_to.strip())
     return RedirectResponse("/admin?msg=Email+settings+saved", status_code=303)
 
 
@@ -1715,16 +1718,18 @@ async def admin_test_email(request: Request):
         return RedirectResponse("/admin?err=Add+recipients+first", status_code=303)
     if not _any_email_configured():
         return RedirectResponse("/admin?err=Sign+in+with+Microsoft+first", status_code=303)
-    subject = "IND3 Passdown — Test Email ✅"
-    body    = "This is a test email from the IND3 Shift Passdown system. Email is working!"
+    subject   = "IND3 Passdown — Test Email ✅"
+    body      = "This is a test email from the IND3 Shift Passdown system. Email is working!"
+    from_name = db.get_setting("email_from_name", "IND3 Shift Passdown").strip()
     try:
         client_id = db.get_setting("ms_client_id", "")
         if ms_auth.signed_in_as() and client_id:
-            await ms_auth.send_email(client_id, to_list, subject, body)
+            await ms_auth.send_email(client_id, to_list, subject, body, from_name=from_name)
         else:
             await asyncio.to_thread(
                 emailer.send_passdown, subject, body,
                 from_addr=_smtp_session["email"],
+                from_name=from_name,
                 to_addrs=to_list,
                 password=_smtp_session["password"],
             )

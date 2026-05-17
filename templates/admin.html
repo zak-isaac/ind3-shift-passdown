@@ -329,18 +329,26 @@
     </button>
     {% endif %}
 
-    <!-- Recipients (always shown) -->
+    <!-- Recipients & display name (always shown) -->
     <form method="POST" action="/admin/email-settings" class="flex flex-col gap-3 border-t mt-5 pt-5">
+      <div class="flex flex-col gap-1">
+        <label class="text-xs font-bold text-gray-500 uppercase tracking-wide">Sender Display Name</label>
+        <input name="email_from_name" type="text"
+          placeholder="IND3 Shift Passdown"
+          value="{{ email_from_name or 'IND3 Shift Passdown' }}"
+          class="rounded-xl border-2 border-gray-200 focus:border-wm-blue px-4 py-2.5 text-sm outline-none transition w-full" />
+        <p class="text-xs text-gray-400">This is what shows in the inbox &mdash; e.g. &ldquo;IND3 Shift Passdown&rdquo;</p>
+      </div>
       <div class="flex flex-col gap-1">
         <label class="text-xs font-bold text-gray-500 uppercase tracking-wide">Send To <span class="normal-case font-normal">(comma-separated)</span></label>
         <input name="email_to" type="text"
-          placeholder="manager@walmart.com, nextlead@walmart.com"
+          placeholder="mt7-60@wal-mart.com, manager@walmart.com"
           value="{{ email_to }}"
           class="rounded-xl border-2 border-gray-200 focus:border-wm-blue px-4 py-2.5 text-sm outline-none transition w-full" />
       </div>
       <button type="submit"
         class="w-fit bg-wm-blue hover:bg-blue-700 text-white font-black px-6 py-2.5 rounded-xl text-sm transition">
-        Save Recipients
+        Save
       </button>
     </form>
   </section>

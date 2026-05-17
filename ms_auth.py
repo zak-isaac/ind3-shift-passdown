@@ -138,13 +138,21 @@ async def _ensure_token(client_id: str) -> str:
     return _session["access_token"]
 
 
-async def send_email(client_id: str, to_addrs: list[str], subject: str, body: str) -> None:
+async def send_email(
+    client_id: str,
+    to_addrs: list[str],
+    subject: str,
+    body: str,
+    from_name: str = "IND3 Shift Passdown",
+) -> None:
     """Send email via Microsoft Graph API using the stored OAuth session."""
-    token = await _ensure_token(client_id)
+    token   = await _ensure_token(client_id)
+    account = _session.get("account", "")
     payload = {
         "message": {
             "subject": subject,
             "body":    {"contentType": "Text", "content": body},
+            "from":    {"emailAddress": {"name": from_name, "address": account}},
             "toRecipients": [{"emailAddress": {"address": a}} for a in to_addrs],
         },
         "saveToSentItems": True,
