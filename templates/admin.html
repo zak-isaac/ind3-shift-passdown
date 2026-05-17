@@ -214,130 +214,54 @@
 
 
 
-  <!-- ══ EMAIL NOTIFICATIONS ═══════════════════════════════════════════════════════ -->
+  <!-- ══ EMAIL NOTIFICATIONS ══════════════════════════════════════════════ -->
   <section class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
     <div class="flex items-center justify-between mb-1">
       <h2 class="font-black text-base" style="color:#001e50;">&#128231; Email Notifications</h2>
-      {% if ms_account %}
-      <span class="text-xs font-bold bg-green-100 text-green-700 px-2.5 py-0.5 rounded-full">&#9989; Microsoft Connected</span>
-      {% elif smtp_email %}
-      <span class="text-xs font-bold bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full">&#128274; SMTP Active</span>
+      {% if smtp_email %}
+      <span class="text-xs font-bold bg-green-100 text-green-700 px-2.5 py-0.5 rounded-full">&#9989; Active</span>
       {% else %}
       <span class="text-xs font-bold bg-gray-100 text-gray-500 px-2.5 py-0.5 rounded-full">Not signed in</span>
       {% endif %}
     </div>
     <p class="text-gray-500 text-xs mb-5">
-      Sends the full shift passdown when an MST ends a shift.
-      Sign in with Microsoft &mdash; MFA and SSO work, no app passwords needed.
+      Sends the full shift passdown report when an MST ends a shift. Password is never saved to disk.
     </p>
 
-    {% if ms_account %}
-    <!-- ── Signed in via OAuth ── -->
+    {% if smtp_email %}
+    <!-- Signed in -->
     <div class="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl px-4 py-3 mb-5 flex-wrap gap-3">
-      <div class="flex items-center gap-3">
-        <svg class="h-6 w-6 shrink-0" viewBox="0 0 21 21" fill="none">
-          <rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
-          <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
-        </svg>
-        <div>
-          <p class="text-sm font-black text-green-800">{{ ms_account }}</p>
-          <p class="text-xs text-green-600">Signed in via Microsoft &bull; tokens auto-refresh &bull; cleared on server restart</p>
-        </div>
-      </div>
-      <div class="flex gap-2">
-        <form method="POST" action="/admin/email-test">
-          <button class="bg-white border border-gray-300 hover:border-wm-blue text-gray-600 hover:text-wm-blue font-bold px-4 py-2 rounded-xl text-xs transition">&#128233; Send Test</button>
-        </form>
-        <form method="POST" action="/admin/email-signout">
-          <button onclick="return confirm('Sign out?')"
-            class="bg-white border border-red-200 hover:border-red-400 text-red-400 hover:text-red-600 font-bold px-4 py-2 rounded-xl text-xs transition">
-            Sign Out
-          </button>
-        </form>
-      </div>
-    </div>
-
-    {% elif smtp_email %}
-    <!-- ── Signed in via SMTP modal ── -->
-    <div class="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-5 flex-wrap gap-3">
       <div>
-        <p class="text-sm font-black text-blue-800">{{ smtp_email }}</p>
-        <p class="text-xs text-blue-600">SMTP session &bull; cleared on server restart</p>
+        <p class="text-sm font-black text-green-800">{{ smtp_email }}</p>
+        <p class="text-xs text-green-600">Sending as &ldquo;{{ email_from_name }}&rdquo; &bull; session clears on server restart</p>
       </div>
       <div class="flex gap-2">
         <form method="POST" action="/admin/email-test">
           <button class="bg-white border border-gray-300 hover:border-wm-blue text-gray-600 hover:text-wm-blue font-bold px-4 py-2 rounded-xl text-xs transition">&#128233; Send Test</button>
         </form>
         <form method="POST" action="/admin/email-signout">
-          <button onclick="return confirm('Sign out?')"
-            class="bg-white border border-red-200 hover:border-red-400 text-red-400 hover:text-red-600 font-bold px-4 py-2 rounded-xl text-xs transition">
-            Sign Out
-          </button>
+          <button onclick="return confirm('Sign out?')" class="bg-white border border-red-200 hover:border-red-400 text-red-400 hover:text-red-600 font-bold px-4 py-2 rounded-xl text-xs transition">Sign Out</button>
         </form>
       </div>
     </div>
-
     {% else %}
-    <!-- ── Not signed in ── -->
-
-    <!-- Microsoft OAuth (preferred) -->
-    <form method="POST" action="/admin/microsoft-connect" class="mb-3">
-      <div class="flex flex-col gap-2 mb-3">
-        <label class="text-xs font-bold text-gray-500 uppercase tracking-wide">Azure App Client ID
-          <span class="normal-case font-normal text-gray-400">&mdash; one-time setup, 2 min</span>
-        </label>
-        <input name="client_id" type="text"
-          placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-          value="{{ ms_client_id }}"
-          class="rounded-xl border-2 border-gray-200 focus:border-[#0078d4] px-4 py-2.5 text-sm font-mono outline-none transition" />
-      </div>
-      <button type="submit"
-        class="flex items-center gap-3 bg-[#0078d4] hover:bg-[#106ebe] text-white
-               font-black px-6 py-3 rounded-xl text-sm transition shadow-sm w-fit">
-        <svg class="h-5 w-5 shrink-0" viewBox="0 0 21 21" fill="none">
-          <rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
-          <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
-        </svg>
-        Sign in with Microsoft
-      </button>
-    </form>
-
-    <details class="mb-5">
-      <summary class="text-xs text-[#0078d4] cursor-pointer hover:underline font-semibold">How to get a Client ID (free, 2 minutes) &#8595;</summary>
-      <ol class="text-xs text-gray-600 mt-3 ml-4 list-decimal space-y-1.5 leading-relaxed">
-        <li>Go to <a href="https://portal.azure.com" target="_blank" class="text-[#0078d4] hover:underline">portal.azure.com</a>
-          &mdash; sign in with <strong>any</strong> Microsoft account (personal outlook.com works, no Walmart IT needed)</li>
-        <li><strong>Azure Active Directory</strong> &rarr; <strong>App registrations</strong> &rarr; <strong>New registration</strong></li>
-        <li>Name: <em>IND3 Passdown</em> &bull; Supported account types: <em>Accounts in any organizational directory and personal Microsoft accounts</em></li>
-        <li>Redirect URI &rarr; <strong>Web</strong> &rarr;
-          <code class="bg-gray-100 px-1 rounded">http://{{ request.headers.get('host', 'localhost:8765') }}/admin/microsoft-callback</code>
-        </li>
-        <li>Click <strong>Register</strong> &rarr; copy the <strong>Application (client) ID</strong> &rarr; paste above</li>
-        <li>Go to <strong>API permissions</strong> &rarr; Add &rarr; Microsoft Graph &rarr; Delegated &rarr; <strong>Mail.Send</strong> &rarr; Add &rarr; Grant admin consent</li>
-      </ol>
-    </details>
-
-    <!-- SMTP fallback divider -->
-    <div class="flex items-center gap-3 my-4">
-      <div class="flex-1 h-px bg-gray-200"></div>
-      <span class="text-xs text-gray-400 font-semibold">or use SMTP (no Client ID needed)</span>
-      <div class="flex-1 h-px bg-gray-200"></div>
-    </div>
-    <button onclick="document.getElementById('ms-signin-modal').classList.remove('hidden')"
-      class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 font-semibold transition">
-      &#128274; Sign in with email &amp; password (SMTP)
+    <!-- Not signed in -->
+    <button onclick="document.getElementById('email-signin-modal').classList.remove('hidden')"
+      class="flex items-center gap-3 w-fit bg-white border-2 border-gray-200 hover:border-wm-blue
+             text-gray-700 hover:text-wm-blue font-black px-5 py-3 rounded-xl text-sm transition shadow-sm mb-5">
+      <span class="text-xl">&#128231;</span> Sign in to enable email
     </button>
     {% endif %}
 
-    <!-- Recipients & display name (always shown) -->
-    <form method="POST" action="/admin/email-settings" class="flex flex-col gap-3 border-t mt-5 pt-5">
+    <!-- Settings (always shown) -->
+    <form method="POST" action="/admin/email-settings" class="flex flex-col gap-3 border-t pt-5">
       <div class="flex flex-col gap-1">
         <label class="text-xs font-bold text-gray-500 uppercase tracking-wide">Sender Display Name</label>
         <input name="email_from_name" type="text"
           placeholder="IND3 Shift Passdown"
           value="{{ email_from_name or 'IND3 Shift Passdown' }}"
           class="rounded-xl border-2 border-gray-200 focus:border-wm-blue px-4 py-2.5 text-sm outline-none transition w-full" />
-        <p class="text-xs text-gray-400">This is what shows in the inbox &mdash; e.g. &ldquo;IND3 Shift Passdown&rdquo;</p>
+        <p class="text-xs text-gray-400">What recipients see as the sender name in their inbox</p>
       </div>
       <div class="flex flex-col gap-1">
         <label class="text-xs font-bold text-gray-500 uppercase tracking-wide">Send To <span class="normal-case font-normal">(comma-separated)</span></label>
@@ -346,8 +270,7 @@
           value="{{ email_to }}"
           class="rounded-xl border-2 border-gray-200 focus:border-wm-blue px-4 py-2.5 text-sm outline-none transition w-full" />
       </div>
-      <button type="submit"
-        class="w-fit bg-wm-blue hover:bg-blue-700 text-white font-black px-6 py-2.5 rounded-xl text-sm transition">
+      <button type="submit" class="w-fit bg-wm-blue hover:bg-blue-700 text-white font-black px-6 py-2.5 rounded-xl text-sm transition">
         Save
       </button>
     </form>
@@ -355,49 +278,42 @@
 
 </main>
 
-<!-- ══ SMTP SIGN-IN MODAL (fallback) ═══════════════════════════════════════════ -->
-<div id="ms-signin-modal"
+<!-- ══ EMAIL SIGN-IN MODAL ══════════════════════════════════════════════════ -->
+<div id="email-signin-modal"
   class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
   onclick="if(event.target===this) this.classList.add('hidden')">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-    <div class="bg-[#0078d4] px-6 pt-8 pb-6 flex flex-col items-center gap-3">
-      <svg class="h-10 w-10" viewBox="0 0 21 21" fill="none">
-        <rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
-        <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
-      </svg>
-      <div class="text-center">
-        <p class="text-white font-black text-lg">Sign in &mdash; SMTP</p>
-        <p class="text-blue-200 text-xs">Outlook email &amp; password (or App Password)</p>
-      </div>
+
+    <div class="bg-wm-blue px-6 pt-7 pb-5 flex flex-col items-center gap-2">
+      <span class="text-4xl">&#128231;</span>
+      <p class="text-white font-black text-lg">Sign in to send emails</p>
+      <p class="text-blue-200 text-xs text-center">Your Outlook email &amp; password &mdash; stored in memory only, never saved to disk</p>
     </div>
+
     <div class="px-6 py-6">
-      <form id="ms-signin-form"
-        hx-post="/admin/email-signin"
-        hx-target="#ms-signin-result"
-        hx-swap="innerHTML"
-        hx-indicator="#ms-signin-spinner"
-        class="flex flex-col gap-4">
+      <form hx-post="/admin/email-signin" hx-target="#email-signin-result" hx-swap="innerHTML"
+            hx-indicator="#email-signin-spinner" class="flex flex-col gap-4">
         <div class="flex flex-col gap-1">
           <label class="text-xs font-bold text-gray-500">Email address</label>
           <input name="email" type="email" required autocomplete="email"
             placeholder="yourname@walmart.com"
-            class="rounded-lg border-2 border-gray-200 focus:border-[#0078d4] px-4 py-2.5 text-sm outline-none transition" />
+            class="rounded-lg border-2 border-gray-200 focus:border-wm-blue px-4 py-2.5 text-sm outline-none transition" />
         </div>
         <div class="flex flex-col gap-1">
           <label class="text-xs font-bold text-gray-500">Password</label>
           <div class="relative">
-            <input id="smtp-pw" name="password" type="password" required
-              class="rounded-lg border-2 border-gray-200 focus:border-[#0078d4] px-4 py-2.5 text-sm outline-none transition w-full pr-10" />
+            <input id="email-pw" name="password" type="password" required
+              class="rounded-lg border-2 border-gray-200 focus:border-wm-blue px-4 py-2.5 text-sm outline-none transition w-full pr-10" />
             <button type="button" tabindex="-1"
-              onclick="const i=document.getElementById('smtp-pw');i.type=i.type==='password'?'text':'password'"
+              onclick="const i=document.getElementById('email-pw');i.type=i.type==='password'?'text':'password'"
               class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">&#128065;</button>
           </div>
         </div>
-        <div id="ms-signin-result"></div>
+        <div id="email-signin-result"></div>
         <div class="flex gap-3">
           <button type="submit"
-            class="flex-1 bg-[#0078d4] hover:bg-[#106ebe] text-white font-black py-2.5 rounded-lg text-sm transition flex items-center justify-center gap-2">
-            <span id="ms-signin-spinner" class="htmx-indicator">
+            class="flex-1 bg-wm-blue hover:bg-blue-700 text-white font-black py-2.5 rounded-lg text-sm transition flex items-center justify-center gap-2">
+            <span id="email-signin-spinner" class="htmx-indicator">
               <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
@@ -405,7 +321,7 @@
             </span>
             Sign in
           </button>
-          <button type="button" onclick="document.getElementById('ms-signin-modal').classList.add('hidden')"
+          <button type="button" onclick="document.getElementById('email-signin-modal').classList.add('hidden')"
             class="px-4 rounded-lg border border-gray-200 text-gray-500 hover:border-gray-400 text-sm font-bold transition">
             Cancel
           </button>
