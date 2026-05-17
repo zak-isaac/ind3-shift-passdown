@@ -214,6 +214,75 @@
 
 
 
+  <!-- ══ EMAIL NOTIFICATIONS ═══════════════════════════════════════════════════════ -->
+  <section class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+    <div class="flex items-center justify-between mb-1">
+      <h2 class="font-black text-base" style="color:#001e50;">&#128231; Email Notifications</h2>
+      {% if email_from and email_pw_set %}
+      <span class="text-xs font-bold bg-green-100 text-green-700 px-2.5 py-0.5 rounded-full">&#9989; Active</span>
+      {% elif email_pw_set %}
+      <span class="text-xs font-bold bg-amber-100 text-amber-700 px-2.5 py-0.5 rounded-full">&#9888;&#65039; Needs addresses</span>
+      {% else %}
+      <span class="text-xs font-bold bg-gray-100 text-gray-500 px-2.5 py-0.5 rounded-full">Off &mdash; no password</span>
+      {% endif %}
+    </div>
+    <p class="text-gray-500 text-xs mb-4">
+      Sends the shift passdown report by email when an MST ends a shift.
+      Uses Office&nbsp;365 SMTP &mdash; same account you log into Outlook with.
+    </p>
+
+    <!-- Password status callout -->
+    {% if not email_pw_set %}
+    <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4 text-xs text-amber-800 font-semibold">
+      &#128274; <strong>Password not set.</strong>
+      Add this line to the <code class="bg-amber-100 px-1 rounded">.env</code> file next to
+      <code class="bg-amber-100 px-1 rounded">main.py</code>, then restart the server:
+      <pre class="mt-2 bg-amber-100 rounded-lg px-3 py-2 font-mono text-xs select-all">PASSDOWN_EMAIL_PASS=YourOutlookPasswordHere</pre>
+    </div>
+    {% else %}
+    <div class="bg-green-50 border border-green-200 rounded-xl px-4 py-3 mb-4 text-xs text-green-800 font-semibold">
+      &#128274; Password is set in <code class="bg-green-100 px-1 rounded">.env</code> &#9989;
+    </div>
+    {% endif %}
+
+    <!-- From / To form -->
+    <form method="POST" action="/admin/email-settings" class="flex flex-col gap-3">
+      <div class="flex flex-col gap-1">
+        <label class="text-xs font-bold text-gray-500 uppercase tracking-wide">Send From</label>
+        <input
+          name="email_from"
+          type="email"
+          placeholder="your.name@walmart.com"
+          value="{{ email_from }}"
+          class="rounded-xl border-2 border-gray-200 focus:border-wm-blue px-4 py-2.5 text-sm outline-none transition w-full"
+        />
+        <p class="text-xs text-gray-400">Must match the account whose password is in .env</p>
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="text-xs font-bold text-gray-500 uppercase tracking-wide">Send To <span class="normal-case font-normal">(comma-separated)</span></label>
+        <input
+          name="email_to"
+          type="text"
+          placeholder="manager@walmart.com, nextlead@walmart.com"
+          value="{{ email_to }}"
+          class="rounded-xl border-2 border-gray-200 focus:border-wm-blue px-4 py-2.5 text-sm outline-none transition w-full"
+        />
+      </div>
+      <div class="flex gap-3">
+        <button type="submit"
+          class="bg-wm-blue hover:bg-blue-700 text-white font-black px-6 py-2.5 rounded-xl text-sm transition">
+          Save Settings
+        </button>
+        <a href="/admin/email-test"
+           onclick="return confirm('Send a test email now?')"
+           class="bg-white border border-gray-300 hover:border-wm-blue text-gray-600 hover:text-wm-blue
+                  font-bold px-5 py-2.5 rounded-xl text-sm transition">
+          &#128233; Send Test Email
+        </a>
+      </div>
+    </form>
+  </section>
+
 </main>
 
 <footer class="text-center text-xs text-gray-400 py-4">

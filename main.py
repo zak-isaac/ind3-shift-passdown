@@ -1,6 +1,7 @@
 """FastAPI app – Shift Passdown Generator (multi-tech edition)."""
 import asyncio
 import hashlib
+import os
 import socket
 from datetime import date, datetime, time, timedelta
 from contextlib import asynccontextmanager
@@ -15,6 +16,7 @@ from pathlib import Path
 import httpx
 import associates as assoc_mod
 import db
+import emailer
 import registry
 from report_models import OosUnit, ReportData, RewrittenHappening, HappeningInput
 from formatter import format_html_preview, format_email
@@ -22,6 +24,17 @@ from rewriter import rewrite_all
 from cetaris_parser import parse_cetaris, ParseResult
 from summarizer import summarize_remarks
 from exporters import export_docx, export_pdf
+
+
+# ── Load .env file (no deps — built-in only) ──────────────────────────────────────────────
+_DOTENV = Path(__file__).resolve().parent / ".env"
+if _DOTENV.exists():
+    for _line in _DOTENV.read_text(encoding="utf-8").splitlines():
+        _line = _line.strip()
+        if _line and not _line.startswith("#") and "=" in _line:
+            _k, _, _v = _line.partition("=")
+            os.environ.setdefault(_k.strip(), _v.strip())
+    print(f"[startup] .env loaded from {_DOTENV}", flush=True)
 
 # Assets loaded from assets.json at startup (sourced from Asset_ID.xlsx)
 _ASSETS_PATH = Path(__file__).resolve().parent / "assets.json"
@@ -88,9 +101,27 @@ async def _notify_teams(priority: str, tech: str, unit: str, issue: str) -> None
     except Exception as exc:
         print(f"[teams] webhook error: {exc}", flush=True)
 
-# ── Tech auth helpers ────────────────────────────────────────────────────────
-# Cookies: tech_assoc = associate number, tech_shift = shift ID at login
-_TECH_ASSOC_COOKIE = "tech_assoc"
+
+# ── Email helper ────────────────────────────────────────────────────────────────────────
+async def _send_passdown_email(subject: str, body: str) -> None:
+    """Fire-and-forget: send the passdown email using DB settings + .env password."""
+    from_addr = db.get_setting("email_from", "").strip()
+    to_raw    = db.get_setting("email_to",   "").strip()
+    to_list   = [a.strip() for a in to_raw.split(",") if a.strip()]
+    try:
+        await asyncio.to_thread(
+            emailer.send_passdown,
+            subject,
+            body,
+            from_addr=from_addr,
+            to_addrs=to_list or None,
+        )
+        print(f"[email] passdown sent to {to_list}", flush=True)
+    except Exception as exc:
+        print(f"[email] send failed: {exc}", flush=True)
+
+
+# ── Tech auth helpers ───────────────────────────────────────────────────────────────
 _TECH_SHIFT_COOKIE = "tech_shift"
 # Legacy name cookie — clear on login so old sessions don't linger
 _TECH_NAME_COOKIE  = "tech_name"
@@ -545,6 +576,19 @@ async def shift_end(request: Request, shift_id: int = Form(...)):
         db.save_report(shift_id, content, data.model_dump_json())
 
     db.close_shift(shift_id)
+
+    # —— Fire-and-forget email — never blocks the redirect ——————————————————
+    if emailer.is_configured(
+        from_addr=db.get_setting("email_from", ""),
+        to_raw=db.get_setting("email_to", ""),
+    ):
+        subj = (
+            f"IND3 Passdown – {shift['shift_type']} Shift – "
+            f"{shift['lead_name']} – {shift['date']}"
+        )
+        asyncio.create_task(_send_passdown_email(subj, content))
+    else:
+        print("[email] not configured — skipping passdown email", flush=True)
 
     carry_overs = db.get_carry_over_entries(current_shift_id=shift_id)
     shift_notes = db.get_shift_notes(shift_id)
@@ -1452,6 +1496,9 @@ async def admin_get(request: Request):
         "dc_number_val":     db.get_setting("dc_number", DC_NUMBER),
         "roster_count":      len(_ROSTER),
         "teams_webhook_url": db.get_setting("teams_webhook_url", ""),
+        "email_from":        db.get_setting("email_from", ""),
+        "email_to":          db.get_setting("email_to", ""),
+        "email_pw_set":      emailer.is_password_set(),
         "msg":        request.query_params.get("msg", ""),
         "err":        request.query_params.get("err", ""),
         "is_manager": is_mgr,
@@ -1507,6 +1554,41 @@ async def admin_save_teams_webhook(request: Request, webhook_url: str = Form("")
     db.set_setting("teams_webhook_url", url)
     msg = "Webhook saved — Teams notifications active ✅" if url else "Webhook cleared — Teams notifications off"
     return RedirectResponse(f"/admin?msg={msg.replace(' ', '+')}", status_code=303)
+
+
+@app.post("/admin/email-settings")
+async def admin_save_email_settings(
+    request:    Request,
+    email_from: str = Form(""),
+    email_to:   str = Form(""),
+):
+    if not _is_lead_authed(request):
+        return _lead_redirect("/admin")
+    db.set_setting("email_from", email_from.strip())
+    db.set_setting("email_to",   email_to.strip())
+    return RedirectResponse("/admin?msg=Email+settings+saved", status_code=303)
+
+
+@app.post("/admin/email-test")
+async def admin_test_email(request: Request):
+    if not _is_lead_authed(request):
+        return _lead_redirect("/admin")
+    from_addr = db.get_setting("email_from", "").strip()
+    to_raw    = db.get_setting("email_to",   "").strip()
+    to_list   = [a.strip() for a in to_raw.split(",") if a.strip()]
+    try:
+        await asyncio.to_thread(
+            emailer.send_passdown,
+            "IND3 Passdown — Test Email ✅",
+            "This is a test email from the IND3 Shift Passdown system.\n\n"
+            "If you received this, email notifications are configured correctly!",
+            from_addr=from_addr,
+            to_addrs=to_list or None,
+        )
+        return RedirectResponse("/admin?msg=Test+email+sent+successfully+%E2%9C%85", status_code=303)
+    except Exception as exc:
+        from urllib.parse import quote
+        return RedirectResponse(f"/admin?err={quote(str(exc))}", status_code=303)
 
 
 # ── Tech done toggle ──────────────────────────────────────────────────────────

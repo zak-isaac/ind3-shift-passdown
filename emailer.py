@@ -1,10 +1,13 @@
 """Email sender – sends the passdown report via Office 365 SMTP.
 
-Configure via environment variables (or a .env file):
+Configure via .env file (auto-loaded at startup) or environment variables:
 
     PASSDOWN_EMAIL_FROM=you@wal-mart.com
-    PASSDOWN_EMAIL_PASS=your-app-password
-    PASSDOWN_EMAIL_TO=supervisor@wal-mart.com,nextlead@wal-mart.com
+    PASSDOWN_EMAIL_PASS=your-outlook-password
+    PASSDOWN_EMAIL_TO=supervisor@wal-mart.com  # optional fallback
+
+The from/to addresses are managed via the Admin panel and stored in the DB.
+Only the password stays in .env — never in the DB or the UI.
 """
 import os
 import smtplib
@@ -17,42 +20,57 @@ SMTP_PORT = 587
 
 
 def _cfg(key: str) -> str:
-    val = os.environ.get(key, "").strip()
-    return val
+    return os.environ.get(key, "").strip()
 
 
-def is_configured() -> bool:
-    """True when all three required env vars are set."""
-    return bool(_cfg("PASSDOWN_EMAIL_FROM")
-                and _cfg("PASSDOWN_EMAIL_PASS")
-                and _cfg("PASSDOWN_EMAIL_TO"))
+def is_password_set() -> bool:
+    """True when the SMTP password env var is present."""
+    return bool(_cfg("PASSDOWN_EMAIL_PASS"))
 
 
-def send_passdown(subject: str, body: str) -> None:
-    """Send *body* (plain-text passdown report) to the configured recipients.
+def is_configured(from_addr: str = "", to_raw: str = "") -> bool:
+    """True when we have everything needed to actually send."""
+    _from = from_addr or _cfg("PASSDOWN_EMAIL_FROM")
+    _to   = to_raw   or _cfg("PASSDOWN_EMAIL_TO")
+    return bool(_from and _cfg("PASSDOWN_EMAIL_PASS") and _to)
 
-    Raises RuntimeError if env vars are missing.
+
+def send_passdown(
+    subject: str,
+    body: str,
+    *,
+    from_addr: str = "",
+    to_addrs: list[str] | None = None,
+) -> None:
+    """Send *body* (plain-text passdown) to recipients.
+
+    Args:
+        from_addr: Override the PASSDOWN_EMAIL_FROM env var (from DB setting).
+        to_addrs:  Override the PASSDOWN_EMAIL_TO env var (from DB setting).
+
+    Raises RuntimeError if config is incomplete.
     Raises smtplib.SMTPException on send failure.
     """
-    from_addr = _cfg("PASSDOWN_EMAIL_FROM")
-    password  = _cfg("PASSDOWN_EMAIL_PASS")
-    to_addrs  = [a.strip() for a in _cfg("PASSDOWN_EMAIL_TO").split(",") if a.strip()]
+    _from    = from_addr or _cfg("PASSDOWN_EMAIL_FROM")
+    password = _cfg("PASSDOWN_EMAIL_PASS")
+    _to      = to_addrs or [a.strip() for a in _cfg("PASSDOWN_EMAIL_TO").split(",") if a.strip()]
 
-    if not (from_addr and password and to_addrs):
-        raise RuntimeError(
-            "Email not configured. Set PASSDOWN_EMAIL_FROM, "
-            "PASSDOWN_EMAIL_PASS, and PASSDOWN_EMAIL_TO."
-        )
+    if not _from:
+        raise RuntimeError("No sender address. Set it in Admin → Email Settings.")
+    if not password:
+        raise RuntimeError("PASSDOWN_EMAIL_PASS not set in .env file.")
+    if not _to:
+        raise RuntimeError("No recipients. Set them in Admin → Email Settings.")
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"]    = from_addr
-    msg["To"]      = ", ".join(to_addrs)
+    msg["From"]    = _from
+    msg["To"]      = ", ".join(_to)
     msg.attach(MIMEText(body, "plain", "utf-8"))
 
     ctx = ssl.create_default_context()
     with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
         s.ehlo()
         s.starttls(context=ctx)
-        s.login(from_addr, password)
-        s.sendmail(from_addr, to_addrs, msg.as_bytes())
+        s.login(_from, password)
+        s.sendmail(_from, _to, msg.as_bytes())
