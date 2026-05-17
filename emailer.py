@@ -41,24 +41,17 @@ def send_passdown(
     *,
     from_addr: str = "",
     to_addrs: list[str] | None = None,
+    password: str = "",          # optional override — falls back to env var
 ) -> None:
-    """Send *body* (plain-text passdown) to recipients.
-
-    Args:
-        from_addr: Override the PASSDOWN_EMAIL_FROM env var (from DB setting).
-        to_addrs:  Override the PASSDOWN_EMAIL_TO env var (from DB setting).
-
-    Raises RuntimeError if config is incomplete.
-    Raises smtplib.SMTPException on send failure.
-    """
-    _from    = from_addr or _cfg("PASSDOWN_EMAIL_FROM")
-    password = _cfg("PASSDOWN_EMAIL_PASS")
-    _to      = to_addrs or [a.strip() for a in _cfg("PASSDOWN_EMAIL_TO").split(",") if a.strip()]
+    """Send *body* (plain-text passdown) to recipients."""
+    _from = from_addr or _cfg("PASSDOWN_EMAIL_FROM")
+    _pw   = password  or _cfg("PASSDOWN_EMAIL_PASS")
+    _to   = to_addrs or [a.strip() for a in _cfg("PASSDOWN_EMAIL_TO").split(",") if a.strip()]
 
     if not _from:
         raise RuntimeError("No sender address. Set it in Admin → Email Settings.")
-    if not password:
-        raise RuntimeError("PASSDOWN_EMAIL_PASS not set in .env file.")
+    if not _pw:
+        raise RuntimeError("No password provided. Sign in via Admin → Email Notifications.")
     if not _to:
         raise RuntimeError("No recipients. Set them in Admin → Email Settings.")
 
@@ -72,5 +65,5 @@ def send_passdown(
     with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
         s.ehlo()
         s.starttls(context=ctx)
-        s.login(_from, password)
+        s.login(_from, _pw)
         s.sendmail(_from, _to, msg.as_bytes())

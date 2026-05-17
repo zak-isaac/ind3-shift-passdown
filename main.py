@@ -126,7 +126,9 @@ async def _send_passdown_email(subject: str, body: str) -> None:
     try:
         await asyncio.to_thread(
             emailer.send_passdown, subject, body,
-            from_addr=from_addr, to_addrs=to_list,
+            from_addr=from_addr,
+            to_addrs=to_list,
+            password=password,
         )
         print(f"[email] sent → {to_list}", flush=True)
     except Exception as exc:
@@ -1628,6 +1630,7 @@ async def admin_email_signin(
             "Sign-in successful! Your account is connected to the IND3 Passdown system.",
             from_addr=email,
             to_addrs=[email],
+            password=password,        # pass directly — env var not set yet
         )
     except Exception as exc:
         return HTMLResponse(
@@ -1674,6 +1677,7 @@ async def admin_test_email(request: Request):
             "This is a test email from the IND3 Shift Passdown system.\n\nEmail notifications are working!",
             from_addr=_smtp_session["email"],
             to_addrs=to_list,
+            password=_smtp_session["password"],
         )
         return RedirectResponse("/admin?msg=Test+email+sent+%E2%9C%85", status_code=303)
     except Exception as exc:
