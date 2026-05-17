@@ -17,12 +17,17 @@ import httpx
 import associates as assoc_mod
 import db
 import emailer
+import outlook_sender
 import registry
 
-# ── In-memory email session (never written to disk) ───────────────────────────
-_smtp_session: dict = {"email": "", "password": ""}
-def _smtp_signed_in() -> bool:
-    return bool(_smtp_session["email"] and _smtp_session["password"])
+# ── Email via local Outlook COM (no passwords, no SMTP auth needed) ────────────
+_OUTLOOK_OK: bool | None = None   # None = not checked yet
+
+def _outlook_ready() -> bool:
+    global _OUTLOOK_OK
+    if _OUTLOOK_OK is None:
+        _OUTLOOK_OK = outlook_sender.is_outlook_available()
+    return _OUTLOOK_OK
 from report_models import OosUnit, ReportData, RewrittenHappening, HappeningInput
 from formatter import format_html_preview, format_email
 from rewriter import rewrite_all
@@ -109,27 +114,18 @@ async def _notify_teams(priority: str, tech: str, unit: str, issue: str) -> None
 
 # ── Email helper ────────────────────────────────────────────────────────────────────────
 async def _send_passdown_email(subject: str, body: str) -> None:
-    """Fire-and-forget SMTP email using in-memory session."""
+    """Fire-and-forget: send via local Outlook COM automation."""
     to_raw    = db.get_setting("email_to", "").strip()
     to_list   = [a.strip() for a in to_raw.split(",") if a.strip()]
     from_name = db.get_setting("email_from_name", "IND3 Shift Passdown").strip()
     if not to_list:
         print("[email] no recipients — skipping", flush=True)
         return
-    if not _smtp_signed_in():
-        print("[email] not signed in — skipping", flush=True)
-        return
     try:
-        await asyncio.to_thread(
-            emailer.send_passdown, subject, body,
-            from_addr=_smtp_session["email"],
-            from_name=from_name,
-            to_addrs=to_list,
-            password=_smtp_session["password"],
-        )
-        print(f"[email] sent → {to_list}", flush=True)
+        await outlook_sender.send_email(to_list, subject, body, from_name=from_name)
+        print(f"[email] sent via Outlook → {to_list}", flush=True)
     except Exception as exc:
-        print(f"[email] send failed: {exc}", flush=True)
+        print(f"[email] Outlook send failed: {exc}", flush=True)
 
 
 # ── Tech auth helpers ───────────────────────────────────────────────────────────────
@@ -589,7 +585,7 @@ async def shift_end(request: Request, shift_id: int = Form(...)):
     db.close_shift(shift_id)
 
     # —— Fire-and-forget passdown email ———————————————————————————
-    if db.get_setting("email_to", "").strip() and _smtp_signed_in():
+    if db.get_setting("email_to", "").strip() and _outlook_ready():
         subj = (
             f"IND3 Passdown – {shift['shift_type']} Shift – "
             f"{shift['lead_name']} – {shift['date']}"
@@ -1506,7 +1502,7 @@ async def admin_get(request: Request):
         "teams_webhook_url": db.get_setting("teams_webhook_url", ""),
         "email_to":          db.get_setting("email_to", ""),
         "email_from_name":   db.get_setting("email_from_name", "IND3 Shift Passdown"),
-        "smtp_email":        _smtp_session["email"],
+        "outlook_ready":     _outlook_ready(),
         "msg":        request.query_params.get("msg", ""),
         "err":        request.query_params.get("err", ""),
         "is_manager": is_mgr,
@@ -1604,48 +1600,6 @@ async def admin_test_email(request: Request):
         return RedirectResponse(f"/admin?err={quote(str(exc))}", status_code=303)
 
 
-@app.post("/admin/email-signin")
-async def admin_email_signin(
-    request:  Request,
-    email:    str = Form(""),
-    password: str = Form(""),
-):
-    if not _is_lead_authed(request):
-        return HTMLResponse("Unauthorized", status_code=401)
-    email    = email.strip()
-    password = password.strip()
-    if not email or not password:
-        return HTMLResponse(
-            '<p class="text-red-600 text-sm font-bold">&#10060; Email and password are required.</p>'
-        )
-    try:
-        await asyncio.to_thread(
-            emailer.send_passdown,
-            "IND3 Passdown — Sign-in Test ✅",
-            "Sign-in successful! Your account is connected to the IND3 Passdown system.",
-            from_addr=email, to_addrs=[email], password=password,
-        )
-    except Exception as exc:
-        return HTMLResponse(
-            f'<p class="text-red-600 text-sm font-bold">&#10060; {exc}</p>'
-        )
-    _smtp_session["email"]    = email
-    _smtp_session["password"] = password
-    return HTMLResponse(
-        f'<p class="text-green-700 text-sm font-bold">&#9989; Signed in as {email}!</p>'
-        '<script>setTimeout(()=>location.reload(),1200)</script>'
-    )
-
-
-@app.post("/admin/email-signout")
-async def admin_email_signout(request: Request):
-    if not _is_lead_authed(request):
-        return _lead_redirect("/admin")
-    _smtp_session["email"] = ""
-    _smtp_session["password"] = ""
-    return RedirectResponse("/admin?msg=Signed+out", status_code=303)
-
-
 @app.post("/admin/email-test")
 async def admin_test_email(request: Request):
     if not _is_lead_authed(request):
@@ -1654,23 +1608,18 @@ async def admin_test_email(request: Request):
     to_list = [a.strip() for a in to_raw.split(",") if a.strip()]
     if not to_list:
         return RedirectResponse("/admin?err=Add+recipients+first", status_code=303)
-    if not _any_email_configured():
-        return RedirectResponse("/admin?err=Sign+in+with+Microsoft+first", status_code=303)
-    subject   = "IND3 Passdown — Test Email ✅"
-    body      = "This is a test email from the IND3 Shift Passdown system. Email is working!"
     from_name = db.get_setting("email_from_name", "IND3 Shift Passdown").strip()
     try:
-        client_id = db.get_setting("ms_client_id", "")
-        if ms_auth.signed_in_as() and client_id:
-            await ms_auth.send_email(client_id, to_list, subject, body, from_name=from_name)
-        else:
-            await asyncio.to_thread(
-                emailer.send_passdown, subject, body,
-                from_addr=_smtp_session["email"],
-                from_name=from_name,
-                to_addrs=to_list,
-                password=_smtp_session["password"],
-            )
+        await outlook_sender.send_email(
+            to_list,
+            "IND3 Passdown — Test Email ✅",
+            "This is a test email from the IND3 Shift Passdown system.\n\nEmail is working!",
+            from_name=from_name,
+        )
+        return RedirectResponse("/admin?msg=Test+email+sent+%E2%9C%85", status_code=303)
+    except Exception as exc:
+        from urllib.parse import quote
+        return RedirectResponse(f"/admin?err={quote(str(exc))}", status_code=303)
         return RedirectResponse("/admin?msg=Test+email+sent+%E2%9C%85", status_code=303)
     except Exception as exc:
         from urllib.parse import quote
