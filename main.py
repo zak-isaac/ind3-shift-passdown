@@ -135,6 +135,7 @@ async def _send_passdown_email(subject: str, body: str) -> None:
 
 # ── Tech auth helpers ───────────────────────────────────────────────────────────────
 _TECH_SHIFT_COOKIE = "tech_shift"
+_TECH_ASSOC_COOKIE = "tech_assoc"
 # Legacy name cookie — clear on login so old sessions don't linger
 _TECH_NAME_COOKIE  = "tech_name"
 
