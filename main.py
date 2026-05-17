@@ -17,6 +17,7 @@ import httpx
 import associates as assoc_mod
 import db
 import emailer
+import ms_auth
 import registry
 from report_models import OosUnit, ReportData, RewrittenHappening, HappeningInput
 from formatter import format_html_preview, format_email
@@ -104,21 +105,31 @@ async def _notify_teams(priority: str, tech: str, unit: str, issue: str) -> None
 
 # ── Email helper ────────────────────────────────────────────────────────────────────────
 async def _send_passdown_email(subject: str, body: str) -> None:
-    """Fire-and-forget: send the passdown email using DB settings + .env password."""
+    """Fire-and-forget: try Graph API first, fall back to SMTP."""
+    to_raw  = db.get_setting("email_to", "").strip()
+    to_list = [a.strip() for a in to_raw.split(",") if a.strip()]
+    # —— Try Microsoft Graph (OAuth — no password needed) ———————————————
+    ms_status = ms_auth.connection_status(db)
+    if ms_status["connected"] and to_list:
+        try:
+            sent_from = await ms_auth.send_email(db, to_list, subject, body)
+            print(f"[email] sent via Graph as {sent_from} → {to_list}", flush=True)
+            return
+        except Exception as exc:
+            print(f"[email] Graph send failed: {exc} — trying SMTP fallback", flush=True)
+    # —— SMTP fallback (requires PASSDOWN_EMAIL_PASS in .env) ——————————
     from_addr = db.get_setting("email_from", "").strip()
-    to_raw    = db.get_setting("email_to",   "").strip()
-    to_list   = [a.strip() for a in to_raw.split(",") if a.strip()]
-    try:
-        await asyncio.to_thread(
-            emailer.send_passdown,
-            subject,
-            body,
-            from_addr=from_addr,
-            to_addrs=to_list or None,
-        )
-        print(f"[email] passdown sent to {to_list}", flush=True)
-    except Exception as exc:
-        print(f"[email] send failed: {exc}", flush=True)
+    if emailer.is_configured(from_addr=from_addr, to_raw=to_raw):
+        try:
+            await asyncio.to_thread(
+                emailer.send_passdown, subject, body,
+                from_addr=from_addr, to_addrs=to_list or None,
+            )
+            print(f"[email] sent via SMTP → {to_list}", flush=True)
+        except Exception as exc:
+            print(f"[email] SMTP send failed: {exc}", flush=True)
+    else:
+        print("[email] no method configured — skipping passdown email", flush=True)
 
 
 # ── Tech auth helpers ───────────────────────────────────────────────────────────────
@@ -577,11 +588,12 @@ async def shift_end(request: Request, shift_id: int = Form(...)):
 
     db.close_shift(shift_id)
 
-    # —— Fire-and-forget email — never blocks the redirect ——————————————————
-    if emailer.is_configured(
-        from_addr=db.get_setting("email_from", ""),
-        to_raw=db.get_setting("email_to", ""),
-    ):
+    # —— Fire-and-forget email (Graph API or SMTP) —————————————————————
+    to_raw    = db.get_setting("email_to", "").strip()
+    ms_status = ms_auth.connection_status(db)
+    if to_raw and (ms_status["connected"] or emailer.is_configured(
+        from_addr=db.get_setting("email_from", ""), to_raw=to_raw
+    )):
         subj = (
             f"IND3 Passdown – {shift['shift_type']} Shift – "
             f"{shift['lead_name']} – {shift['date']}"
@@ -1499,6 +1511,7 @@ async def admin_get(request: Request):
         "email_from":        db.get_setting("email_from", ""),
         "email_to":          db.get_setting("email_to", ""),
         "email_pw_set":      emailer.is_password_set(),
+        "ms_status":         ms_auth.connection_status(db),
         "msg":        request.query_params.get("msg", ""),
         "err":        request.query_params.get("err", ""),
         "is_manager": is_mgr,
@@ -1573,22 +1586,80 @@ async def admin_save_email_settings(
 async def admin_test_email(request: Request):
     if not _is_lead_authed(request):
         return _lead_redirect("/admin")
-    from_addr = db.get_setting("email_from", "").strip()
-    to_raw    = db.get_setting("email_to",   "").strip()
-    to_list   = [a.strip() for a in to_raw.split(",") if a.strip()]
+    to_raw  = db.get_setting("email_to", "").strip()
+    to_list = [a.strip() for a in to_raw.split(",") if a.strip()]
+    if not to_list:
+        return RedirectResponse("/admin?err=Set+recipient+addresses+first", status_code=303)
+    subject = "IND3 Passdown — Test Email ✅"
+    body    = "This is a test email from the IND3 Shift Passdown system.\n\nEmail notifications are working!"
     try:
-        await asyncio.to_thread(
-            emailer.send_passdown,
-            "IND3 Passdown — Test Email ✅",
-            "This is a test email from the IND3 Shift Passdown system.\n\n"
-            "If you received this, email notifications are configured correctly!",
-            from_addr=from_addr,
-            to_addrs=to_list or None,
-        )
-        return RedirectResponse("/admin?msg=Test+email+sent+successfully+%E2%9C%85", status_code=303)
+        # Prefer Graph API if connected
+        ms_status = ms_auth.connection_status(db)
+        if ms_status["connected"]:
+            await ms_auth.send_email(db, to_list, subject, body)
+        else:
+            from_addr = db.get_setting("email_from", "").strip()
+            await asyncio.to_thread(
+                emailer.send_passdown, subject, body,
+                from_addr=from_addr, to_addrs=to_list,
+            )
+        return RedirectResponse("/admin?msg=Test+email+sent+%E2%9C%85", status_code=303)
     except Exception as exc:
         from urllib.parse import quote
         return RedirectResponse(f"/admin?err={quote(str(exc))}", status_code=303)
+
+
+@app.post("/admin/microsoft-connect")
+async def admin_ms_connect(request: Request, client_id: str = Form("")):
+    """Save the Azure App client_id and start the OAuth flow."""
+    if not _is_lead_authed(request):
+        return _lead_redirect("/admin")
+    cid = client_id.strip()
+    if cid:
+        db.set_setting("ms_client_id", cid)
+    cid = cid or db.get_setting("ms_client_id", "")
+    if not cid:
+        return RedirectResponse("/admin?err=Enter+your+Azure+App+Client+ID+first", status_code=303)
+    redirect_uri = str(request.base_url).rstrip("/") + "/admin/microsoft-callback"
+    auth_url, _state = ms_auth.build_auth_url(cid, redirect_uri)
+    return RedirectResponse(auth_url, status_code=303)
+
+
+@app.get("/admin/microsoft-callback")
+async def admin_ms_callback(request: Request, code: str = "", state: str = "", error: str = ""):
+    """Microsoft redirects here after the user authenticates."""
+    if not _is_lead_authed(request):
+        return _lead_redirect("/admin")
+    if error:
+        from urllib.parse import quote
+        return RedirectResponse(f"/admin?err={quote(error)}", status_code=303)
+    client_id    = db.get_setting("ms_client_id", "")
+    redirect_uri = str(request.base_url).rstrip("/") + "/admin/microsoft-callback"
+    try:
+        tokens = await ms_auth.exchange_code(client_id, code, state, redirect_uri)
+        rec    = ms_auth._token_record(tokens)
+        # Grab account name from /me if not in id_token
+        if not rec["account"]:
+            async with httpx.AsyncClient(timeout=10) as c:
+                me = await c.get(
+                    "https://graph.microsoft.com/v1.0/me",
+                    headers={"Authorization": f"Bearer {rec['access_token']}"}
+                )
+                if me.is_success:
+                    rec["account"] = me.json().get("mail") or me.json().get("userPrincipalName", "")
+        db.set_setting("ms_tokens", json.dumps(rec))
+        return RedirectResponse(f"/admin?msg=Connected+as+{rec['account']}", status_code=303)
+    except Exception as exc:
+        from urllib.parse import quote
+        return RedirectResponse(f"/admin?err={quote(str(exc))}", status_code=303)
+
+
+@app.post("/admin/microsoft-disconnect")
+async def admin_ms_disconnect(request: Request):
+    if not _is_lead_authed(request):
+        return _lead_redirect("/admin")
+    db.set_setting("ms_tokens", "")
+    return RedirectResponse("/admin?msg=Microsoft+account+disconnected", status_code=303)
 
 
 # ── Tech done toggle ──────────────────────────────────────────────────────────
