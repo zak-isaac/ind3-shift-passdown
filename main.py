@@ -829,9 +829,6 @@ async def _process_cmms_upload(
             "tech_name":         uploader_name,
         },
     )
-    # Tell the tech page to immediately refresh #my-entries (server-authoritative)
-    if include_entries_oob:
-        resp.headers["HX-Trigger"] = "entries-updated"
     return resp
 
 

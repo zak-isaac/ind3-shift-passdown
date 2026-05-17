@@ -241,7 +241,7 @@
     <div
       id="my-entries"
       hx-get="/tech/my-entries?shift_id={{ shift.id }}&tech_name={{ tech_name | urlencode }}"
-      hx-trigger="refresh, entries-updated from:body, every 10s"
+      hx-trigger="refresh, every 15s"
       hx-swap="innerHTML"
     >
       {% include 'partials/my_entries.html' %}
@@ -411,9 +411,8 @@
       ws = new WebSocket(`${proto}://${location.host}/ws/feed`);
       ws.onmessage = (evt) => {
         const msg = JSON.parse(evt.data);
-        // Refresh my entries whenever any import/entry event comes through
         if (msg.type === 'cmms_import' || msg.type === 'new_entry') {
-          document.body.dispatchEvent(new Event('entries-updated'));
+          htmx.trigger(document.getElementById('my-entries'), 'refresh');
         }
       };
       ws.onclose = () => { setTimeout(connect, 3000); };
@@ -439,12 +438,10 @@
     clearTimeout(_importTimer);
     const txt = document.getElementById('cmms-spinner-text');
     if (txt) txt.textContent = 'Uploading…';  // reset for next time
-    // Reset file input so same file can be re-submitted
     const fi = document.getElementById('cmms-file-input');
     if (fi) fi.value = '';
-    // Scroll the entries panel into view so the tech sees the update
-    const panel = document.getElementById('my-entries');
-    if (panel) panel.closest('.bg-white') ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Immediately pull fresh entries from the server
+    htmx.trigger(document.getElementById('my-entries'), 'refresh');
   }
 </script>
 </body>
