@@ -237,6 +237,12 @@ def close_shift(shift_id: int) -> None:
         c.execute("UPDATE shifts SET is_active=0 WHERE id=?", (shift_id,))
 
 
+def get_shift_notes(shift_id: int) -> str:
+    with _conn() as c:
+        row = c.execute("SELECT notes FROM shifts WHERE id=?", (shift_id,)).fetchone()
+    return row[0] if row else ""
+
+
 # ── LOTO verification ─────────────────────────────────────────────────────
 
 def save_loto(shift_id: int, verified: bool, missing_keys: str) -> None:
