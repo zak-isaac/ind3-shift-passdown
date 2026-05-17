@@ -14,6 +14,23 @@
                hover:bg-yellow-400 transition whitespace-nowrap">
         &#128203; Copy Email Version
       </button>
+      <!-- Send Email — opens preview modal -->
+      <button
+        hx-get="/report/{{ report_id }}/email-preview"
+        hx-target="#email-modal-wrap"
+        hx-swap="innerHTML"
+        hx-indicator="#email-btn-spinner"
+        class="text-xs bg-green-600 hover:bg-green-700 text-white font-bold px-3 py-1.5
+               rounded-lg transition whitespace-nowrap flex items-center gap-1">
+        <span id="email-btn-spinner" class="htmx-indicator"
+          style="display:none;">
+          <svg style="animation:spin 1s linear infinite;width:12px;height:12px;" fill="none" viewBox="0 0 24 24">
+            <circle style="opacity:.25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path style="opacity:.75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+          </svg>
+        </span>
+        &#9993; Send Email
+      </button>
       <a href="/report/{{ report_id }}/docx" download
         class="text-xs bg-white text-wm-dark font-bold px-3 py-1.5 rounded-lg
                hover:bg-gray-100 transition whitespace-nowrap">
@@ -39,11 +56,15 @@
     {{ preview_html | safe }}
   </div>
 
-  <!-- Hidden email text for copy — use | e to prevent XSS but keep raw text via JS -->
+  <!-- Hidden email text for copy -->
   <textarea id="email-text-hidden" class="sr-only" aria-hidden="true"
     tabindex="-1" readonly>{{ email_text | e }}</textarea>
 
+  <!-- Email modal mount point -->
+  <div id="email-modal-wrap"></div>
+
 </div>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 
 <script>
 function copyEmail() {

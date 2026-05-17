@@ -238,15 +238,7 @@
           <p class="text-xs text-green-600">Emails send from your logged-in Outlook account &bull; no passwords stored</p>
         </div>
       </div>
-      <form method="POST" action="/admin/email-test">
-        <button class="bg-white border border-gray-300 hover:border-wm-blue text-gray-600 hover:text-wm-blue font-bold px-4 py-2 rounded-xl text-xs transition">
-          &#128233; Send Test Email
-        </button>
-      </form>
-      <a href="/admin/email-preview" target="_blank"
-        class="bg-white border border-gray-300 hover:border-wm-blue text-gray-600 hover:text-wm-blue font-bold px-4 py-2 rounded-xl text-xs transition">
-        &#128065; Preview Format
-      </a>
+      <form method="POST" action="/admin/email-test" style="display:none"></form>
     </div>
     {% else %}
     <div class="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-5 text-sm text-red-700">

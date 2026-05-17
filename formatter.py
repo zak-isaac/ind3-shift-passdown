@@ -261,18 +261,11 @@ def format_email_passdown_html(
     if loto_missing:
         loto_html += f"<p style='color:#c00;margin:2px 0;'><strong>Missing keys:</strong> {loto_missing}</p>"
 
-    # Signature
+    # Signature — Outlook appends MST facility block automatically
     sig = (
-        "<div style='margin-top:32px;padding-top:16px;border-top:2px solid #e5e7eb;'>"
+        "<div style='margin-top:28px;padding-top:14px;border-top:2px solid #e5e7eb;'>"
         f"<p style='margin:0;font-weight:bold;font-size:14px;'>{data.lead_name}</p>"
         f"<p style='margin:2px 0;font-size:13px;color:#444;'>{lead_title}</p>"
-        "<p style='margin:10px 0 2px;font-size:12px;color:#555;'>eCommerce Fulfillment Center # 7552/8972</p>"
-        "<p style='margin:0;font-size:12px;color:#555;'>5259 W. 500 North</p>"
-        "<p style='margin:0;font-size:12px;color:#555;'>McCordsville, Indiana, 46055</p>"
-        "<p style='margin:8px 0 0;font-size:12px;'>"
-        "<strong style='color:#0053e2;'>Walmart</strong> "
-        "<span style='color:#ffc220;font-size:16px;'>&#10043;</span> "
-        "<em>Save money. Live better.</em></p>"
         "</div>"
     )
 

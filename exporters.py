@@ -14,7 +14,7 @@ def _fmt(iso: str) -> str:
 
 # ── DOCX ───────────────────────────────────────────────────────────────────────────────
 
-def export_docx(data: ReportData) -> bytes:
+def export_docx(data: ReportData, pending_pms: list[dict] | None = None, loto_missing: str = "") -> bytes:
     """Build a branded DOCX matching the PDF layout and return as bytes."""
     from docx import Document
     from docx.shared import Pt, Inches, RGBColor
@@ -177,12 +177,40 @@ def export_docx(data: ReportData) -> bytes:
     else:
         _none("No shift happenings recorded.")
 
-    # ── Reliable Operations ─────────────────────────────────────────────
-    _sec("Reliable Operations")
-    if data.ro:
+    # ── PM's Needing to be Completed ────────────────────────────────────
+    _sec("PM's Needing to be Completed")
+    if pending_pms:
+        from docx.enum.text import WD_ALIGN_PARAGRAPH as _WAP
+        from docx.oxml.ns import nsdecls as _nsd
+        from docx.oxml import parse_xml as _pxml
+        pm_tbl = doc.add_table(rows=1, cols=5)
+        pm_tbl.style = "Table Grid"
+        hdr_cells = pm_tbl.rows[0].cells
+        for ci, lbl in enumerate(["WO #", "Asset", "PM Due Date", "Promise Date/Time", "WO Date/Time"]):
+            hdr_cells[ci].text = lbl
+            r = hdr_cells[ci].paragraphs[0].runs[0]
+            r.bold, r.font.size, r.font.color.rgb = True, Pt(9), WHITE
+            _shade(hdr_cells[ci], "1a56db")
+            _cell_pad(hdr_cells[ci], top=50, bottom=50)
+        from datetime import date as _dt
+        today = _dt.today().strftime("%m/%d/%Y")
+        for i, r in enumerate(pending_pms):
+            row = pm_tbl.add_row()
+            vals = [r.get("wo_number",""), r.get("asset_num",""), r.get("pm_due_date",""),
+                    r.get("promise_date",""), r.get("wo_date","")]
+            bg = "fef08a" if today in r.get("pm_due_date","") else ("f9fafb" if i % 2 == 0 else "ffffff")
+            for ci, v in enumerate(vals):
+                row.cells[ci].text = v
+                run = row.cells[ci].paragraphs[0].runs[0]
+                run.font.size = Pt(9)
+                run.bold = ci in (1, 2)
+                _shade(row.cells[ci], bg)
+                _cell_pad(row.cells[ci], top=40, bottom=40)
+        doc.add_paragraph()
+    elif data.ro:
         for ro in data.ro: _item(f"\u25b6  {ro}")
     else:
-        _none("No reliable operations recorded this shift.")
+        _none("No PMs recorded for this shift.")
 
     # ── Returned to Service ──────────────────────────────────────────────
     _sec("Returned to Service (RTS)")
@@ -210,6 +238,25 @@ def export_docx(data: ReportData) -> bytes:
     pr.font.size, pr.font.color.rgb = Pt(8), LGRAY
     _page_field(fp)
 
+    # ── LOTO + Signature ──────────────────────────────────────────────────────
+    _sec("LOTO Keys")
+    _item("All LOTO Keys Verified \u2713", color=GREEN, bold=True)
+    if loto_missing:
+        _item(f"Missing keys: {loto_missing}", color=RED, bold=True)
+
+    # Signature
+    doc.add_paragraph()
+    p = doc.add_paragraph()
+    _para_rule(p, color="e5e7eb")
+    p.paragraph_format.space_after = Pt(4)
+    sig_p = doc.add_paragraph()
+    sig_p.paragraph_format.left_indent = Inches(0)
+    r = sig_p.add_run(data.lead_name)
+    r.bold, r.font.size, r.font.color.rgb = True, Pt(12), BLACK
+    title_p = doc.add_paragraph()
+    r2 = title_p.add_run("MST Lead")
+    r2.font.size, r2.font.color.rgb = Pt(10), MED_GRAY
+
     buf = io.BytesIO()
     doc.save(buf)
     return buf.getvalue()
@@ -217,7 +264,7 @@ def export_docx(data: ReportData) -> bytes:
 
 # ── PDF ────────────────────────────────────────────────────────────────────────────────
 
-def export_pdf(data: ReportData) -> bytes:
+def export_pdf(data: ReportData, pending_pms: list[dict] | None = None, loto_missing: str = "") -> bytes:
     """Build a professionally branded PDF using ReportLab and return as bytes."""
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import letter
@@ -384,13 +431,52 @@ def export_pdf(data: ReportData) -> bytes:
     else:
         add_none("No shift happenings recorded.")
 
-    # ── RELIABLE OPERATIONS ─────────────────────────────────────────────
-    add_section("Reliable Operations")
-    if data.ro:
+    # ── PM'S NEEDING TO BE COMPLETED ──────────────────────────────
+    add_section("PM's Needing to be Completed")
+    if pending_pms:
+        from datetime import date as _dt
+        today = _dt.today().strftime("%m/%d/%Y")
+        YELLOW = colors.HexColor("#fef08a")
+        PM_HDR = S("PH", fontSize=9,  textColor=WHITE,     fontName="Helvetica-Bold",  spaceAfter=0)
+        PM_TD  = S("PT", fontSize=9,  textColor=MED_GRAY,  fontName="Helvetica",        spaceAfter=0)
+        PM_TDB = S("PTB",fontSize=9,  textColor=BLACK,     fontName="Helvetica-Bold",   spaceAfter=0)
+        headers = [[Paragraph(h, PM_HDR) for h in ["WO #", "Asset", "PM Due Date", "Promise Date/Time", "WO Date/Time"]]]
+        rows = []
+        for i, r in enumerate(pending_pms):
+            hot = today in r.get("pm_due_date","")
+            row = [
+                Paragraph(r.get("wo_number",""),  PM_TD),
+                Paragraph(r.get("asset_num",""),   PM_TDB),
+                Paragraph(r.get("pm_due_date",""), PM_TDB),
+                Paragraph(r.get("promise_date",""),PM_TD),
+                Paragraph(r.get("wo_date",""),     PM_TD),
+            ]
+            rows.append(row)
+        col_w = [1.0*inch, 1.1*inch, 1.1*inch, 1.6*inch, 1.4*inch]
+        pm_tbl = Table(headers + rows, colWidths=col_w)
+        style_cmds = [
+            ("BACKGROUND",    (0,0),(-1,0),  WM_BLUE),
+            ("TEXTCOLOR",     (0,0),(-1,0),  WHITE),
+            ("TOPPADDING",    (0,0),(-1,-1), 5),
+            ("BOTTOMPADDING", (0,0),(-1,-1), 5),
+            ("LEFTPADDING",   (0,0),(-1,-1), 6),
+            ("RIGHTPADDING",  (0,0),(-1,-1), 6),
+            ("GRID",          (0,0),(-1,-1), 0.5, colors.HexColor("#d1d5db")),
+            ("VALIGN",        (0,0),(-1,-1), "MIDDLE"),
+        ]
+        for i, r in enumerate(pending_pms):
+            hot = today in r.get("pm_due_date","")
+            if hot:
+                style_cmds.append(("BACKGROUND",(0,i+1),(-1,i+1),YELLOW))
+            elif i % 2 == 0:
+                style_cmds.append(("BACKGROUND",(0,i+1),(-1,i+1),BG_ROW_ALT))
+        pm_tbl.setStyle(TableStyle(style_cmds))
+        story.append(pm_tbl)
+    elif data.ro:
         for r in data.ro:
             story.append(Paragraph(f"&#9658;&#160;&#160;{r}", BODY))
     else:
-        add_none("No reliable operations recorded this shift.")
+        add_none("No PMs recorded for this shift.")
 
     # ── RETURNED TO SERVICE (RTS) ─────────────────────────────────────────
     add_section("Returned to Service (RTS)")
@@ -415,6 +501,28 @@ def export_pdf(data: ReportData) -> bytes:
     else:
         add_none("No equipment currently out of service.")
 
+    story.append(Spacer(1, 0.25 * inch))
+
+    # ── LOTO + Signature ─────────────────────────────────────────────────
+    add_section("LOTO Keys")
+    story.append(Paragraph(
+        "<font color='#2a8703'>&#10004;</font>&#160;&#160;All LOTO Keys Verified",
+        RTS_S,
+    ))
+    if loto_missing:
+        story.append(Paragraph(
+            f"<font color='#ea1100'>&#9888;</font>&#160;&#160;Missing: {loto_missing}",
+            OOS_S,
+        ))
+
+    # Signature line
+    story.append(Spacer(1, 0.3 * inch))
+    story.append(HRFlowable(width="100%", thickness=0.5, color=LGRAY))
+    story.append(Spacer(1, 0.08 * inch))
+    SIG_NAME  = S("SN", fontSize=12, textColor=BLACK,    fontName="Helvetica-Bold")
+    SIG_TITLE = S("ST", fontSize=10, textColor=MED_GRAY, fontName="Helvetica")
+    story.append(Paragraph(data.lead_name, SIG_NAME))
+    story.append(Paragraph("MST Lead",     SIG_TITLE))
     story.append(Spacer(1, 0.25 * inch))
 
     doc.build(story, onFirstPage=_draw_page, onLaterPages=_draw_page)

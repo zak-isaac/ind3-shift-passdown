@@ -597,20 +597,7 @@ async def shift_end(request: Request, shift_id: int = Form(...)):
 
     db.close_shift(shift_id)
     loto = db.get_loto(shift_id)
-
-    # —— Fire-and-forget passdown email —————————————————————————————————
-    if db.get_setting("email_to", "").strip() and _outlook_ready():
-        subj = (
-            f"IND3 Passdown – {shift['shift_type']} Shift – "
-            f"{shift['lead_name']} – {shift['date']}"
-        )
-        # Use clean passdown format if we have structured data; fall back to content
-        email_body = format_email_passdown_html(
-        email_data,
-        loto_missing=loto.get("loto_missing_keys", ""),
-        pending_pms=db.get_pending_pms(shift_id),
-    ) if email_data else content
-        asyncio.create_task(_send_passdown_email(subj, email_body))
+    # Email is now sent manually via report UI (Send Email button)
 
     carry_overs = db.get_carry_over_entries(current_shift_id=shift_id)
     shift_notes = db.get_shift_notes(shift_id)
@@ -1800,6 +1787,74 @@ async def admin_save_email_settings(
     return RedirectResponse("/admin?msg=Email+settings+saved", status_code=303)
 
 
+# ── Email preview + manual send ────────────────────────────────────────────────────
+
+@app.get("/report/{report_id}/email-preview", response_class=HTMLResponse)
+async def report_email_preview(request: Request, report_id: int):
+    if not _is_lead_authed(request):
+        return HTMLResponse("Unauthorized", status_code=401)
+    rec = db.get_report(report_id)
+    if not rec:
+        return HTMLResponse("Report not found", status_code=404)
+    shift_id = rec["shift_id"]
+    shift    = db.get_shift(shift_id)
+    loto     = db.get_loto(shift_id)
+    email_data = (
+        ReportData.model_validate_json(rec["report_json"])
+        if rec.get("report_json") else None
+    )
+    html_body = format_email_passdown_html(
+        email_data,
+        loto_missing=loto.get("loto_missing_keys", ""),
+        pending_pms=db.get_pending_pms(shift_id),
+    ) if email_data else rec["content"]
+
+    subj = (
+        f"IND3 Passdown – {shift['shift_type']} Shift – "
+        f"{shift['lead_name']} – {shift['date']}"
+    ) if shift else "IND3 Passdown"
+
+    return templates.TemplateResponse(
+        request, "partials/email_preview_modal.html",
+        {"report_id": report_id, "subject": subj, "html_body": html_body},
+    )
+
+
+@app.post("/report/{report_id}/send-email", response_class=HTMLResponse)
+async def report_send_email(
+    request:   Request,
+    report_id: int,
+    subject:   str  = Form(""),
+    html_body: str  = Form(""),
+):
+    if not _is_lead_authed(request):
+        return HTMLResponse("Unauthorized", status_code=401)
+    if not db.get_setting("email_to", "").strip():
+        return HTMLResponse(
+            '<p class="text-red-600 font-bold text-sm">&#10060; No recipients configured — add them in Admin → Email Settings.</p>'
+        )
+    if not _outlook_ready():
+        return HTMLResponse(
+            '<p class="text-red-600 font-bold text-sm">&#10060; Outlook is not running. Open Outlook and try again.</p>'
+        )
+    to_raw    = db.get_setting("email_to", "").strip()
+    to_list   = [a.strip() for a in to_raw.split(",") if a.strip()]
+    from_name = db.get_setting("email_from_name", "IND3 Shift Passdown").strip()
+    reply_to  = db.get_setting("email_reply_to", "").strip() or (to_list[0] if to_list else "")
+    try:
+        await outlook_sender.send_email(
+            to_list, subject or "IND3 Passdown",
+            html_body, from_name=from_name, reply_to=reply_to,
+        )
+        return HTMLResponse(
+            '<p class="text-green-700 font-bold text-sm">&#10003; Email sent successfully!</p>'
+        )
+    except Exception as exc:
+        return HTMLResponse(
+            f'<p class="text-red-600 font-bold text-sm">&#10060; Send failed: {exc}</p>'
+        )
+
+
 @app.get("/admin/email-preview", response_class=HTMLResponse)
 async def admin_email_preview(request: Request):
     """Live preview of the passdown email format with sample data."""
@@ -2323,11 +2378,11 @@ async def download_docx(report_id: int):
     if not rec or not rec.get("report_json"):
         raise HTTPException(status_code=404, detail="Report data not found")
     data  = ReportData.model_validate_json(rec["report_json"])
-    fname = (
-        f"passdown_{rec['generated_at'].replace(' ', '_').replace(':', '-')}.docx"
-    )
+    loto  = db.get_loto(rec["shift_id"])
+    pms   = db.get_pending_pms(rec["shift_id"])
+    fname = f"passdown_{rec['generated_at'].replace(' ', '_').replace(':', '-')}.docx"
     return Response(
-        content=export_docx(data),
+        content=export_docx(data, pending_pms=pms or None, loto_missing=loto.get("loto_missing_keys","")),
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
@@ -2339,11 +2394,11 @@ async def download_pdf(report_id: int):
     if not rec or not rec.get("report_json"):
         raise HTTPException(status_code=404, detail="Report data not found")
     data  = ReportData.model_validate_json(rec["report_json"])
-    fname = (
-        f"passdown_{rec['generated_at'].replace(' ', '_').replace(':', '-')}.pdf"
-    )
+    loto  = db.get_loto(rec["shift_id"])
+    pms   = db.get_pending_pms(rec["shift_id"])
+    fname = f"passdown_{rec['generated_at'].replace(' ', '_').replace(':', '-')}.pdf"
     return Response(
-        content=export_pdf(data),
+        content=export_pdf(data, pending_pms=pms or None, loto_missing=loto.get("loto_missing_keys","")),
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
