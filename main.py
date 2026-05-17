@@ -16,8 +16,9 @@ import httpx
 import associates as assoc_mod
 import db
 import registry
-from report_models import OosUnit, ReportData, RewrittenHappening
+from report_models import OosUnit, ReportData, RewrittenHappening, HappeningInput
 from formatter import format_html_preview, format_email
+from rewriter import rewrite_all
 from cetaris_parser import parse_cetaris, ParseResult
 from summarizer import summarize_remarks
 from exporters import export_docx, export_pdf
@@ -113,6 +114,7 @@ def _get_tech_session(request: Request, shift_id: int) -> dict | None:
 _LEAD_PIN_DEFAULT = hashlib.sha256(b"8972").hexdigest()
 _EMERGENCY_CODE   = "8972"   # always works even if PIN was changed — this IS the manager code
 _LEAD_COOKIE      = "lead_auth"
+_LEAD_SHIFT_COOKIE = "lead_shift_id"   # which shift this MST session owns
 _MGR_COOKIE       = "mgr_session"   # set ONLY when 8972 is entered
 _MGR_TOKEN        = hashlib.sha256(b"mgr:8972").hexdigest()  # opaque, never sent to client
 
@@ -127,13 +129,10 @@ def _check_lead_credential(entered: str) -> bool:
     entered = entered.strip()
     if not entered:
         return False
-    # 1. Matches the stored PIN hash (handles 8972 default + custom PINs)
     if hashlib.sha256(entered.encode()).hexdigest() == _get_pin_hash():
         return True
-    # 2. Hardcoded emergency/manager override — always works
     if entered == _EMERGENCY_CODE:
         return True
-    # 3. Valid associate marked as MST in the roster
     assoc = _ROSTER.get(entered)
     if assoc and assoc.get("is_mst"):
         return True
@@ -143,6 +142,23 @@ def _check_lead_credential(entered: str) -> bool:
 def _is_lead_authed(request: Request) -> bool:
     return request.cookies.get(_LEAD_COOKIE) == _get_pin_hash()
 
+
+def _get_lead_shift_id(request: Request) -> int:
+    """Return the shift_id this MST session was bound to, or 0 if manager/unknown."""
+    try:
+        return int(request.cookies.get(_LEAD_SHIFT_COOKIE, "0"))
+    except (ValueError, TypeError):
+        return 0
+
+
+def _can_manage_shift(request: Request, shift_id: int) -> bool:
+    """True if this session is allowed to mutate the given shift.
+    Manager override (8972) bypasses the check; regular MSTs are bound to their shift.
+    """
+    if _is_manager_authed(request):
+        return True
+    bound = _get_lead_shift_id(request)
+    return bound == 0 or bound == shift_id  # 0 = unbound legacy session
 
 def _is_manager_authed(request: Request) -> bool:
     """True only when the session was opened with the hardcoded 8972 code."""
@@ -494,10 +510,15 @@ async def lead_force_end(request: Request):
 async def shift_end(request: Request, shift_id: int = Form(...)):
     if not _is_lead_authed(request):
         return _lead_redirect("/lead")
-    # Use get_shift so we always find the correct shift even during overlap
     shift = db.get_shift(shift_id)
     if not shift or not shift.get("is_active"):
         raise HTTPException(status_code=404, detail="Shift not found or already ended")
+    # Prevent a different shift's MST from ending this one
+    if not _can_manage_shift(request, shift_id):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Your session is bound to a different shift. Use manager code 8972 to override.",
+        )
 
     # Prefer the last lead-generated report; fall back to auto-building one
     last = db.get_last_report_for_shift(shift_id)
@@ -954,12 +975,25 @@ async def lead_login_post(
     if _check_lead_credential(entered):
         # Credential OK — create any pending shift
         pending_raw = request.cookies.get("__pending_shift")
+        bound_shift_id = 0
         if pending_raw:
             try:
                 p = json.loads(pending_raw)
-                db.start_shift(p["date"], p["shift_type"], p["lead_name"])
+                bound_shift_id = db.start_shift(p["date"], p["shift_type"], p["lead_name"])
             except Exception as exc:
                 print(f"[login] pending shift cookie invalid: {exc}", flush=True)
+
+        # If no pending shift, try to bind to the most-recent active shift for
+        # this credential (associate-ID login finds their shift by lead_name)
+        if not bound_shift_id:
+            assoc = _ROSTER.get(entered)
+            if assoc:
+                lead_display = assoc.get("display_name") or assoc.get("full_name", "")
+                active = db.get_active_shifts()
+                for s in active:
+                    if s["lead_name"] == lead_display:
+                        bound_shift_id = s["id"]
+                        break
 
         safe_next = next if next.startswith("/") else "/lead"
         html = f"""
@@ -973,6 +1007,12 @@ async def lead_login_post(
         resp.set_cookie(_LEAD_COOKIE, _get_pin_hash(),
                         httponly=True, samesite="lax", path="/")
         resp.delete_cookie("__pending_shift", path="/")
+        # Bind this session to the shift — prevents cross-shift mutations
+        if bound_shift_id:
+            resp.set_cookie(_LEAD_SHIFT_COOKIE, str(bound_shift_id),
+                            httponly=True, samesite="lax", path="/")
+        else:
+            resp.delete_cookie(_LEAD_SHIFT_COOKIE, path="/")
         # Manager cookie — only granted when 8972 is the credential
         if entered == _EMERGENCY_CODE:
             resp.set_cookie(_MGR_COOKIE, _MGR_TOKEN,
@@ -1176,7 +1216,71 @@ async def lead_feed(request: Request, shift_id: int = 0):
     )
 
 
-# ── Carry-over toggle ────────────────────────────────────────────────────────────────
+# ── Carry-over panel partial + actions ──────────────────────────────────────
+
+@app.get("/lead/carry-overs", response_class=HTMLResponse)
+async def lead_carry_overs_panel(request: Request, shift_id: int):
+    """Returns the full carry-over panel so HTMX can refresh it after actions."""
+    if not _is_lead_authed(request):
+        return HTMLResponse("")
+    carry_overs = db.get_carry_over_entries(current_shift_id=shift_id)
+    return templates.TemplateResponse(
+        request, "partials/carry_overs_panel.html",
+        {"carry_overs": carry_overs, "shift_id": shift_id},
+    )
+
+
+@app.post("/lead/carry-over/{entry_id}/dismiss", response_class=HTMLResponse)
+async def dismiss_carry_over(
+    request: Request,
+    entry_id: int,
+    shift_id: int = Form(...),
+):
+    """Clear the carry-over flag — item is resolved, stop showing it."""
+    if not _is_lead_authed(request):
+        raise HTTPException(status_code=403)
+    db.set_carry_over(entry_id, False)
+    carry_overs = db.get_carry_over_entries(current_shift_id=shift_id)
+    return templates.TemplateResponse(
+        request, "partials/carry_overs_panel.html",
+        {"carry_overs": carry_overs, "shift_id": shift_id},
+    )
+
+
+@app.post("/lead/carry-over/{entry_id}/adopt", response_class=HTMLResponse)
+async def adopt_carry_over(
+    request: Request,
+    entry_id: int,
+    shift_id: int = Form(...),
+):
+    """Copy this carry-over into the current shift as a new entry, then clear the flag.
+    The MST can then manage it (carry it over again, exclude it, etc.) from the live feed.
+    """
+    if not _is_lead_authed(request):
+        raise HTTPException(status_code=403)
+    source = db.get_entry(entry_id)
+    if source:
+        lead_name = db.get_shift(shift_id)["lead_name"] if db.get_shift(shift_id) else "MST"
+        db.add_entry(
+            shift_id=shift_id,
+            tech_name=f"{lead_name} (adopted)",
+            unit=source["unit"],
+            issue=source["issue"],
+            action=source.get("action", ""),
+            result=source.get("result", ""),
+            priority=source.get("priority", "monitor"),
+        )
+        db.set_carry_over(entry_id, False)
+        await _ws.broadcast({"type": "new_entry", "tech": lead_name,
+                             "unit": source["unit"], "priority": source.get("priority", "monitor")})
+    carry_overs = db.get_carry_over_entries(current_shift_id=shift_id)
+    return templates.TemplateResponse(
+        request, "partials/carry_overs_panel.html",
+        {"carry_overs": carry_overs, "shift_id": shift_id},
+    )
+
+
+# ── Carry-over toggle (live-feed button) ────────────────────────────────────
 
 @app.post("/lead/entry/{entry_id}/carry-over", response_class=HTMLResponse)
 async def toggle_carry_over(

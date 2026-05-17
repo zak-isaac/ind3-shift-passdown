@@ -96,27 +96,13 @@
   </div>
   {% endif %}
 
-  <!-- CARRY-OVERS FROM PREVIOUS SHIFT -->
-  {% if carry_overs %}
-  <div class="lg:col-span-5 bg-orange-50 border-2 border-orange-400 rounded-2xl p-5">
-    <h2 class="text-orange-700 font-black text-base flex items-center gap-2 mb-3">
-      &#128198; Carried Over from Previous Shift
-      <span class="bg-orange-400 text-white text-xs font-black px-2 py-0.5 rounded-full">{{ carry_overs | length }}</span>
-    </h2>
-    <ul class="flex flex-col gap-2">
-      {% for e in carry_overs %}
-      {% if e.priority == 'down' %}{% set pbadge = '🔴' %}{% elif e.priority == 'degraded' %}{% set pbadge = '🟡' %}{% else %}{% set pbadge = '🟢' %}{% endif %}
-      <li class="bg-white rounded-xl border border-orange-200 px-4 py-3 flex items-start justify-between gap-3">
-        <div class="flex-1 min-w-0">
-          <p class="text-sm font-bold text-gray-800">{{ pbadge }} {{ e.unit }} <span class="text-gray-400 font-normal text-xs">&bull; from {{ e.shift_type }} {{ e.date }}</span></p>
-          <p class="text-xs text-gray-600 mt-0.5">{{ e.issue }}</p>
-        </div>
-        <span class="text-xs text-gray-500 whitespace-nowrap">MST: {{ e.lead_name }}</span>
-      </li>
-      {% endfor %}
-    </ul>
+  <!-- CARRY-OVERS FROM PREVIOUS SHIFT (live panel, refreshes after actions) -->
+  <div id="carry-overs-panel"
+       hx-get="/lead/carry-overs?shift_id={{ shift.id }}"
+       hx-trigger="load"
+       hx-swap="outerHTML"
+       class="lg:col-span-5">
   </div>
-  {% endif %}
 
   <!-- NEW ENTRY TOAST -->
   <div id="new-entry-toast"

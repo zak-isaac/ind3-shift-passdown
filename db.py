@@ -681,6 +681,13 @@ def get_entries(shift_id: int) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def get_entry(entry_id: int) -> Optional[dict]:
+    """Fetch a single entry by ID."""
+    with _conn() as c:
+        row = c.execute("SELECT * FROM entries WHERE id=?", (entry_id,)).fetchone()
+    return dict(row) if row else None
+
+
 def delete_entry(entry_id: int) -> None:
     with _conn() as c:
         c.execute("DELETE FROM entries WHERE id=?", (entry_id,))
