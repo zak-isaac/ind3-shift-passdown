@@ -1587,9 +1587,7 @@ async def admin_save_teams_webhook(request: Request, webhook_url: str = Form("")
 async def lead_pm_files_list(request: Request, shift_id: int = 0):
     if not _is_lead_authed(request):
         return HTMLResponse("")
-    file_html  = _render_pm_file_list(db.get_pm_files(shift_id))
-    table_html = _render_pm_table(db.get_pending_pms(shift_id))
-    return HTMLResponse(file_html + table_html)
+    return HTMLResponse(_render_pm_section(shift_id))
 
 
 @app.post("/lead/loto", response_class=HTMLResponse)
@@ -1673,7 +1671,7 @@ async def lead_pm_upload(
             print(f"[pm] parse failed: {exc}", flush=True)
 
     files = db.get_pm_files(shift_id)
-    return HTMLResponse(_render_pm_file_list(files) + _render_pm_table(db.get_pending_pms(shift_id)))
+    return HTMLResponse(_render_pm_section(shift_id))
 
 
 @app.get("/lead/pm-file/{file_id}/download")
@@ -1702,42 +1700,64 @@ async def lead_pm_delete(request: Request, file_id: int, shift_id: int = Form(..
         p = PM_UPLOAD_DIR / stored
         if p.exists():
             p.unlink()
+    return HTMLResponse(_render_pm_section(shift_id))
+
+
+def _render_pm_section(shift_id: int) -> str:
+    """Full #pm-file-list outer div — used for both init-load and post-upload outerHTML swap."""
     files = db.get_pm_files(shift_id)
-    return HTMLResponse(_render_pm_file_list(files) + _render_pm_table(db.get_pending_pms(shift_id)))
+    rows  = db.get_pending_pms(shift_id)
 
+    # File chips
+    if not files:
+        file_html = '<p class="text-gray-400 text-xs italic">No files uploaded yet.</p>'
+    else:
+        chips = "".join(
+            f'<div class="flex items-center justify-between gap-2 py-1.5 border-b border-gray-100 last:border-0">'
+            f'<a href="/lead/pm-file/{f["id"]}/download" class="text-xs text-wm-blue hover:underline truncate max-w-[70%]" title="{f["filename"]}">'
+            f'&#128196; {f["filename"]}</a>'
+            f'<form method="POST" action="/lead/pm-file/{f["id"]}/delete">'
+            f'<input type="hidden" name="shift_id" value="{f["shift_id"]}">'
+            f'<button class="text-red-400 hover:text-red-600 text-xs font-bold">&#10005;</button>'
+            f'</form></div>'
+            for f in files
+        )
+        file_html = f'<div class="flex flex-col">{chips}</div>'
 
-def _render_pm_table(rows: list[dict]) -> str:
-    """Render pending PM rows as an HTML table partial."""
+    # PM table
     if not rows:
-        return ""
-    today = date.today().strftime("%m/%d/%Y")
-    th = "px-3 py-2 text-left text-xs font-bold text-gray-600 uppercase tracking-wide bg-gray-50"
-    td = "px-3 py-2 text-xs text-gray-800"
-    header = (
-        f'<tr><th class="{th}">WO #</th><th class="{th}">Asset</th>'
-        f'<th class="{th}">PM Due</th><th class="{th}">Promise</th>'
-        f'<th class="{th}">WO Date</th></tr>'
-    )
-    body_rows = ""
-    for r in rows:
-        due = r["pm_due_date"]
-        highlight = "background:#fef08a;" if today in due else ""
-        body_rows += (
-            f'<tr style="{highlight}">'
+        table_html = ""
+    else:
+        from datetime import date as _dt
+        today = _dt.today().strftime("%m/%d/%Y")
+        th = "px-3 py-2 text-left text-xs font-bold text-white uppercase bg-wm-blue"
+        td = "px-3 py-2 text-xs text-gray-800"
+        hdr = (
+            f'<tr><th class="{th}">WO #</th><th class="{th}">Asset</th>'
+            f'<th class="{th}">PM Due</th><th class="{th}">Promise</th>'
+            f'<th class="{th}">WO Date</th></tr>'
+        )
+        body = "".join(
+            f'<tr style="{"background:#fef08a;" if today in r["pm_due_date"] else ""}" class="border-b border-gray-100 last:border-0">'
             f'<td class="{td} font-mono">{r["wo_number"]}</td>'
             f'<td class="{td} font-semibold">{r["asset_num"]}</td>'
-            f'<td class="{td} font-bold">{due}</td>'
+            f'<td class="{td} font-bold">{r["pm_due_date"]}</td>'
             f'<td class="{td}">{r["promise_date"]}</td>'
             f'<td class="{td} text-gray-500">{r["wo_date"]}</td>'
             f'</tr>'
+            for r in rows
         )
+        table_html = (
+            f'<div class="mt-3 overflow-x-auto rounded-lg border border-gray-200">'
+            f'<table class="w-full border-collapse"><thead>{hdr}</thead>'
+            f'<tbody>{body}</tbody></table></div>'
+        )
+
     return (
-        f'<div class="mt-3 overflow-x-auto rounded-lg border border-gray-200" id="pm-table">'
-        f'<p class="text-xs font-bold text-gray-500 px-3 pt-2">'
-        f'{len(rows)} PM{"s" if len(rows)!=1 else ""} Needing Completion — '
-        f'<span style="background:#fef08a;padding:1px 4px;border-radius:3px;">yellow</span> = due today</p>'
-        f'<table class="w-full border-collapse mt-1"><thead>{header}</thead>'
-        f'<tbody class="divide-y divide-gray-100">{body_rows}</tbody></table></div>'
+        f'<div id="pm-file-list" class="min-h-[2rem] mb-3">'
+        + file_html
+        + table_html
+        + '</div>'
     )
 
 

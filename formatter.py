@@ -190,73 +190,103 @@ def format_email_passdown(data: ReportData) -> str:
     return "\n".join(lines)
 
 
-def format_email_passdown_html(data: ReportData, loto_missing: str = "", pending_pms: list[dict] | None = None) -> str:
-    """HTML passdown email — bold titles, bullet list, Outlook-safe inline styles."""
+def format_email_passdown_html(
+    data: ReportData,
+    loto_missing: str = "",
+    pending_pms: list[dict] | None = None,
+    lead_title: str = "MST Lead",
+) -> str:
+    """HTML passdown email: bold titles, real bordered PM table, signature block."""
+    from datetime import date as _date
 
-    def _bullets(items: list[str]) -> str:
+    def _li(items: list[str]) -> str:
         if not items:
-            return "<li style='margin:2px 0;'>None</li>"
+            return "<li style='margin:2px 0;color:#555;'>None</li>"
         return "".join(f"<li style='margin:4px 0;'>{i}</li>" for i in items)
 
-    def _section(title: str, items: list[str]) -> str:
+    def _bullet_sec(title: str, items: list[str]) -> str:
         return (
-            f"<p style='margin:14px 0 2px;'><strong>{title}</strong></p>"
-            f"<ul style='margin:0 0 4px;padding-left:20px;'>{''.join(_bullets(items) if items else ['<li style=margin:2px 0;>None</li>'])}</ul>"
+            f"<p style='margin:16px 0 4px;'><strong style='font-size:14px;'>{title}</strong></p>"
+            f"<ul style='margin:0 0 4px;padding-left:20px;line-height:1.8;'>{_li(items)}</ul>"
         )
 
+    # Shift Happenings
     h_items: list[str] = []
     if data.pm_count:
         h_items.append(f"{data.pm_count} PM{'s' if data.pm_count != 1 else ''} completed this shift")
     for h in data.happenings:
         prefix = h.title.split("\u2013")[0].split("-")[0].strip()
-        if prefix and not any(c in prefix for c in (" ", ",")):
+        if prefix and " " not in prefix and "," not in prefix:
             h_items.append(f"<strong>{prefix}:</strong> {h.paragraph}")
         else:
             h_items.append(h.paragraph)
 
-    loto_html = "<p style='margin-top:16px;'><strong>All LOTO Keys verified &#10003;</strong></p>"
+    # PM section: proper bordered table or bullet fallback
+    today  = _date.today().strftime("%m/%d/%Y")
+    border = "border:1px solid #d1d5db;"
+    th_s   = f"padding:8px 12px;text-align:left;font-size:12px;font-weight:bold;background:#1a56db;color:#fff;{border}"
+    td_s   = f"padding:7px 12px;font-size:12px;{border}"
+
+    if pending_pms:
+        hdr = (
+            f"<tr><th style='{th_s}'>WO #</th><th style='{th_s}'>Asset</th>"
+            f"<th style='{th_s}'>PM Due Date</th><th style='{th_s}'>Promise Date / Time</th>"
+            f"<th style='{th_s}'>WO Date / Time</th></tr>"
+        )
+        body_rows = ""
+        for i, r in enumerate(pending_pms):
+            due     = r.get("pm_due_date", "")
+            hot     = today in due
+            row_bg  = "#fef08a" if hot else ("#f9fafb" if i % 2 == 0 else "#ffffff")
+            due_col = "color:#c00;" if hot else ""
+            body_rows += (
+                f"<tr style='background:{row_bg};'>"
+                f"<td style='{td_s}font-family:monospace;'>{r.get('wo_number','')}</td>"
+                f"<td style='{td_s}font-weight:bold;'>{r.get('asset_num','')}</td>"
+                f"<td style='{td_s}font-weight:bold;{due_col}'>{due}</td>"
+                f"<td style='{td_s}'>{r.get('promise_date','')}</td>"
+                f"<td style='{td_s}color:#666;'>{r.get('wo_date','')}</td>"
+                f"</tr>"
+            )
+        pm_html = (
+            f"<p style='margin:16px 0 4px;'><strong style='font-size:14px;'>PM\u2019s Needing to be Completed</strong></p>"
+            f"<table style='width:100%;border-collapse:collapse;margin-top:4px;'>"
+            f"<thead>{hdr}</thead><tbody>{body_rows}</tbody></table>"
+        )
+    else:
+        pm_html = _bullet_sec("PM\u2019s Needing to be Completed", list(data.ro) if data.ro else [])
+
+    # LOTO
+    loto_html = "<p style='margin-top:18px;'><strong>All LOTO Keys Verified &#10003;</strong></p>"
     if loto_missing:
         loto_html += f"<p style='color:#c00;margin:2px 0;'><strong>Missing keys:</strong> {loto_missing}</p>"
 
-    pm_table_html = ""
-    if pending_pms:
-        from datetime import date as _date
-        today = _date.today().strftime("%m/%d/%Y")
-        th_s = "padding:6px 10px;text-align:left;font-size:12px;font-weight:bold;background:#f3f4f6;border-bottom:2px solid #e5e7eb;"
-        td_s = "padding:6px 10px;font-size:12px;border-bottom:1px solid #f0f0f0;"
-        rows_html = "".join(
-            "<tr style='background:{bg};'>".format(
-                bg="#fef08a" if today in r.get("pm_due_date", "") else "#ffffff"
-            ) +
-            f"<td style='{td_s}'>{r.get('wo_number','')}</td>"
-            f"<td style='{td_s}'><strong>{r.get('asset_num','')}</strong></td>"
-            f"<td style='{td_s}'><strong>{r.get('pm_due_date','')}</strong></td>"
-            f"<td style='{td_s}'>{r.get('promise_date','')}</td>"
-            f"<td style='{td_s};color:#888;'>{r.get('wo_date','')}</td></tr>"
-            for r in pending_pms
-        )
-        pm_table_html = (
-            f"<p style='margin:18px 0 6px;'><strong>PM&#8217;s Needing to be Completed</strong> "
-            f"<span style='font-size:11px;color:#666;'>({len(pending_pms)} open — "
-            f"<span style='background:#fef08a;padding:1px 4px;'>yellow</span> = due today)</span></p>"
-            f"<table style='width:100%;border-collapse:collapse;font-family:Calibri,Arial,sans-serif;'>"
-            f"<thead><tr>"
-            f"<th style='{th_s}'>WO #</th><th style='{th_s}'>Asset</th>"
-            f"<th style='{th_s}'>PM Due</th><th style='{th_s}'>Promise</th>"
-            f"<th style='{th_s}'>WO Date</th></tr></thead>"
-            f"<tbody>{rows_html}</tbody></table>"
-        )
+    # Signature
+    sig = (
+        "<div style='margin-top:32px;padding-top:16px;border-top:2px solid #e5e7eb;'>"
+        f"<p style='margin:0;font-weight:bold;font-size:14px;'>{data.lead_name}</p>"
+        f"<p style='margin:2px 0;font-size:13px;color:#444;'>{lead_title}</p>"
+        "<p style='margin:10px 0 2px;font-size:12px;color:#555;'>eCommerce Fulfillment Center # 7552/8972</p>"
+        "<p style='margin:0;font-size:12px;color:#555;'>5259 W. 500 North</p>"
+        "<p style='margin:0;font-size:12px;color:#555;'>McCordsville, Indiana, 46055</p>"
+        "<p style='margin:8px 0 0;font-size:12px;'>"
+        "<strong style='color:#0053e2;'>Walmart</strong> "
+        "<span style='color:#ffc220;font-size:16px;'>&#10043;</span> "
+        "<em>Save money. Live better.</em></p>"
+        "</div>"
+    )
 
     return (
-        "<html><body style='font-family:Calibri,Arial,sans-serif;font-size:14px;color:#111;max-width:680px;line-height:1.5;'>"
-        f"<p style='margin:0 0 16px;font-size:15px;'><strong>{data.shift_type} End of Shift Passdown</strong></p>"
-        + _section("Vendors", list(data.vendors))
-        + _section("Shift Happenings", h_items)
-        + _section("PM\u2019s Needing to be Completed", list(data.ro))
-        + _section("Out of Service \u2014 Returned to Service (RTS)", list(data.rts))
-        + _section("Current Out of Service", [o.unit for o in data.oos])
+        "<html><body style='font-family:Calibri,Arial,sans-serif;font-size:14px;"
+        "color:#111;max-width:700px;line-height:1.6;'>"
+        f"<p style='margin:0 0 18px;font-size:16px;'><strong>{data.shift_type} End of Shift Passdown</strong></p>"
+        + _bullet_sec("Vendors", list(data.vendors))
+        + _bullet_sec("Shift Happenings", h_items)
+        + pm_html
+        + _bullet_sec("Out of Service \u2014 Returned to Service (RTS)", list(data.rts))
+        + _bullet_sec("Current Out of Service", [o.unit for o in data.oos])
         + loto_html
-        + pm_table_html
+        + sig
         + "</body></html>"
     )
 

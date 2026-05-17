@@ -191,13 +191,13 @@
       </h2>
       <p class="text-gray-400 text-xs mb-3">Upload the Cetaris open PM report (Excel/CSV). Table auto-parses and goes into the email.</p>
 
-      <!-- Init loader (fires once on page load, separate from the swap target) -->
+      <!-- Init loader: fires once on page load, replaces the whole #pm-file-list -->
       <div hx-get="/lead/pm-files?shift_id={{ shift.id }}"
            hx-trigger="load"
            hx-target="#pm-file-list"
-           hx-swap="innerHTML"></div>
+           hx-swap="outerHTML"></div>
 
-      <!-- Swap target — NO hx-* on this element so it won't self-re-trigger -->
+      <!-- Swap target — outerHTML means the whole div is replaced, no re-trigger -->
       <div id="pm-file-list" class="min-h-[2rem] mb-3">
         <p class="text-gray-300 text-xs italic">Loading...</p>
       </div>
@@ -205,7 +205,7 @@
       <!-- Upload form -->
       <form hx-post="/lead/pm-upload"
         hx-target="#pm-file-list"
-        hx-swap="innerHTML"
+        hx-swap="outerHTML"
         hx-encoding="multipart/form-data"
         hx-indicator="#pm-upload-spinner"
         hx-on::after-request="this.reset()"
