@@ -166,7 +166,94 @@
                    file:cursor-pointer cursor-pointer"
           />
         </label>
-        <button type="submit"
+        <!-- ══ PM FILE UPLOAD ══ -->
+      <details class="bg-white rounded-xl border border-blue-200 shadow-sm">
+        <summary class="px-4 py-3 font-semibold text-sm text-wm-dark cursor-pointer select-none">
+          &#128196; PM's Needing to be Completed
+          <span class="text-gray-400 font-normal text-xs ml-1">(upload schedule file)</span>
+        </summary>
+        <div class="px-4 pb-4 flex flex-col gap-3">
+
+          <!-- File list -->
+          <div id="pm-file-list"
+            hx-get="/lead/pm-files?shift_id={{ shift.id }}"
+            hx-trigger="load"
+            hx-swap="innerHTML"
+            class="min-h-[2rem]">
+            <p class="text-gray-300 text-xs italic">Loading...</p>
+          </div>
+
+          <!-- Upload form -->
+          <form hx-post="/lead/pm-upload"
+            hx-target="#pm-file-list"
+            hx-swap="innerHTML"
+            hx-encoding="multipart/form-data"
+            class="flex items-center gap-2 mt-1">
+            <input type="hidden" name="shift_id" value="{{ shift.id }}">
+            <input type="file" name="pm_file" required
+              accept=".pdf,.xlsx,.xls,.csv,.png,.jpg,.jpeg"
+              class="text-xs text-gray-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg
+                     file:border-0 file:text-xs file:font-bold file:bg-wm-blue file:text-white
+                     file:cursor-pointer hover:file:bg-blue-700 flex-1" />
+            <button type="submit"
+              class="px-3 py-1.5 bg-wm-blue hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition shrink-0">
+              Upload
+            </button>
+          </form>
+          <p class="text-xs text-gray-400">PDF, Excel, CSV or image. Attached to this shift's record.</p>
+        </div>
+      </details>
+
+      <!-- ══ LOTO KEY VERIFICATION ══ -->
+      <details class="bg-white rounded-xl border border-yellow-200 shadow-sm">
+        <summary class="px-4 py-3 font-semibold text-sm text-wm-dark cursor-pointer select-none">
+          &#128273; LOTO Key Verification
+          {% if loto.loto_verified %}
+          <span class="ml-2 text-xs font-bold text-green-600">&#10003; Verified</span>
+          {% else %}
+          <span class="ml-2 text-xs font-bold text-yellow-600">Pending</span>
+          {% endif %}
+        </summary>
+        <div class="px-4 pb-4 flex flex-col gap-3">
+
+          <div id="loto-status" class="text-xs text-gray-500">
+            {% if loto.loto_verified %}
+            <p class="font-bold text-green-700">&#10003; All LOTO Keys Verified</p>
+            {% if loto.loto_missing_keys %}
+            <p class="text-red-600"><strong>Missing keys:</strong> {{ loto.loto_missing_keys }}</p>
+            {% endif %}
+            {% else %}
+            <p class="text-gray-400 italic">Not yet verified for this shift.</p>
+            {% endif %}
+          </div>
+
+          <form hx-post="/lead/loto"
+            hx-target="#loto-status"
+            hx-swap="innerHTML"
+            class="flex flex-col gap-3">
+            <input type="hidden" name="shift_id" value="{{ shift.id }}">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" name="loto_verified" value="on"
+                {% if loto.loto_verified %}checked{% endif %}
+                class="w-4 h-4 accent-green-600" />
+              <span class="text-sm font-semibold text-gray-700">All LOTO Keys accounted for</span>
+            </label>
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-bold text-gray-500">Missing keys <span class="font-normal">(leave blank if none)</span></label>
+              <input name="missing_keys" type="text"
+                value="{{ loto.loto_missing_keys }}"
+                placeholder="e.g. CHAR0020 key, TK51 key..."
+                class="rounded-lg border border-gray-300 px-3 py-2 text-xs focus:border-yellow-400 outline-none" />
+            </div>
+            <button type="submit"
+              class="w-fit px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-bold text-xs rounded-lg transition">
+              Save LOTO Status
+            </button>
+          </form>
+        </div>
+      </details>
+
+      <button type="submit"
           class="flex items-center justify-center gap-2 bg-wm-blue hover:bg-blue-700
                  text-white font-bold py-2 rounded-xl transition text-sm">
           <span id="lead-cmms-spinner" class="htmx-indicator items-center gap-1 text-sm">

@@ -161,6 +161,25 @@ def init_db() -> None:
         if "is_mst" not in existing_assoc_cols:
             c.execute("ALTER TABLE associates ADD COLUMN is_mst INTEGER NOT NULL DEFAULT 0")
 
+        # LOTO verification fields on shifts
+        existing_shift_cols = {row[1] for row in c.execute("PRAGMA table_info(shifts)")}
+        if "loto_verified" not in existing_shift_cols:
+            c.execute("ALTER TABLE shifts ADD COLUMN loto_verified INTEGER NOT NULL DEFAULT 0")
+        if "loto_missing_keys" not in existing_shift_cols:
+            c.execute("ALTER TABLE shifts ADD COLUMN loto_missing_keys TEXT NOT NULL DEFAULT ''")
+
+        # PM files table
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS pm_files (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                shift_id    INTEGER NOT NULL REFERENCES shifts(id),
+                filename    TEXT    NOT NULL,
+                stored_name TEXT    NOT NULL,
+                uploaded_by TEXT    NOT NULL DEFAULT '',
+                uploaded_at TEXT    NOT NULL
+            )
+        """)
+
         # NOTE: entries are intentionally kept forever for cross-shift history.
 
 
@@ -218,7 +237,58 @@ def close_shift(shift_id: int) -> None:
         c.execute("UPDATE shifts SET is_active=0 WHERE id=?", (shift_id,))
 
 
-def get_shift_notes(shift_id: int) -> str:
+# ── LOTO verification ─────────────────────────────────────────────────────
+
+def save_loto(shift_id: int, verified: bool, missing_keys: str) -> None:
+    with _conn() as c:
+        c.execute(
+            "UPDATE shifts SET loto_verified=?, loto_missing_keys=? WHERE id=?",
+            (1 if verified else 0, missing_keys.strip(), shift_id),
+        )
+
+
+def get_loto(shift_id: int) -> dict:
+    with _conn() as c:
+        row = c.execute(
+            "SELECT loto_verified, loto_missing_keys FROM shifts WHERE id=?",
+            (shift_id,)
+        ).fetchone()
+    if not row:
+        return {"loto_verified": 0, "loto_missing_keys": ""}
+    return {"loto_verified": row[0], "loto_missing_keys": row[1]}
+
+
+# ── PM files ────────────────────────────────────────────────────────────
+
+def save_pm_file(shift_id: int, filename: str, stored_name: str, uploaded_by: str) -> int:
+    with _conn() as c:
+        cur = c.execute(
+            "INSERT INTO pm_files (shift_id, filename, stored_name, uploaded_by, uploaded_at)"
+            " VALUES (?,?,?,?,?)",
+            (shift_id, filename, stored_name, uploaded_by, _now()),
+        )
+        return cur.lastrowid
+
+
+def get_pm_files(shift_id: int) -> list[dict]:
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT * FROM pm_files WHERE shift_id=? ORDER BY id DESC",
+            (shift_id,)
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def delete_pm_file(file_id: int) -> Optional[str]:
+    """Delete DB record; returns stored_name so caller can remove the file too."""
+    with _conn() as c:
+        row = c.execute("SELECT stored_name FROM pm_files WHERE id=?", (file_id,)).fetchone()
+        if row:
+            c.execute("DELETE FROM pm_files WHERE id=?", (file_id,))
+            return row[0]
+    return None
+
+
     with _conn() as c:
         row = c.execute("SELECT notes FROM shifts WHERE id=?", (shift_id,)).fetchone()
     return row[0] if row else ""

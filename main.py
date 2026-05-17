@@ -3,6 +3,7 @@ import asyncio
 import hashlib
 import os
 import socket
+import uuid
 from datetime import date, datetime, time, timedelta
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Form, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File
@@ -29,7 +30,7 @@ def _outlook_ready() -> bool:
         _OUTLOOK_OK = outlook_sender.is_outlook_available()
     return _OUTLOOK_OK
 from report_models import OosUnit, ReportData, RewrittenHappening, HappeningInput
-from formatter import format_html_preview, format_email, format_email_passdown
+from formatter import format_html_preview, format_email, format_email_passdown, format_email_passdown_html
 from rewriter import rewrite_all
 from cetaris_parser import parse_cetaris, ParseResult
 from summarizer import summarize_remarks
@@ -594,6 +595,7 @@ async def shift_end(request: Request, shift_id: int = Form(...)):
         db.save_report(shift_id, content, email_data.model_dump_json())
 
     db.close_shift(shift_id)
+    loto = db.get_loto(shift_id)
 
     # —— Fire-and-forget passdown email —————————————————————————————————
     if db.get_setting("email_to", "").strip() and _outlook_ready():
@@ -602,7 +604,7 @@ async def shift_end(request: Request, shift_id: int = Form(...)):
             f"{shift['lead_name']} – {shift['date']}"
         )
         # Use clean passdown format if we have structured data; fall back to content
-        email_body = format_email_passdown(email_data) if email_data else content
+        email_body = format_email_passdown_html(email_data, loto_missing=loto.get("loto_missing_keys", "")) if email_data else content
         asyncio.create_task(_send_passdown_email(subj, email_body))
 
     carry_overs = db.get_carry_over_entries(current_shift_id=shift_id)
@@ -1104,7 +1106,9 @@ async def lead_page(request: Request, status: str = "", shift_id: int = 0):
         request, "lead.html",
         {"shift": shift, "shifts": shifts, "entries": entries, "status": status,
          "assets": _ASSETS, "carry_overs": carry_overs, "shift_notes": shift_notes,
-         "shift_id": shift["id"]}
+         "shift_id": shift["id"],
+         "loto": db.get_loto(shift["id"]),
+         "pm_files": db.get_pm_files(shift["id"])}
     )
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     response.headers["Pragma"] = "no-cache"
@@ -1567,8 +1571,127 @@ async def admin_save_teams_webhook(request: Request, webhook_url: str = Form("")
         return _lead_redirect("/admin")
     url = webhook_url.strip()
     db.set_setting("teams_webhook_url", url)
-    msg = "Webhook saved — Teams notifications active ✅" if url else "Webhook cleared — Teams notifications off"
+    msg = "Webhook saved — Teams notifications active" if url else "Webhook cleared — Teams notifications off"
     return RedirectResponse(f"/admin?msg={msg.replace(' ', '+')}", status_code=303)
+
+
+# ── LOTO verification ──────────────────────────────────────────────────────
+
+@app.get("/lead/pm-files", response_class=HTMLResponse)
+async def lead_pm_files_list(request: Request, shift_id: int = 0):
+    if not _is_lead_authed(request):
+        return HTMLResponse("")
+    return _render_pm_file_list(db.get_pm_files(shift_id))
+
+
+@app.post("/lead/loto", response_class=HTMLResponse)
+async def lead_save_loto(
+    request:      Request,
+    shift_id:     int = Form(...),
+    loto_verified: str = Form(""),
+    missing_keys:  str = Form(""),
+):
+    if not _is_lead_authed(request):
+        return HTMLResponse("Unauthorized", status_code=401)
+    verified = loto_verified.lower() in ("on", "true", "1", "yes")
+    db.save_loto(shift_id, verified, missing_keys)
+    check = "&#10003;" if verified else "&#9744;"
+    label = "All LOTO Keys Verified" if verified else "LOTO Not Verified"
+    colour = "text-green-700" if verified else "text-red-600"
+    missing_html = ""
+    if missing_keys.strip():
+        missing_html = f'<p class="text-xs text-red-600 mt-1"><strong>Missing:</strong> {missing_keys.strip()}</p>'
+    return HTMLResponse(
+        f'<p class="font-bold text-sm {colour}">{check} {label}</p>'
+        + missing_html
+        + '<p class="text-xs text-gray-400 mt-1">Saved</p>'
+    )
+
+
+# ── PM file upload ──────────────────────────────────────────────────────────
+
+PM_UPLOAD_DIR = Path("pm_uploads")
+PM_UPLOAD_DIR.mkdir(exist_ok=True)
+ALLOWED_PM_EXTS = {".pdf", ".xlsx", ".xls", ".csv", ".png", ".jpg", ".jpeg"}
+
+
+@app.post("/lead/pm-upload", response_class=HTMLResponse)
+async def lead_pm_upload(
+    request:  Request,
+    shift_id: int  = Form(...),
+    pm_file:  UploadFile = File(...),
+):
+    if not _is_lead_authed(request):
+        return HTMLResponse("Unauthorized", status_code=401)
+    ext = Path(pm_file.filename or "").suffix.lower()
+    if ext not in ALLOWED_PM_EXTS:
+        return HTMLResponse(
+            f'<p class="text-red-600 text-xs font-bold">&#10060; File type not allowed. Use PDF, Excel, CSV or image.</p>'
+        )
+    stored = f"{shift_id}_{uuid.uuid4().hex[:8]}{ext}"
+    dest   = PM_UPLOAD_DIR / stored
+    data   = await pm_file.read()
+    dest.write_bytes(data)
+    session   = _get_lead_session_name(request)
+    db.save_pm_file(shift_id, pm_file.filename or stored, stored, session or "lead")
+    files = db.get_pm_files(shift_id)
+    return _render_pm_file_list(files)
+
+
+@app.get("/lead/pm-file/{file_id}/download")
+async def lead_pm_download(request: Request, file_id: int):
+    if not _is_lead_authed(request):
+        return RedirectResponse("/lead", status_code=303)
+    import sqlite3 as _sql
+    with _sql.connect(db.get_db_path()) as con:
+        con.row_factory = _sql.Row
+        row = con.execute("SELECT * FROM pm_files WHERE id=?", (file_id,)).fetchone()
+    if not row:
+        raise HTTPException(404, "File not found")
+    path = PM_UPLOAD_DIR / row["stored_name"]
+    if not path.exists():
+        raise HTTPException(404, "File missing from disk")
+    from fastapi.responses import FileResponse
+    return FileResponse(path, filename=row["filename"], media_type="application/octet-stream")
+
+
+@app.post("/lead/pm-file/{file_id}/delete", response_class=HTMLResponse)
+async def lead_pm_delete(request: Request, file_id: int, shift_id: int = Form(...)):
+    if not _is_lead_authed(request):
+        return HTMLResponse("Unauthorized", status_code=401)
+    stored = db.delete_pm_file(file_id)
+    if stored:
+        p = PM_UPLOAD_DIR / stored
+        if p.exists():
+            p.unlink()
+    files = db.get_pm_files(shift_id)
+    return _render_pm_file_list(files)
+
+
+def _render_pm_file_list(files: list[dict]) -> HTMLResponse:
+    if not files:
+        return HTMLResponse('<p class="text-gray-400 text-xs italic">No files uploaded yet.</p>')
+    rows = "".join(
+        f'<div class="flex items-center justify-between gap-2 py-1.5 border-b border-gray-100 last:border-0">'
+        f'<a href="/lead/pm-file/{f["id"]}/download" class="text-xs text-wm-blue hover:underline truncate max-w-[70%]" title="{f["filename"]}">'
+        f'&#128196; {f["filename"]}</a>'
+        f'<form method="POST" action="/lead/pm-file/{f["id"]}/delete" class="shrink-0">'
+        f'<input type="hidden" name="shift_id" value="{f["shift_id"]}">'
+        f'<button class="text-red-400 hover:text-red-600 text-xs font-bold">&#10005;</button>'
+        f'</form></div>'
+        for f in files
+    )
+    return HTMLResponse(f'<div class="flex flex-col">{rows}</div>')
+
+
+def _get_lead_session_name(request: Request) -> str:
+    """Best-effort: return the lead's display name from their shift cookie."""
+    raw = request.cookies.get(_LEAD_SHIFT_COOKIE, "")
+    if raw.isdigit():
+        shift = db.get_shift(int(raw))
+        if shift:
+            return shift.get("lead_name", "")
+    return ""
 
 
 @app.post("/admin/email-settings")

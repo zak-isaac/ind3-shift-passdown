@@ -21,7 +21,7 @@ $ol   = New-Object -ComObject Outlook.Application
 $mail = $ol.CreateItem(0)
 $mail.To      = '{to_str}'
 $mail.Subject = '{subj}'
-$mail.Body    = [System.IO.File]::ReadAllText($env:PASSDOWN_BODY_FILE)
+$mail.HTMLBody = [System.IO.File]::ReadAllText($env:PASSDOWN_BODY_FILE)
 if ('{reply}') {{
     $mail.ReplyRecipients.Add('{reply}') | Out-Null
 }}

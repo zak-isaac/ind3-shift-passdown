@@ -190,10 +190,50 @@ def format_email_passdown(data: ReportData) -> str:
     return "\n".join(lines)
 
 
+def format_email_passdown_html(data: ReportData, loto_missing: str = "") -> str:
+    """HTML passdown email — bold titles, bullet list, Outlook-safe inline styles."""
 
-W  = 64                        # report column width
-_DIV = "=" * W
-_RULE = "─" * W
+    def _bullets(items: list[str]) -> str:
+        if not items:
+            return "<li style='margin:2px 0;'>None</li>"
+        return "".join(f"<li style='margin:4px 0;'>{i}</li>" for i in items)
+
+    def _section(title: str, items: list[str]) -> str:
+        return (
+            f"<p style='margin:14px 0 2px;'><strong>{title}</strong></p>"
+            f"<ul style='margin:0 0 4px;padding-left:20px;'>{''.join(_bullets(items) if items else ['<li style=margin:2px 0;>None</li>'])}</ul>"
+        )
+
+    h_items: list[str] = []
+    if data.pm_count:
+        h_items.append(f"{data.pm_count} PM{'s' if data.pm_count != 1 else ''} completed this shift")
+    for h in data.happenings:
+        prefix = h.title.split("\u2013")[0].split("-")[0].strip()
+        if prefix and not any(c in prefix for c in (" ", ",")):
+            h_items.append(f"<strong>{prefix}:</strong> {h.paragraph}")
+        else:
+            h_items.append(h.paragraph)
+
+    loto_html = "<p style='margin-top:16px;'><strong>All LOTO Keys verified &#10003;</strong></p>"
+    if loto_missing:
+        loto_html += f"<p style='color:#c00;margin:2px 0;'><strong>Missing keys:</strong> {loto_missing}</p>"
+
+    return (
+        "<html><body style='font-family:Calibri,Arial,sans-serif;font-size:14px;color:#111;max-width:680px;line-height:1.5;'>"
+        f"<p style='margin:0 0 16px;font-size:15px;'><strong>{data.shift_type} End of Shift Passdown</strong></p>"
+        + _section("Vendors", list(data.vendors))
+        + _section("Shift Happenings", h_items)
+        + _section("PM\u2019s Needing to be Completed", list(data.ro))
+        + _section("Out of Service \u2014 Returned to Service (RTS)", list(data.rts))
+        + _section("Current Out of Service", [o.unit for o in data.oos])
+        + loto_html
+        + "</body></html>"
+    )
+
+
+W    = 64
+_DIV  = "=" * W
+_RULE = "-" * W
 
 
 def _txt_sec(title: str, lines: list[str]) -> str:
