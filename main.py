@@ -1863,6 +1863,67 @@ async def report_email_preview(request: Request, report_id: int):
     )
 
 
+@app.post("/report/{report_id}/open-in-outlook", response_class=HTMLResponse)
+async def report_open_in_outlook(
+    request:   Request,
+    report_id: int,
+    subject:   str = Form(""),
+    html_body: str = Form(""),
+):
+    """Open an Outlook compose window pre-filled with the passdown email.
+
+    The lead’s saved signature is preserved automatically below the content.
+    They review, optionally edit, then hit Send from their own Outlook account.
+    """
+    if not _is_lead_authed(request):
+        return HTMLResponse("Unauthorized", status_code=401)
+    if not _outlook_ready():
+        return HTMLResponse(
+            '<span style="color:#c00;font-weight:700;">&#10060; Outlook not available on this PC.</span>',
+            status_code=503,
+        )
+
+    rec = db.get_report(report_id)
+    if not rec:
+        return HTMLResponse("Report not found", status_code=404)
+
+    to_raw   = db.get_setting("email_to", "").strip()
+    to_addrs = [a.strip() for a in to_raw.split(",") if a.strip()]
+    reply_to = db.get_setting("email_reply_to", "").strip()
+
+    # If caller sent an edited body use it; otherwise regenerate from saved data
+    if html_body.strip():
+        body = html_body
+    else:
+        data = ReportData.model_validate_json(rec["report_json"]) if rec.get("report_json") else None
+        loto = db.get_loto(rec["shift_id"])
+        pms  = db.get_pending_pms(rec["shift_id"])
+        body = format_email_passdown_html(
+            data,
+            loto_missing=loto.get("loto_missing_keys", ""),
+            pending_pms=pms or None,
+            loto_verified=bool(loto.get("loto_verified", 0)),
+        ) if data else rec.get("content", "")
+
+    try:
+        await outlook_sender.display_email(
+            to_addrs=to_addrs,
+            subject=subject or f"IND3 Passdown – {rec.get('generated_at', '')[:10]}",
+            body=body,
+            reply_to=reply_to,
+        )
+        return HTMLResponse(
+            '<span style="color:#2a8703;font-weight:700;">'
+            '&#9989; Outlook is open — review, add your signature, then click Send!'
+            '</span>'
+        )
+    except Exception as exc:
+        return HTMLResponse(
+            f'<span style="color:#c00;font-weight:700;">&#10060; {exc}</span>',
+            status_code=500,
+        )
+
+
 @app.post("/report/{report_id}/send-email", response_class=HTMLResponse)
 async def report_send_email(
     request:   Request,
