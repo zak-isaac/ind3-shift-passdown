@@ -180,6 +180,18 @@ def init_db() -> None:
             )
         """)
 
+        # Happenings files — MST-uploaded supplement to tech-logged entries
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS happenings_files (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                shift_id    INTEGER NOT NULL REFERENCES shifts(id),
+                filename    TEXT    NOT NULL,
+                stored_name TEXT    NOT NULL,
+                uploaded_by TEXT    NOT NULL DEFAULT '',
+                uploaded_at TEXT    NOT NULL
+            )
+        """)
+
         # Pending PM rows (parsed from uploaded Cetaris PM report)
         c.execute("""
             CREATE TABLE IF NOT EXISTS pending_pms (
@@ -305,6 +317,37 @@ def delete_pm_file(file_id: int) -> Optional[str]:
         row = c.execute("SELECT stored_name FROM pm_files WHERE id=?", (file_id,)).fetchone()
         if row:
             c.execute("DELETE FROM pm_files WHERE id=?", (file_id,))
+            return row[0]
+    return None
+
+
+# ── Happenings files ──────────────────────────────────────────────────────────────
+
+def save_happenings_file(shift_id: int, filename: str, stored_name: str, uploaded_by: str) -> int:
+    with _conn() as c:
+        cur = c.execute(
+            "INSERT INTO happenings_files (shift_id, filename, stored_name, uploaded_by, uploaded_at)"
+            " VALUES (?,?,?,?,?)",
+            (shift_id, filename, stored_name, uploaded_by, _now()),
+        )
+        return cur.lastrowid
+
+
+def get_happenings_files(shift_id: int) -> list[dict]:
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT * FROM happenings_files WHERE shift_id=? ORDER BY id DESC",
+            (shift_id,)
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def delete_happenings_file(file_id: int) -> Optional[str]:
+    """Delete DB record; returns stored_name so caller can remove the file too."""
+    with _conn() as c:
+        row = c.execute("SELECT stored_name FROM happenings_files WHERE id=?", (file_id,)).fetchone()
+        if row:
+            c.execute("DELETE FROM happenings_files WHERE id=?", (file_id,))
             return row[0]
     return None
 

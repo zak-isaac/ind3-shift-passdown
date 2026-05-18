@@ -215,6 +215,42 @@
     <div class="divider"></div>
     <p class="section-label">Data Inputs</p>
 
+    <!-- Shift Happenings Upload -->
+    <div class="card" style="border-left:3px solid #10b981;">
+      <div class="card-title">
+        <span class="text-emerald-600">&#9889;</span> Shift Happenings
+        <span class="badge bg-emerald-100 text-emerald-700">Upload</span>
+      </div>
+      <p class="text-slate-400 text-xs mb-3">Upload your shift happenings file — Excel, PDF, CSV, image or Word doc.</p>
+
+      <div hx-get="/lead/happenings-files?shift_id={{ shift.id }}"
+           hx-trigger="load" hx-target="#happenings-file-list" hx-swap="outerHTML"></div>
+      <div id="happenings-file-list" class="min-h-[1.5rem] mb-2">
+        <p class="text-slate-300 text-xs italic">Loading...</p>
+      </div>
+
+      <form hx-post="/lead/happenings-upload" hx-target="#happenings-file-list" hx-swap="outerHTML"
+        hx-encoding="multipart/form-data" hx-indicator="#happenings-upload-spinner"
+        hx-on::after-request="this.reset()" class="flex flex-col gap-2">
+        <input type="hidden" name="shift_id" value="{{ shift.id }}">
+        <input type="file" name="happenings_file" required
+          accept=".pdf,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.docx,.txt"
+          class="text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg
+                 file:border-0 file:text-xs file:font-bold file:bg-emerald-600 file:text-white
+                 file:cursor-pointer hover:file:bg-emerald-700 cursor-pointer" />
+        <button type="submit" class="btn-primary" style="background:#059669;">
+          <span id="happenings-upload-spinner" class="htmx-indicator items-center gap-1">
+            <svg class="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+            </svg>
+          </span>
+          &#128228; Upload Happenings
+        </button>
+      </form>
+      <p class="text-xs text-slate-400 mt-1.5">PDF, Excel, CSV, Word or image accepted.</p>
+    </div>
+
     <!-- CMMS Import -->
     <div class="card" style="border-left:3px solid #0053e2;">
       <div class="card-title">
@@ -362,36 +398,6 @@
       hx-on:htmx:after-swap="if(event.detail.target.id==='report-output') document.body.dispatchEvent(new Event('oos-refresh'))"
       autocomplete="off" class="flex flex-col gap-3">
       <input type="hidden" name="shift_id" value="{{ shift.id }}" />
-
-      <!-- Shift Happenings -->
-      <details class="card" style="padding:0;" open>
-        <summary class="px-4 py-3 font-bold text-sm text-slate-700 cursor-pointer select-none flex items-center gap-2">
-          <span class="text-wm-blue">&#9889;</span> Shift Happenings
-        </summary>
-        <div class="px-4 pb-4 flex flex-col gap-3 border-t border-slate-100 mt-0 pt-3">
-          <div id="happenings-preview"
-            hx-get="/lead/happenings-preview?shift_id={{ shift.id }}"
-            hx-trigger="load, refresh" hx-swap="innerHTML"
-            class="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 min-h-[2.5rem]">
-            <p class="text-xs text-slate-400 italic">Loading…</p>
-          </div>
-          <p class="text-xs font-semibold text-slate-600">&#43; Extra happenings <span class="text-slate-400 font-normal">(MST additions only)</span></p>
-          <div class="flex flex-col gap-2" id="extra-happening-rows">
-            <div class="entry-row bg-slate-50 rounded-lg border border-slate-200 p-3 flex flex-col gap-2">
-              <div class="flex items-center gap-2">
-                <input name="extra_title" type="text" placeholder="Title (optional)"
-                  class="flex-1 input-sm font-semibold" />
-                <button type="button" onclick="removeRow(this)"
-                  class="text-xs text-red-400 hover:text-red-600 font-bold px-1 shrink-0" title="Remove">&#10005;</button>
-              </div>
-              <textarea name="extra_note" rows="2" placeholder="Describe what happened"
-                class="input-sm resize-none"></textarea>
-            </div>
-          </div>
-          <button type="button" onclick="addExtraHappening()"
-            class="text-xs text-wm-blue font-semibold text-left hover:underline">+ Add extra happening</button>
-        </div>
-      </details>
 
       <!-- Vendors -->
       <details class="card" style="padding:0;">

@@ -1816,6 +1816,99 @@ def _get_lead_session_name(request: Request) -> str:
     return ""
 
 
+# ── Shift Happenings file upload ────────────────────────────────────────────────────
+HAPPENINGS_UPLOAD_DIR = Path("happenings_uploads")
+HAPPENINGS_UPLOAD_DIR.mkdir(exist_ok=True)
+ALLOWED_HAPPENINGS_EXTS = {".pdf", ".xlsx", ".xls", ".csv", ".png", ".jpg", ".jpeg", ".docx", ".txt"}
+
+
+@app.get("/lead/happenings-files", response_class=HTMLResponse)
+async def lead_happenings_files_list(request: Request, shift_id: int = 0):
+    if not _is_lead_authed(request):
+        return HTMLResponse("Unauthorized", status_code=401)
+    files = db.get_happenings_files(shift_id)
+    return HTMLResponse(_render_happenings_file_list(shift_id, files))
+
+
+@app.post("/lead/happenings-upload", response_class=HTMLResponse)
+async def lead_happenings_upload(
+    request:          Request,
+    shift_id:         int        = Form(...),
+    happenings_file:  UploadFile = File(...),
+):
+    if not _is_lead_authed(request):
+        return HTMLResponse("Unauthorized", status_code=401)
+    ext = Path(happenings_file.filename or "").suffix.lower()
+    if ext not in ALLOWED_HAPPENINGS_EXTS:
+        return HTMLResponse(
+            '<p class="text-red-600 text-xs font-bold">&#10060; File type not allowed.</p>'
+        )
+    stored = f"{shift_id}_{uuid.uuid4().hex[:8]}{ext}"
+    dest   = HAPPENINGS_UPLOAD_DIR / stored
+    dest.write_bytes(await happenings_file.read())
+    session = _get_lead_session_name(request)
+    db.save_happenings_file(shift_id, happenings_file.filename or stored, stored, session or "lead")
+    files = db.get_happenings_files(shift_id)
+    return HTMLResponse(_render_happenings_file_list(shift_id, files))
+
+
+@app.get("/lead/happenings-file/{file_id}/download")
+async def lead_happenings_file_download(request: Request, file_id: int):
+    if not _is_lead_authed(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    files = db.get_happenings_files(0)  # fetch all, then filter
+    # look up across any shift
+    with __import__('db')._conn() as c:
+        row = c.execute("SELECT * FROM happenings_files WHERE id=?", (file_id,)).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="File not found")
+    path = HAPPENINGS_UPLOAD_DIR / row["stored_name"]
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="File missing from disk")
+    return FileResponse(path, filename=row["filename"])
+
+
+@app.post("/lead/happenings-file/{file_id}/delete", response_class=HTMLResponse)
+async def lead_happenings_file_delete(request: Request, file_id: int, shift_id: int = Form(...)):
+    if not _is_lead_authed(request):
+        return HTMLResponse("Unauthorized", status_code=401)
+    stored = db.delete_happenings_file(file_id)
+    if stored:
+        p = HAPPENINGS_UPLOAD_DIR / stored
+        if p.exists():
+            p.unlink()
+    files = db.get_happenings_files(shift_id)
+    return HTMLResponse(_render_happenings_file_list(shift_id, files))
+
+
+def _render_happenings_file_list(shift_id: int, files: list[dict]) -> str:
+    """Outer #happenings-file-list div — used for init-load and post-upload outerHTML swap."""
+    if not files:
+        chip_html = '<p class="text-slate-400 text-xs italic">No files uploaded yet.</p>'
+    else:
+        chip_html = '<div class="flex flex-col">'
+        for f in files:
+            chip_html += (
+                f'<div class="flex items-center justify-between gap-2 py-1.5'
+                f' border-b border-slate-100 last:border-0">'
+                f'<a href="/lead/happenings-file/{f["id"]}/download"'
+                f' class="text-xs text-wm-blue hover:underline truncate max-w-[70%]"'
+                f' title="{f["filename"]}">&#128196; {f["filename"]}</a>'
+                f'<form method="POST" action="/lead/happenings-file/{f["id"]}/delete"'
+                f' hx-post="/lead/happenings-file/{f["id"]}/delete"'
+                f' hx-target="#happenings-file-list" hx-swap="outerHTML">'
+                f'<input type="hidden" name="shift_id" value="{f["shift_id"]}">'
+                f'<button class="text-red-400 hover:text-red-600 text-xs font-bold">&#10005;</button>'
+                f'</form></div>'
+            )
+        chip_html += '</div>'
+    return (
+        f'<div id="happenings-file-list" class="min-h-[1.5rem] mb-2">'
+        + chip_html
+        + '</div>'
+    )
+
+
 @app.post("/admin/email-settings")
 async def admin_save_email_settings(
     request:         Request,
