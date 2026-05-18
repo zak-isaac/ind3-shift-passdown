@@ -33,44 +33,39 @@
 
 <!-- HEADER -->
 <header class="bg-wm-blue sticky top-0 shadow-md" style="z-index:9999;">
-  <div class="max-w-3xl mx-auto px-4 flex items-center justify-between" style="min-height:56px;">
-    <div class="flex items-center gap-3">
-      <a href="/" class="flex items-center gap-2 hover:opacity-80 transition shrink-0">
+  <div class="max-w-screen-2xl mx-auto px-5 flex items-center justify-between" style="min-height:56px;">
+    <div class="flex items-center gap-3 min-w-0">
+      <a href="/" class="hover:opacity-80 transition shrink-0">
         <img src="/static/walmart-logo-white.svg" alt="Walmart" style="height:38px;width:auto;" />
-        
       </a>
-      <div class="h-8 w-px bg-blue-400 mx-1"></div>
-      <div>
-        <p class="text-white font-black text-base leading-tight">Technician View</p>
-        <p class="text-blue-100 text-sm font-medium">
+      <div class="w-px bg-blue-500 self-stretch my-2"></div>
+      <div class="min-w-0">
+        <p class="text-white font-black text-sm leading-tight tracking-wide">Technician View</p>
+        <p class="text-blue-200 text-xs truncate">
           <span class="text-wm-spark font-bold">{{ shift.shift_type }}</span>
-          &bull; {{ shift.date }}
-          &bull; MST: <span class="font-semibold">{{ shift.lead_name }}</span>
+          &nbsp;&bull;&nbsp;{{ shift.date }}
+          &nbsp;&bull;&nbsp;MST: <span class="font-semibold text-white">{{ shift.lead_name }}</span>
+          &nbsp;&bull;&nbsp;Logged in as: <span class="text-wm-spark font-black">{{ tech_name }}</span>
+          &nbsp;&bull;&nbsp;<span class="text-wm-spark">Signed on <span id="signon-time"></span></span>
         </p>
       </div>
     </div>
-    <div class="flex items-center gap-3">
-      <span class="text-wm-spark text-sm font-black font-mono bg-white bg-opacity-10 px-3 py-1 rounded-full border border-wm-spark border-opacity-30">{{ dc_number }}</span>
-      <a href="/" class="text-blue-100 hover:text-white text-sm font-medium transition">&#8592; Home</a>
-      <button onclick="toggleDark()" class="text-blue-100 hover:text-white text-lg transition" title="Toggle dark mode">&#9790;</button>
-      <a href="/tech/logout" class="text-blue-100 hover:text-white text-xs font-medium border border-blue-400 px-2 py-1 rounded-lg transition">&#128275; Sign Out</a>
+    <div class="flex items-center gap-2 shrink-0">
+      <span class="text-wm-spark font-black font-mono bg-white bg-opacity-10 px-2.5 py-1 rounded-full border border-wm-spark border-opacity-40 text-xs">{{ dc_number }}</span>
+      <a href="/" class="text-blue-200 hover:text-white text-xs font-medium transition px-2 py-1 rounded">&#127968; Home</a>
+      <button onclick="toggleDark()" class="text-blue-200 hover:text-white text-sm transition px-2 py-1 rounded" title="Toggle dark mode">&#9790;</button>
+      <a href="/tech/logout" class="text-blue-200 hover:text-white text-xs font-bold border border-blue-500 px-2.5 py-1 rounded-lg transition">&#128275; Sign Out</a>
     </div>
   </div>
 </header>
-
-<!-- SHIFT BADGE -->
-<div class="bg-wm-blue text-white text-center py-2 text-xs font-semibold tracking-wide shrink-0">
-  MST: {{ shift.lead_name }} &nbsp;&bull;&nbsp; Logged in as: <span class="text-wm-spark font-black">{{ tech_name }}</span> &nbsp;&bull;&nbsp;
-  Signed on: <span id="signon-time" class="text-wm-spark"></span>
-</div>
 <script>
   (function () {
     const now = new Date();
     const h = now.getHours(), m = now.getMinutes();
     const period = h < 12 ? 'AM' : 'PM';
     const h12 = h % 12 || 12;
-    document.getElementById('signon-time').textContent =
-      h12 + ':' + String(m).padStart(2, '0') + ' ' + period;
+    const el = document.getElementById('signon-time');
+    if (el) el.textContent = h12 + ':' + String(m).padStart(2, '0') + ' ' + period;
   })();
 </script>
 
