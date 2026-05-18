@@ -1,126 +1,263 @@
-<!-- Email Preview Modal — loaded via HTMX into #email-modal-wrap -->
+<!-- email_preview_modal.html — loaded via HTMX into #email-modal-wrap -->
 
-<!-- Backdrop — light, not dark -->
-<div id="email-backdrop"
-  onclick="closeEmailModal()"
-  style="position:fixed;inset:0;background:rgba(0,0,0,.18);z-index:9998;"></div>
+<!-- Backdrop -->
+<div id="email-backdrop" onclick="closeEmailModal()"
+  style="position:fixed;inset:0;background:rgba(0,0,0,.2);z-index:9998;"></div>
 
 <!-- Modal -->
 <div id="email-modal"
   style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
-         width:min(860px,96vw);height:93vh;max-height:93vh;z-index:9999;
-         border-radius:14px;overflow:hidden;background:#fff;
-         box-shadow:0 20px 60px rgba(0,0,0,.28);
+         width:min(880px,96vw);height:93vh;
+         z-index:9999;border-radius:16px;overflow:hidden;
+         background:#fff;box-shadow:0 24px 72px rgba(0,0,0,.32);
          display:flex;flex-direction:column;">
 
-  <!-- Header -->
-  <div style="background:#0053e2;color:#fff;padding:13px 20px;
-    display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
-    <div>
-      <p style="margin:0;font-weight:800;font-size:15px;">&#9993; Send Passdown Email</p>
-      <p style="margin:2px 0 0;font-size:11px;opacity:.8;">Preview · edit if needed · confirm · send</p>
-    </div>
-    <button onclick="closeEmailModal()"
-      style="background:rgba(255,255,255,.2);border:none;color:#fff;font-size:17px;
-             width:30px;height:30px;border-radius:50%;cursor:pointer;line-height:30px;">&#10005;</button>
-  </div>
-
-  <!-- To + Subject -->
-  <div style="padding:10px 20px;background:#fff;border-bottom:1px solid #e5e7eb;flex-shrink:0;">
-    <div style="display:flex;gap:16px;align-items:baseline;flex-wrap:wrap;">
-      <div style="min-width:0;">
-        <span style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;">To</span>
-        <p style="margin:2px 0 0;font-size:12px;color:#374151;">{{ email_to }}</p>
-      </div>
-      <div style="flex:1;min-width:220px;">
-        <label style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;display:block;">Subject</label>
-        <input id="email-subject" value="{{ subject | e }}"
-          style="display:block;width:100%;margin-top:2px;padding:5px 10px;
-                 border:1px solid #d1d5db;border-radius:7px;font-size:13px;
-                 box-sizing:border-box;background:#fff;" />
+  <!-- ── HEADER ─────────────────────────────────────────────── -->
+  <div style="background:#0053e2;color:#fff;padding:14px 22px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:space-between;gap:12px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff"
+        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+        <polyline points="22,6 12,13 2,6"/>
+      </svg>
+      <div>
+        <p style="margin:0;font-weight:800;font-size:15px;">IND3 Shift Passdown</p>
+        <p style="margin:2px 0 0;font-size:11px;opacity:.75;">{{ email_to }}</p>
       </div>
     </div>
+    <button onclick="closeEmailModal()" title="Close"
+      style="background:rgba(255,255,255,.18);border:none;color:#fff;
+             width:32px;height:32px;border-radius:50%;cursor:pointer;
+             font-size:18px;line-height:32px;text-align:center;">&#10005;</button>
   </div>
 
-  <!-- Tab bar -->
-  <div style="padding:7px 20px;background:#f8faff;border-bottom:1px solid #e5e7eb;
-    display:flex;gap:8px;align-items:center;flex-shrink:0;">
-    <button onclick="showTab('preview')" id="tab-preview"
-      style="font-size:11px;font-weight:700;padding:5px 14px;border-radius:6px;cursor:pointer;
-             background:#0053e2;color:#fff;border:none;">&#128065; Preview</button>
-    <button onclick="showTab('edit')" id="tab-edit"
-      style="font-size:11px;font-weight:700;padding:5px 14px;border-radius:6px;cursor:pointer;
-             background:#fff;color:#374151;border:1px solid #d1d5db;">&#9998; Edit</button>
+  <!-- ── SUBJECT BAR ─────────────────────────────────────────── -->
+  <div style="padding:9px 22px;background:#f8faff;border-bottom:1px solid #e5e7eb;flex-shrink:0;
+    display:flex;align-items:center;gap:10px;">
+    <span style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;white-space:nowrap;">Subject</span>
+    <input id="email-subject" value="{{ subject | e }}"
+      style="flex:1;padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;
+             font-size:13px;background:#fff;outline:none;" />
   </div>
 
-  <!-- Preview pane -->
-  <div id="pane-preview" style="flex:1 1 0;min-height:0;padding:0;">
+  <!-- ── ACTION BAR ─────────────────────────────────────────── -->
+  <div style="padding:10px 22px;background:#fff;border-bottom:1px solid #e5e7eb;
+    flex-shrink:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+
+    <!-- Download dropdown -->
+    <div style="position:relative;" id="dl-wrap">
+      <button onclick="toggleDownloadMenu()" id="dl-btn"
+        style="display:flex;align-items:center;gap:6px;padding:7px 14px;
+               border:1.5px solid #d1d5db;border-radius:9px;background:#fff;
+               font-size:12px;font-weight:700;color:#374151;cursor:pointer;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Download
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+      <!-- Dropdown menu -->
+      <div id="dl-menu"
+        style="display:none;position:absolute;top:calc(100% + 6px);left:0;
+               background:#fff;border:1px solid #e5e7eb;border-radius:10px;
+               box-shadow:0 8px 24px rgba(0,0,0,.12);min-width:170px;z-index:10;">
+        <a href="/report/{{ report_id }}/print" target="_blank"
+          onclick="toggleDownloadMenu()"
+          style="display:flex;align-items:center;gap:9px;padding:10px 14px;
+                 color:#374151;text-decoration:none;font-size:13px;font-weight:600;
+                 border-bottom:1px solid #f3f4f6;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ea1100" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/>
+            <rect x="6" y="14" width="12" height="8"/>
+          </svg>
+          Save as PDF
+        </a>
+        <a href="/report/{{ report_id }}/docx" download
+          onclick="toggleDownloadMenu()"
+          style="display:flex;align-items:center;gap:9px;padding:10px 14px;
+                 color:#374151;text-decoration:none;font-size:13px;font-weight:600;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0053e2" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+            <polyline points="10 9 9 9 8 9"/>
+          </svg>
+          Word Document
+        </a>
+      </div>
+    </div>
+
+    <!-- Copy email -->
+    <button id="copy-btn" onclick="copyEmailContent()"
+      style="display:flex;align-items:center;gap:6px;padding:7px 14px;
+             border:1.5px solid #d1d5db;border-radius:9px;background:#fff;
+             font-size:12px;font-weight:700;color:#374151;cursor:pointer;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+      </svg>
+      Copy Email
+    </button>
+
+    <!-- Edit email -->
+    <button id="edit-btn" onclick="toggleEditMode()"
+      style="display:flex;align-items:center;gap:6px;padding:7px 14px;
+             border:1.5px solid #d1d5db;border-radius:9px;background:#fff;
+             font-size:12px;font-weight:700;color:#374151;cursor:pointer;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+      <span id="edit-btn-label">Edit Email</span>
+    </button>
+
+    <!-- Spacer -->
+    <div style="flex:1;"></div>
+
+    <!-- Status -->
+    <div id="email-send-result" style="font-size:12px;"></div>
+
+    <!-- Send -->
+    <button id="email-send-btn" onclick="emailConfirmSend({{ report_id }})"
+      style="display:flex;align-items:center;gap:7px;padding:8px 22px;
+             border:none;border-radius:9px;border-bottom:3px solid #003db5;
+             background:#0053e2;color:#fff;font-weight:800;font-size:13px;cursor:pointer;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff"
+        stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+      Send Email
+    </button>
+  </div>
+
+  <!-- ── EMAIL PREVIEW (iframe) ──────────────────────────────── -->
+  <div id="pane-preview" style="flex:1 1 0;min-height:0;position:relative;">
     <iframe id="email-iframe"
       style="width:100%;height:100%;border:none;display:block;"
       sandbox="allow-same-origin"></iframe>
   </div>
 
-  <!-- Edit pane — full HTML, no padding steal, white background -->
-  <div id="pane-edit" style="flex:1 1 0;min-height:0;display:none;background:#fff;">
-    <textarea id="email-html-edit"
-      style="width:100%;height:100%;font-family:Consolas,'Courier New',monospace;
-             font-size:12px;line-height:1.65;
-             border:none;outline:none;padding:16px 20px;
-             box-sizing:border-box;resize:none;
-             color:#1e293b;background:#fff;display:block;"></textarea>
+  <!-- ── EDIT PANE (contenteditable, looks like the email) ─────── -->
+  <div id="pane-edit"
+    style="flex:1 1 0;min-height:0;overflow-y:auto;display:none;
+           padding:28px 36px;background:#fafafa;">
+    <div id="email-editable"
+      contenteditable="true"
+      style="max-width:700px;margin:0 auto;background:#fff;
+             font-family:Calibri,Arial,sans-serif;font-size:14px;color:#111;
+             line-height:1.6;padding:32px 36px;border-radius:10px;
+             border:1px solid #e5e7eb;box-shadow:0 2px 12px rgba(0,0,0,.06);
+             outline:none;min-height:400px;"></div>
+    <p style="text-align:center;margin-top:10px;font-size:11px;color:#9ca3af;">
+      Click anywhere in the email above to edit · Changes reflected when you send
+    </p>
   </div>
 
-  <!-- Footer -->
-  <div style="padding:11px 20px;background:#fff;border-top:1px solid #e5e7eb;
-    display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
-    <div id="email-send-result" style="font-size:13px;min-height:20px;"></div>
-    <div style="display:flex;gap:8px;">
-      <button onclick="closeEmailModal()"
-        style="padding:7px 18px;border:1px solid #d1d5db;border-radius:8px;
-               background:#fff;font-weight:700;font-size:13px;cursor:pointer;color:#374151;">
-        Cancel
-      </button>
-      <button id="email-send-btn" onclick="emailConfirmSend({{ report_id }})"
-        style="padding:7px 22px;border:none;border-radius:8px;
-               background:#0053e2;color:#fff;font-weight:700;font-size:13px;cursor:pointer;">
-        &#128232; Send Email
-      </button>
-    </div>
-  </div>
 </div>
 
 <script>
 (function () {
   const raw = {{ html_body | tojson }};
-  window._rawHtml = raw;
+  window._emailRaw = raw;
 
-  // Iframe preview
+  // Load iframe
   document.getElementById('email-iframe').srcdoc = raw;
 
-  // Edit pane — shows HTML source (easy to read, easy to edit)
-  document.getElementById('email-html-edit').value = raw;
+  // Pre-populate the editable pane (strip outer html/body wrappers)
+  const editable = document.getElementById('email-editable');
+  // Extract body inner HTML for contenteditable
+  const tmp = document.createElement('div');
+  tmp.innerHTML = raw;
+  // Get just the body content if possible
+  const bodyMatch = raw.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  editable.innerHTML = bodyMatch ? bodyMatch[1] : raw;
 })();
 
-function showTab(which) {
-  const isPreview = which === 'preview';
+/* ── Download dropdown ── */
+function toggleDownloadMenu() {
+  const m = document.getElementById('dl-menu');
+  m.style.display = m.style.display === 'none' ? 'block' : 'none';
+}
+document.addEventListener('click', function(e) {
+  if (!document.getElementById('dl-wrap')?.contains(e.target)) {
+    const m = document.getElementById('dl-menu');
+    if (m) m.style.display = 'none';
+  }
+});
 
-  // If switching back to preview, sync iframe with any edits
-  if (isPreview) {
-    document.getElementById('email-iframe').srcdoc =
-      document.getElementById('email-html-edit').value;
+/* ── Copy email ── */
+function copyEmailContent() {
+  const btn = document.getElementById('copy-btn');
+  const orig = btn.innerHTML;
+  // Copy the current state (edited or original)
+  const isEdit = document.getElementById('pane-edit').style.display !== 'none';
+  const html   = isEdit
+    ? '<html><body>' + document.getElementById('email-editable').innerHTML + '</body></html>'
+    : window._emailRaw;
+
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(html).then(() => flash()).catch(legacyCopy);
+  } else {
+    legacyCopy();
   }
 
-  document.getElementById('pane-preview').style.display = isPreview ? '' : 'none';
-  document.getElementById('pane-edit').style.display    = isPreview ? 'none' : '';
-
-  const active   = { background:'#0053e2', color:'#fff',     border:'none' };
-  const inactive = { background:'#fff',    color:'#374151',  border:'1px solid #d1d5db' };
-  Object.assign(document.getElementById('tab-preview').style, isPreview ? active : inactive);
-  Object.assign(document.getElementById('tab-edit').style,    isPreview ? inactive : active);
+  function flash() {
+    btn.style.background = '#f0fdf4';
+    btn.style.color      = '#16a34a';
+    btn.style.borderColor= '#16a34a';
+    setTimeout(() => {
+      btn.style.background  = '';
+      btn.style.color       = '';
+      btn.style.borderColor = '';
+    }, 2200);
+  }
+  function legacyCopy() {
+    const ta = document.createElement('textarea');
+    ta.value = html;
+    ta.style.cssText = 'position:fixed;top:-9999px;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    flash();
+  }
 }
 
+/* ── Edit / Preview toggle ── */
+let _editMode = false;
+function toggleEditMode() {
+  _editMode = !_editMode;
+  const btn   = document.getElementById('edit-btn');
+  const label = document.getElementById('edit-btn-label');
+  const prev  = document.getElementById('pane-preview');
+  const edit  = document.getElementById('pane-edit');
+
+  if (_editMode) {
+    prev.style.display  = 'none';
+    edit.style.display  = '';
+    label.textContent   = 'Preview';
+    btn.style.background  = '#eff6ff';
+    btn.style.color       = '#0053e2';
+    btn.style.borderColor = '#0053e2';
+  } else {
+    // Sync iframe with any edits before switching back
+    const edited = document.getElementById('email-editable').innerHTML;
+    document.getElementById('email-iframe').srcdoc =
+      '<html><body style="font-family:Calibri,Arial,sans-serif;font-size:14px;color:#111;max-width:700px;line-height:1.6;padding:20px;">'
+      + edited + '</body></html>';
+    prev.style.display  = '';
+    edit.style.display  = 'none';
+    label.textContent   = 'Edit Email';
+    btn.style.background  = '';
+    btn.style.color       = '';
+    btn.style.borderColor = '';
+  }
+}
+
+/* ── Close ── */
 function closeEmailModal() {
-  ['email-modal', 'email-backdrop'].forEach(id => {
+  ['email-modal','email-backdrop'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.remove();
   });
@@ -128,14 +265,20 @@ function closeEmailModal() {
   if (wrap) wrap.innerHTML = '';
 }
 
+/* ── Send ── */
 function emailConfirmSend(reportId) {
   if (!confirm('Send this passdown email to all configured recipients?\n\nThis cannot be undone.')) return;
 
   const btn    = document.getElementById('email-send-btn');
   const result = document.getElementById('email-send-result');
   const subj   = document.getElementById('email-subject').value;
-  // Always use the HTML from the edit box (synced with any edits)
-  const body   = document.getElementById('email-html-edit').value;
+
+  // If in edit mode, use the edited content; otherwise use original HTML
+  const isEdit = document.getElementById('pane-edit').style.display !== 'none';
+  const body   = isEdit
+    ? '<html><body style="font-family:Calibri,Arial,sans-serif;font-size:14px;color:#111;max-width:700px;line-height:1.6;">'
+      + document.getElementById('email-editable').innerHTML + '</body></html>'
+    : window._emailRaw;
 
   btn.disabled     = true;
   btn.textContent  = 'Sending…';
@@ -145,17 +288,18 @@ function emailConfirmSend(reportId) {
   fd.append('subject',   subj);
   fd.append('html_body', body);
 
-  fetch(`/report/${reportId}/send-email`, { method: 'POST', body: fd })
+  fetch(`/report/${reportId}/send-email`, { method:'POST', body: fd })
     .then(r => r.text())
     .then(html => {
-      result.innerHTML     = html;
-      btn.textContent      = '✓ Sent';
-      btn.style.background = '#2a8703';
+      result.innerHTML       = html;
+      btn.innerHTML          = '&#10003; Sent';
+      btn.style.background   = '#2a8703';
+      btn.style.borderColor  = '#1a5c02';
     })
     .catch(err => {
       result.innerHTML = `<span style="color:#c00;">&#10060; ${err}</span>`;
       btn.disabled     = false;
-      btn.textContent  = '📨 Send Email';
+      btn.innerHTML    = '&#9993; Send Email';
     });
 }
 </script>

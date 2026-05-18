@@ -1,27 +1,65 @@
 <!-- partials/report_output.html -->
-<div class="flex flex-col gap-2">
+<div class="flex flex-col gap-3">
 
-  <!-- Action bar: just Send Email -->
-  <div class="bg-wm-dark rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-2">
-    <div class="flex items-center gap-2">
-      <span class="text-wm-spark text-base">&#9989;</span>
-      <span class="text-white font-bold text-sm">Report Generated</span>
+  <!-- Report Ready Card -->
+  <div class="rounded-2xl overflow-hidden shadow-lg border border-green-200">
+
+    <!-- Top stripe -->
+    <div class="bg-green-600 px-5 py-2 flex items-center gap-2">
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="#fff" xmlns="http://www.w3.org/2000/svg">
+        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+      </svg>
+      <span class="text-white font-black text-xs uppercase tracking-widest">Report Ready</span>
     </div>
-    <button
-      hx-get="/report/{{ report_id }}/email-preview"
-      hx-target="#email-modal-wrap"
-      hx-swap="innerHTML"
-      hx-indicator="#email-btn-spinner"
-      class="text-xs bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-2
-             rounded-lg transition whitespace-nowrap flex items-center gap-2">
-      <span id="email-btn-spinner" class="htmx-indicator" style="display:none;">
-        <svg style="animation:spin 1s linear infinite;width:12px;height:12px;" fill="none" viewBox="0 0 24 24">
-          <circle style="opacity:.25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-          <path style="opacity:.75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+
+    <!-- Body -->
+    <div class="bg-wm-dark px-5 py-5 flex flex-col gap-4">
+
+      <div class="flex items-start gap-4">
+        <!-- Icon -->
+        <div class="shrink-0 bg-green-500 bg-opacity-20 rounded-xl p-3">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+            <polyline points="22,6 12,13 2,6"/>
+          </svg>
+        </div>
+        <!-- Text -->
+        <div>
+          <p class="text-white font-black text-base leading-tight">Passdown Report Generated</p>
+          <p class="text-blue-200 text-xs mt-1 leading-relaxed">
+            Review the report, edit if needed, then send it to the team.
+          </p>
+        </div>
+      </div>
+
+      <!-- Big Send Button -->
+      <button
+        hx-get="/report/{{ report_id }}/email-preview"
+        hx-target="#email-modal-wrap"
+        hx-swap="innerHTML"
+        hx-indicator="#email-btn-spinner"
+        class="w-full flex items-center justify-center gap-3 py-4 px-6
+               bg-wm-blue hover:bg-blue-700 active:bg-blue-800
+               text-white font-black text-base rounded-xl
+               shadow-lg border-b-4 border-blue-800
+               transition focus:outline-none focus:ring-4 focus:ring-blue-300">
+        <span id="email-btn-spinner" class="htmx-indicator" style="display:none;">
+          <svg style="animation:spin 1s linear infinite;width:18px;height:18px;" fill="none" viewBox="0 0 24 24">
+            <circle style="opacity:.25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path style="opacity:.75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+          </svg>
+        </span>
+        <!-- Envelope icon -->
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+          <polyline points="22,6 12,13 2,6"/>
         </svg>
-      </span>
-      &#9993; Send Email
-    </button>
+        Open &amp; Send Email
+      </button>
+
+    </div>
   </div>
 
   <!-- Email modal mount point -->
