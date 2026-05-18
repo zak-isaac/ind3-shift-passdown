@@ -798,6 +798,17 @@ function refreshRelTimes() {
 refreshRelTimes();
 setInterval(refreshRelTimes, 60000);
 document.addEventListener('htmx:afterSwap', refreshRelTimes);
+
+// After any feed-entry row is swapped (save or cancel), immediately
+// re-poll the feed so new entries appear without waiting 10 seconds.
+// This replaces the broken hx-on:htmx:after-swap inline attributes.
+document.addEventListener('htmx:afterSwap', function (e) {
+  var target = e.detail && e.detail.target;
+  if (target && target.id && target.id.startsWith('feed-entry-')) {
+    var feed = document.getElementById('live-feed');
+    if (feed) htmx.trigger(feed, 'refresh');
+  }
+});
 document.body.addEventListener('htmx:afterSwap', function (e) {
   if (e.detail.target.id !== 'live-feed') return;
   const q = document.getElementById('feedSearch')?.value || '';

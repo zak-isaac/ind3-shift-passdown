@@ -17,15 +17,10 @@
       &bull; {{ e.tech_name }} &bull; {{ e.created_at | fmt_time }}
     </p>
 
-    <!-- hx-on:htmx:after-swap fires after outerHTML swap completes;
-         at that point the form is gone so the next 10s tick will resume.
-         We also immediately fire 'refresh' so the feed catches up without
-         waiting the full 10 seconds. -->
     <form
       hx-post="/lead/entry/{{ e.id }}/update"
       hx-target="#feed-entry-{{ e.id }}"
       hx-swap="outerHTML"
-      hx-on:htmx:after-swap="htmx.trigger(document.getElementById('live-feed'), 'refresh')"
       class="flex flex-col gap-2">
 
       <textarea name="issue" rows="3" autofocus
@@ -41,7 +36,6 @@
           hx-get="/lead/entry/{{ e.id }}/edit-form/cancel"
           hx-target="#feed-entry-{{ e.id }}"
           hx-swap="outerHTML"
-          hx-on:htmx:after-swap="htmx.trigger(document.getElementById('live-feed'), 'refresh')"
           class="text-gray-500 text-xs font-bold px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 transition">
           &#10005; Cancel
         </button>
