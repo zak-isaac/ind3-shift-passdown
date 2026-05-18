@@ -24,12 +24,6 @@ _WM_LOGO = (
 
 # ── Shared address block ────────────────────────────────────────────────────────
 _ADDR = "5259 W. 500 N.<br>McCordsville, IN&nbsp; 46055"
-_WM_LOGO = (
-    "<span style='font-size:20px;font-weight:900;"
-    "font-family:Calibri,Arial,sans-serif;'>"
-    "<span style='color:#0053e2;'>Walmart Supply Chain</span>"
-    "</span>"
-)
 
 # ── Individual signatures ───────────────────────────────────────────────────────
 _SIGS: dict[str, str] = {
