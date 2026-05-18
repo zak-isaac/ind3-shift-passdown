@@ -73,27 +73,66 @@
       </div>
     </div>
 
-    <!-- Right: nav actions -->
-    <nav class="flex items-center gap-1 text-xs shrink-0 ml-4">
-      <span class="text-wm-spark font-black font-mono bg-white bg-opacity-10 px-2.5 py-1 rounded-full border border-wm-spark border-opacity-40 text-xs mr-1">{{ dc_number }}</span>
-      <span class="bg-green-400 text-green-900 text-xs font-bold px-2 py-0.5 rounded-full animate-pulse mr-1">LIVE</span>
-      <button id="notif-btn" onclick="requestNotifPermission()" title="Enable push notifications"
-        class="text-blue-200 hover:text-white px-2 py-1 rounded transition">&#128276;</button>
-      <a href="/share"    class="text-blue-200 hover:text-white px-2 py-1 rounded transition font-semibold">&#128279; Share</a>
-      <a href="/history"  class="text-blue-200 hover:text-white px-2 py-1 rounded transition">&#128203; History</a>
-      <a href="/analytics"class="text-blue-200 hover:text-white px-2 py-1 rounded transition">&#128200; Analytics</a>
-      <a href="/guide" target="_blank" class="text-blue-200 hover:text-white px-2 py-1 rounded transition">&#128214; Guide</a>
-      <a href="/lead/print-report" target="_blank" class="text-blue-200 hover:text-white px-2 py-1 rounded transition">&#128438; Print</a>
-      <a href="/admin"    class="text-blue-200 hover:text-white px-2 py-1 rounded transition">&#9881;&#65039; Admin</a>
-      <span id="roster-status"></span>
-      <button hx-post="/admin/reload-roster" hx-target="#roster-status" hx-swap="innerHTML"
-        title="Reload associate roster from Excel"
-        class="text-blue-200 hover:text-white text-xs border border-blue-500 px-2 py-1 rounded transition">
-        &#128257; Roster
-      </button>
-      <a href="/" class="text-blue-200 hover:text-white px-2 py-1 rounded transition">&#8592; Home</a>
-      <button onclick="toggleDark()" class="text-blue-200 hover:text-white px-2 py-1 rounded text-base transition" title="Toggle dark mode">&#9790;</button>
-    </nav>
+    <!-- Right: always-visible badges + hamburger -->
+    <div class="flex items-center gap-2 shrink-0 ml-4">
+      <span class="text-wm-spark font-black font-mono bg-white bg-opacity-10 px-2.5 py-1 rounded-full border border-wm-spark border-opacity-40 text-xs">{{ dc_number }}</span>
+      <span class="bg-green-400 text-green-900 text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">LIVE</span>
+
+      <!-- Hamburger button -->
+      <div class="relative">
+        <button id="hamburger-btn" onclick="toggleHamburger()"
+          class="text-blue-100 hover:text-white border border-blue-500 rounded-lg px-2.5 py-1.5
+                 text-sm transition flex items-center gap-1.5 font-bold">
+          <span id="hamburger-icon">&#9776;</span>
+          <span class="text-xs">Menu</span>
+        </button>
+
+        <!-- Dropdown -->
+        <div id="hamburger-menu"
+          class="hidden absolute right-0 top-full mt-1 w-52 bg-wm-dark border border-blue-700
+                 rounded-xl shadow-2xl overflow-hidden z-50">
+          <div class="flex flex-col py-1">
+            <button id="notif-btn" onclick="requestNotifPermission()"
+              class="text-left text-blue-200 hover:bg-blue-900 hover:text-white px-4 py-2.5 text-xs transition">
+              &#128276; Notifications
+            </button>
+            <a href="/share" class="text-blue-200 hover:bg-blue-900 hover:text-white px-4 py-2.5 text-xs transition font-semibold">
+              &#128279; Share Link
+            </a>
+            <a href="/history" class="text-blue-200 hover:bg-blue-900 hover:text-white px-4 py-2.5 text-xs transition">
+              &#128203; Shift History
+            </a>
+            <a href="/analytics" class="text-blue-200 hover:bg-blue-900 hover:text-white px-4 py-2.5 text-xs transition">
+              &#128200; Analytics
+            </a>
+            <a href="/guide" target="_blank" class="text-blue-200 hover:bg-blue-900 hover:text-white px-4 py-2.5 text-xs transition">
+              &#128214; Guide
+            </a>
+            <a href="/lead/print-report" target="_blank" class="text-blue-200 hover:bg-blue-900 hover:text-white px-4 py-2.5 text-xs transition">
+              &#128438; Print Report
+            </a>
+            <hr class="border-blue-800 my-1">
+            <a href="/admin" class="text-blue-200 hover:bg-blue-900 hover:text-white px-4 py-2.5 text-xs transition">
+              &#9881;&#65039; Admin Settings
+            </a>
+            <div class="flex items-center justify-between px-4 py-2.5">
+              <span id="roster-status" class="text-xs text-blue-300"></span>
+              <button hx-post="/admin/reload-roster" hx-target="#roster-status" hx-swap="innerHTML"
+                class="text-blue-200 hover:text-white text-xs border border-blue-600 px-2 py-1 rounded transition">
+                &#128257; Reload Roster
+              </button>
+            </div>
+            <hr class="border-blue-800 my-1">
+            <a href="/" class="text-blue-200 hover:bg-blue-900 hover:text-white px-4 py-2.5 text-xs transition">
+              &#8592; Home
+            </a>
+            <button onclick="toggleDark()" class="text-left text-blue-200 hover:bg-blue-900 hover:text-white px-4 py-2.5 text-xs transition">
+              &#9790; Toggle Dark Mode
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </header>
 
@@ -315,17 +354,36 @@
           <p class="text-slate-400 italic">Not yet verified for this shift.</p>
         {% endif %}
       </div>
-      <form hx-post="/lead/loto" hx-target="#loto-status" hx-swap="innerHTML" class="flex flex-col gap-2">
+      <form id="loto-form" hx-post="/lead/loto" hx-target="#loto-status" hx-swap="innerHTML"
+        class="flex flex-col gap-3"
+        onsubmit="serializeLotoKeys()">
         <input type="hidden" name="shift_id" value="{{ shift.id }}">
+        <input type="hidden" name="missing_keys" id="missing-keys-hidden" value="{{ loto.loto_missing_keys }}">
         <label class="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" name="loto_verified" value="on"
             {% if loto.loto_verified %}checked{% endif %}
             class="w-4 h-4 accent-green-600" />
           <span class="text-sm font-semibold text-slate-700">All LOTO Keys accounted for</span>
         </label>
-        <input name="missing_keys" type="text" value="{{ loto.loto_missing_keys }}"
-          placeholder="Missing keys e.g. CHAR0020, TK51..."
-          class="input-sm" />
+
+        <!-- Key 1–20 checkbox grid -->
+        <div>
+          <p class="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">Missing Keys <span class="font-normal text-slate-400">(select any not found)</span></p>
+          <div class="grid grid-cols-4 gap-1.5">
+            {% for n in range(1, 21) %}
+            {% set kname = "Key " ~ n %}
+            <label class="flex items-center gap-1.5 cursor-pointer bg-slate-50 hover:bg-amber-50
+                          border border-slate-200 rounded-lg px-2 py-1.5 transition
+                          {% if kname in (loto.loto_missing_keys or '') %}ring-2 ring-amber-400{% endif %}">
+              <input type="checkbox" name="loto_key_item" value="{{ kname }}"
+                {% if kname in (loto.loto_missing_keys or '') %}checked{% endif %}
+                class="w-3.5 h-3.5 accent-amber-500" />
+              <span class="text-xs font-semibold text-slate-700">{{ kname }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
         <button type="submit"
           class="w-fit px-4 py-1.5 bg-amber-400 hover:bg-amber-500 text-amber-900 font-bold text-xs rounded-lg transition">
           &#128274; Save LOTO Status
@@ -333,7 +391,40 @@
       </form>
     </div>
 
-    <!-- ── GROUP 3: Generate Report ───────────────────────────── -->
+    <!-- ── GROUP 3: Out of Service (persistent) ───────────────── -->
+    <div class="divider"></div>
+    <p class="section-label">Out of Service</p>
+
+    <div class="card" style="border-left:3px solid #ef4444;">
+      <div class="card-title">
+        <span class="text-red-500">&#9940;</span> Out of Service Units
+        <span class="text-slate-400 text-xs font-normal ml-auto">Persists until removed</span>
+      </div>
+      <div id="oos-list"
+        hx-get="/oos/list"
+        hx-trigger="load, oos-refresh from:body"
+        hx-swap="innerHTML"
+        class="flex flex-col gap-2 min-h-[2rem] mb-3">
+        <p class="text-slate-300 italic text-xs">Loading...</p>
+      </div>
+      <div class="flex gap-2">
+        <input id="oos-add-input" type="text" name="unit"
+          list="lead-asset-list" autocomplete="off"
+          placeholder="Asset ID to mark out of service..."
+          class="flex-1 input-sm focus:border-red-400" />
+        <button type="button"
+          hx-post="/oos/add"
+          hx-include="#oos-add-input"
+          hx-target="#oos-list"
+          hx-swap="innerHTML"
+          hx-on:htmx:after-request="document.getElementById('oos-add-input').value=''"
+          class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition shrink-0">
+          + Add OOS
+        </button>
+      </div>
+    </div>
+
+    <!-- ── GROUP 4: Generate Report ───────────────────────────── -->
     <div class="divider"></div>
     <div class="flex items-center gap-2">
       <p class="section-label mb-0" style="margin-bottom:0">Generate Passdown</p>
@@ -416,36 +507,7 @@
         </div>
       </details>
 
-      <!-- OOS -->
-      <details class="card" style="padding:0;" open>
-        <summary class="px-4 py-3 font-bold text-sm text-slate-700 cursor-pointer select-none flex items-center gap-2">
-          <span class="text-red-500">&#9940;</span> Out of Service
-          <span class="text-slate-400 font-normal text-xs">(persists until removed)</span>
-        </summary>
-        <div class="px-4 pb-4 flex flex-col gap-3 border-t border-slate-100 pt-3">
-          <div id="oos-list"
-            hx-get="/oos/list" hx-trigger="load, oos-refresh from:body"
-            hx-swap="innerHTML"
-            class="flex flex-col gap-2 min-h-[2rem]">
-            <p class="text-slate-300 italic text-xs">Loading...</p>
-          </div>
-          <div class="flex gap-2">
-            <input id="oos-add-input" type="text" name="unit"
-              list="lead-asset-list" autocomplete="off"
-              placeholder="Asset ID to add to OOS..."
-              class="flex-1 input-sm focus:border-red-400" />
-            <button type="button"
-              hx-post="/oos/add" hx-include="#oos-add-input"
-              hx-target="#oos-list" hx-swap="innerHTML"
-              hx-on:htmx:after-request="document.getElementById('oos-add-input').value=''"
-              class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition shrink-0">
-              + Add OOS
-            </button>
-          </div>
-        </div>
-      </details>
 
-      <!-- Generate button -->
       <button type="submit" class="btn-primary-lg shadow-md focus:outline-none focus:ring-4 focus:ring-blue-200">
         <span id="gen-spinner" class="htmx-indicator items-center gap-2">
           <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -500,6 +562,28 @@
 
 <script src="/static/app.js"></script>
 <script>
+// ── Hamburger menu ────────────────────────────────────────────────────
+function toggleHamburger() {
+  const menu = document.getElementById('hamburger-menu');
+  menu.classList.toggle('hidden');
+}
+// Close on click outside
+document.addEventListener('click', function(e) {
+  const btn  = document.getElementById('hamburger-btn');
+  const menu = document.getElementById('hamburger-menu');
+  if (!btn || !menu) return;
+  if (!btn.contains(e.target) && !menu.contains(e.target)) {
+    menu.classList.add('hidden');
+  }
+});
+
+// ── LOTO key serializer ──────────────────────────────────────────
+function serializeLotoKeys() {
+  const boxes   = document.querySelectorAll('input[name="loto_key_item"]:checked');
+  const keys    = Array.from(boxes).map(b => b.value).join(', ');
+  document.getElementById('missing-keys-hidden').value = keys;
+}
+
 // ── Dark mode ──────────────────────────────────────────────────────────
 function toggleDark() {
   const on = document.body.classList.toggle('dark-mode');
