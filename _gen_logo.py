@@ -37,6 +37,18 @@ drawing.transform = (scale, 0, 0, scale, 0, 0)
 buf = io.BytesIO()
 renderPM.drawToFile(drawing, buf, fmt='PNG', bg=0xFFFFFF)
 png_bytes = buf.getvalue()
+
+# ── Make white background transparent via Pillow ──────────────────────────────
+from PIL import Image
+import numpy as np
+pil = Image.open(io.BytesIO(png_bytes)).convert("RGBA")
+arr = np.array(pil)
+r, g, b, a = arr[...,0], arr[...,1], arr[...,2], arr[...,3]
+white = (r > 240) & (g > 240) & (b > 240)
+arr[..., 3][white] = 0
+png_bytes = io.BytesIO()
+Image.fromarray(arr).save(png_bytes, format='PNG')
+png_bytes = png_bytes.getvalue()
 print(f'PNG: {len(png_bytes)} bytes')
 
 with open(OUT_PNG, 'wb') as f:

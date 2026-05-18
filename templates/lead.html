@@ -11,98 +11,132 @@
     .htmx-indicator{display:none}.htmx-request .htmx-indicator{display:inline-flex}
     .htmx-request.htmx-indicator{display:inline-flex}
     @keyframes spin{to{transform:rotate(360deg)}}
+    body { background:#f1f5f9; }
+    .section-label {
+      font-size:0.65rem; font-weight:800; letter-spacing:0.1em;
+      text-transform:uppercase; color:#64748b; margin-bottom:0.5rem;
+    }
+    .card {
+      background:#fff; border-radius:1rem; border:1px solid #e2e8f0;
+      box-shadow:0 1px 3px rgba(0,0,0,.06); padding:1.25rem;
+    }
+    .card-title {
+      font-size:0.8rem; font-weight:800; color:#1e293b;
+      display:flex; align-items:center; gap:0.5rem; margin-bottom:0.75rem;
+    }
+    .card-title .badge {
+      margin-left:auto; font-size:0.6rem; font-weight:800;
+      padding:0.15rem 0.5rem; border-radius:999px;
+    }
+    .input-sm {
+      width:100%; border-radius:0.5rem; border:1px solid #e2e8f0;
+      padding:0.375rem 0.625rem; font-size:0.75rem; outline:none; transition:border-color .15s;
+    }
+    .input-sm:focus { border-color:#0053e2; }
+    .btn-primary {
+      display:inline-flex; align-items:center; justify-content:center; gap:0.5rem;
+      background:#0053e2; color:#fff; font-weight:700; font-size:0.75rem;
+      padding:0.5rem 1rem; border-radius:0.5rem; border:none; cursor:pointer;
+      transition:background .15s;
+    }
+    .btn-primary:hover { background:#003db5; }
+    .btn-primary-lg {
+      display:flex; align-items:center; justify-content:center; gap:0.5rem;
+      background:#0053e2; color:#fff; font-weight:800; font-size:0.875rem;
+      padding:0.75rem 1rem; border-radius:0.75rem; border:none; cursor:pointer;
+      transition:background .15s; width:100%;
+    }
+    .btn-primary-lg:hover { background:#003db5; }
+    .divider { height:1px; background:#f1f5f9; margin:0.75rem 0; }
   </style>
 </head>
-<body class="bg-gray-50 min-h-screen flex flex-col">
+<body class="min-h-screen flex flex-col">
 
-<!-- HEADER -->
-<header class="bg-wm-blue shadow-lg sticky top-0 z-10">
-  <div class="max-w-screen-xl mx-auto px-5 py-2 flex items-center justify-between">
-    <div class="flex items-center gap-3">
-      <a href="/" class="flex items-center gap-2 hover:opacity-80 transition shrink-0">
+<!-- ░░ HEADER ░░ -->
+<header class="bg-wm-blue sticky top-0 z-20 shadow-md">
+  <div class="max-w-screen-2xl mx-auto px-5 flex items-center justify-between" style="height:56px;">
+
+    <!-- Left: logo + shift context -->
+    <div class="flex items-center gap-4 min-w-0">
+      <a href="/" class="hover:opacity-80 transition shrink-0">
         <img src="/static/walmart-logo-white.svg" alt="Walmart" style="height:52px;width:auto;" />
-        
       </a>
-      <div class="h-8 w-px bg-blue-400 mx-1"></div>
-      <div>
-        <p class="text-white font-black text-base leading-tight">MST Dashboard</p>
-        <p class="text-blue-100 text-sm font-medium">
+      <div class="w-px bg-blue-500 self-stretch my-2"></div>
+      <div class="min-w-0">
+        <p class="text-white font-black text-sm leading-tight tracking-wide">MST Dashboard</p>
+        <p class="text-blue-200 text-xs truncate">
           <span class="text-wm-spark font-bold">{{ shift.shift_type }}</span>
-          &bull; {{ shift.date }}
-          &bull; <span class="font-semibold">{{ shift.lead_name }}</span>
-          &bull; <span class="text-wm-spark font-semibold">Started {{ shift.created_at | fmt_time }}</span>
+          &nbsp;&bull;&nbsp;{{ shift.date }}
+          &nbsp;&bull;&nbsp;<span class="font-semibold text-white">{{ shift.lead_name }}</span>
+          &nbsp;&bull;&nbsp;<span class="text-wm-spark">Started {{ shift.created_at | fmt_time }}</span>
         </p>
       </div>
     </div>
-    <div class="flex items-center gap-3">
-      <span class="text-wm-spark text-sm font-black font-mono bg-white bg-opacity-10 px-3 py-1 rounded-full border border-wm-spark border-opacity-30">{{ dc_number }}</span>
-      <span class="bg-green-400 text-green-900 text-xs font-bold px-2 py-1 rounded-full animate-pulse">LIVE</span>
-      <!-- Notification bell -->
-      <button id="notif-btn" onclick="requestNotifPermission()"
-        title="Enable push notifications"
-        class="text-blue-100 hover:text-white text-sm transition">
-        &#128276;
-      </button>
-      <a href="/share" class="text-wm-spark hover:text-yellow-300 text-sm font-semibold transition">&#128279; Share</a>
-      <a href="/history" class="text-blue-100 hover:text-white text-sm font-medium transition">&#128203; History</a>
-      <a href="/analytics" class="text-blue-100 hover:text-white text-sm font-medium transition">&#128200; Analytics</a>
-      <a href="/guide" target="_blank" class="text-blue-100 hover:text-white text-sm font-medium transition">&#128214; Guide</a>
-      <a href="/lead/print-report" target="_blank" class="text-blue-100 hover:text-white text-sm font-medium transition">&#128438; Print</a>
-      <a href="/admin" class="text-blue-100 hover:text-white text-sm font-medium transition">&#9881;&#65039; Admin</a>
-      <!-- Roster reload -->
+
+    <!-- Right: nav actions -->
+    <nav class="flex items-center gap-1 text-xs shrink-0 ml-4">
+      <span class="text-wm-spark font-black font-mono bg-white bg-opacity-10 px-2.5 py-1 rounded-full border border-wm-spark border-opacity-40 text-xs mr-1">{{ dc_number }}</span>
+      <span class="bg-green-400 text-green-900 text-xs font-bold px-2 py-0.5 rounded-full animate-pulse mr-1">LIVE</span>
+      <button id="notif-btn" onclick="requestNotifPermission()" title="Enable push notifications"
+        class="text-blue-200 hover:text-white px-2 py-1 rounded transition">&#128276;</button>
+      <a href="/share"    class="text-blue-200 hover:text-white px-2 py-1 rounded transition font-semibold">&#128279; Share</a>
+      <a href="/history"  class="text-blue-200 hover:text-white px-2 py-1 rounded transition">&#128203; History</a>
+      <a href="/analytics"class="text-blue-200 hover:text-white px-2 py-1 rounded transition">&#128200; Analytics</a>
+      <a href="/guide" target="_blank" class="text-blue-200 hover:text-white px-2 py-1 rounded transition">&#128214; Guide</a>
+      <a href="/lead/print-report" target="_blank" class="text-blue-200 hover:text-white px-2 py-1 rounded transition">&#128438; Print</a>
+      <a href="/admin"    class="text-blue-200 hover:text-white px-2 py-1 rounded transition">&#9881;&#65039; Admin</a>
       <span id="roster-status"></span>
-      <button
-        hx-post="/admin/reload-roster"
-        hx-target="#roster-status"
-        hx-swap="innerHTML"
-        class="text-blue-100 hover:text-white text-xs font-medium border border-blue-400 px-2 py-1 rounded-lg transition"
-        title="Reload associate roster from Excel">
+      <button hx-post="/admin/reload-roster" hx-target="#roster-status" hx-swap="innerHTML"
+        title="Reload associate roster from Excel"
+        class="text-blue-200 hover:text-white text-xs border border-blue-500 px-2 py-1 rounded transition">
         &#128257; Roster
       </button>
-      <a href="/" class="text-blue-100 hover:text-white text-sm font-medium transition">&#8592; Home</a>
-      <button onclick="toggleDark()" class="text-blue-100 hover:text-white text-lg transition" title="Toggle dark mode">&#9790;</button>
-    </div>
+      <a href="/" class="text-blue-200 hover:text-white px-2 py-1 rounded transition">&#8592; Home</a>
+      <button onclick="toggleDark()" class="text-blue-200 hover:text-white px-2 py-1 rounded text-base transition" title="Toggle dark mode">&#9790;</button>
+    </nav>
   </div>
 </header>
 
+<!-- ░░ OVERLAP BANNER ░░ -->
 {% if shifts | length > 1 %}
-<!-- Overlap window — shift switcher banner -->
-<div class="bg-amber-50 border-b border-amber-300 px-5 py-2 flex items-center gap-3 flex-wrap">
-  <span class="text-amber-800 text-xs font-black uppercase tracking-wide">&#9888; Overlap Window — 2 Shifts Active:</span>
+<div class="bg-amber-50 border-b border-amber-200 px-6 py-2 flex items-center gap-3 flex-wrap">
+  <span class="text-amber-700 text-xs font-black uppercase tracking-widest">&#9888; Overlap Window — 2 Shifts Active:</span>
   {% for s in shifts %}
   <a href="/lead?shift_id={{ s.id }}"
-     class="text-xs font-black px-3 py-1 rounded-full border-2 transition
-            {% if s.id == shift.id %}bg-wm-blue text-white border-wm-blue{% else %}bg-white text-gray-700 border-gray-300 hover:border-wm-blue hover:text-wm-blue{% endif %}">
+     class="text-xs font-black px-3 py-0.5 rounded-full border-2 transition
+            {% if s.id == shift.id %}bg-wm-blue text-white border-wm-blue{% else %}bg-white text-gray-600 border-gray-300 hover:border-wm-blue hover:text-wm-blue{% endif %}">
     {{ s.shift_type }} &mdash; {{ s.lead_name }}
   </a>
   {% endfor %}
 </div>
 {% endif %}
 
-<!-- SUMMARY STRIP -->
-<div class="bg-wm-dark px-5 py-2"
+<!-- ░░ SUMMARY STRIP ░░ -->
+<div class="bg-wm-dark"
      id="summary-strip"
      hx-get="/lead/summary?shift_id={{ shift.id }}"
      hx-trigger="load, every 60s, refresh"
      hx-swap="innerHTML">
-  <span class="text-blue-300 text-xs">Loading stats...</span>
+  <span class="text-blue-400 text-xs px-5 py-2 block">Loading stats...</span>
 </div>
 
-<main class="flex-1 max-w-screen-xl mx-auto w-full px-4 py-6 grid grid-cols-1 lg:grid-cols-5 gap-6">
+<!-- ░░ MAIN GRID ░░ -->
+<main class="flex-1 max-w-screen-2xl mx-auto w-full px-4 py-5 grid grid-cols-1 lg:grid-cols-12 gap-5">
 
   {% if status == 'started' %}
-  <div class="lg:col-span-5 bg-green-50 border border-green-300 text-green-800 rounded-xl px-5 py-3 flex items-center gap-3 text-sm">
-    <span class="text-xl">&#9989;</span>
-    <strong>New shift started!</strong> &nbsp;Technicians can now log their entries.
+  <div class="lg:col-span-12 bg-green-50 border border-green-200 text-green-800 rounded-xl px-5 py-2.5 flex items-center gap-3 text-sm">
+    <span>&#9989;</span> <strong>New shift started!</strong> &nbsp;Technicians can now log their entries.
   </div>
   {% endif %}
 
-  <!-- CARRY-OVERS FROM PREVIOUS SHIFT (server-side render + HTMX refresh after actions) -->
-  {% include "partials/carry_overs_panel.html" %}
+  <!-- Carry-overs -->
+  <div class="lg:col-span-12">
+    {% include "partials/carry_overs_panel.html" %}
+  </div>
 
-  <!-- NEW ENTRY TOAST -->
+  <!-- New-entry toast -->
   <div id="new-entry-toast"
-    class="hidden lg:col-span-5 bg-wm-spark text-gray-900 font-bold rounded-xl px-5 py-3
+    class="hidden lg:col-span-12 bg-wm-spark text-gray-900 font-bold rounded-xl px-5 py-3
            flex items-center gap-3 shadow-lg">
     <span class="text-xl">&#128276;</span>
     <span id="new-entry-msg">New entry received!</span>
@@ -110,68 +144,95 @@
       class="ml-auto text-gray-700 hover:text-gray-900 text-xl leading-none">&times;</button>
   </div>
 
-  <!-- LEFT: LIVE FEED (3 cols) -->
-  <section class="lg:col-span-3 flex flex-col gap-3">
+  <!-- ══════════════════════════════════════════════════════════════
+       COL A — Activity Log (7 cols, main focus)
+  ══════════════════════════════════════════════════════════════ -->
+  <section class="lg:col-span-7 flex flex-col gap-3">
 
-    <div class="flex items-center justify-between flex-wrap gap-2">
-      <h2 class="text-wm-dark font-bold text-lg">Activity Log</h2>
-      <input
-        id="feedSearch"
-        type="search"
-        placeholder="&#128269; Filter by unit or tech..."
+    <!-- Section header -->
+    <div class="flex items-center justify-between">
+      <div>
+        <p class="section-label">Live Activity</p>
+        <h2 class="text-slate-800 font-black text-lg leading-tight">Activity Log</h2>
+      </div>
+      <input id="feedSearch" type="search"
+        placeholder="&#128269; Filter unit or tech..."
         oninput="filterFeed(this.value)"
-        class="rounded-xl border border-gray-300 px-3 py-1.5 text-xs focus:border-wm-blue outline-none transition w-52"
-      />
+        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs
+               focus:border-wm-blue outline-none transition w-48 shadow-sm" />
     </div>
 
-    <div
-      id="live-feed"
+    <!-- Live feed -->
+    <div id="live-feed"
       hx-get="/lead/feed?shift_id={{ shift.id }}"
       hx-trigger="load, every 10s, refresh"
       hx-swap="innerHTML"
-    >
-      <div class="text-gray-400 text-sm italic p-4">Loading entries...</div>
+      class="flex flex-col gap-2">
+      <div class="text-slate-400 text-sm italic p-4">Loading entries...</div>
     </div>
 
   </section>
 
-  <!-- RIGHT: SIDEBAR (2 cols) — Problem Assets + Tech + Report -->
-  <section class="lg:col-span-2 flex flex-col gap-4">
+  <!-- ══════════════════════════════════════════════════════════════
+       COL B — Right sidebar (5 cols)
+  ══════════════════════════════════════════════════════════════ -->
+  <section class="lg:col-span-5 flex flex-col gap-4">
 
-    <!-- CMMS IMPORT CARD -->
-    <div class="bg-white rounded-2xl border-2 border-wm-blue border-opacity-30 shadow-sm p-4">
-      <h2 class="text-wm-dark font-bold text-sm mb-1 flex items-center gap-2">
-        <span class="text-wm-blue">&#128196;</span> Cetaris Import
-        <span class="ml-auto bg-wm-blue text-white text-xs font-black px-2 py-0.5 rounded-full">CMMS</span>
-      </h2>
-      <p class="text-gray-400 text-xs mb-3">Upload a Cetaris CSV export to auto-fill shift happenings.</p>
-      <form
-        hx-post="/lead/cmms-upload"
-        hx-target="#lead-cmms-result"
+    <!-- ── GROUP 1: Monitoring ─────────────────────────────────── -->
+    <p class="section-label">Shift Monitoring</p>
+
+    <!-- Problem Assets -->
+    <div class="card">
+      <div class="card-title">
+        <span class="text-red-500">&#128200;</span> Problem Assets
+        <span class="text-slate-400 text-xs font-normal ml-auto">Every 30s</span>
+      </div>
+      <div id="asset-stats"
+        hx-get="/lead/asset-stats?shift_id={{ shift.id }}"
+        hx-trigger="load, every 30s, refresh"
         hx-swap="innerHTML"
-        hx-encoding="multipart/form-data"
-        hx-indicator="#lead-cmms-spinner"
-        hx-push-url="false"
-        class="flex flex-col gap-3"
-      >
+        style="min-height:4rem">
+        <div class="text-slate-400 italic text-xs text-center py-3">Loading...</div>
+      </div>
+    </div>
+
+    <!-- Technicians -->
+    <div class="card">
+      <div class="card-title">
+        <span>&#128100;</span> Technicians On Shift
+        <span class="text-slate-400 text-xs font-normal ml-auto">Real-time</span>
+      </div>
+      <div id="tech-participation"
+        hx-get="/lead/tech-participation?shift_id={{ shift.id }}"
+        hx-trigger="load, every 30s, refresh"
+        hx-swap="innerHTML"
+        style="min-height:3rem;max-height:16rem;overflow-y:auto;">
+        <p class="text-slate-400 italic text-xs text-center py-3">Loading...</p>
+      </div>
+    </div>
+
+    <!-- ── GROUP 2: Data Inputs ────────────────────────────────── -->
+    <div class="divider"></div>
+    <p class="section-label">Data Inputs</p>
+
+    <!-- CMMS Import -->
+    <div class="card" style="border-left:3px solid #0053e2;">
+      <div class="card-title">
+        <span class="text-wm-blue">&#128196;</span> Cetaris CMMS Import
+        <span class="badge bg-blue-100 text-wm-blue">CMMS</span>
+      </div>
+      <p class="text-slate-400 text-xs mb-3">Upload a Cetaris CSV export to auto-fill shift happenings.</p>
+      <form hx-post="/lead/cmms-upload" hx-target="#lead-cmms-result" hx-swap="innerHTML"
+        hx-encoding="multipart/form-data" hx-indicator="#lead-cmms-spinner"
+        hx-push-url="false" class="flex flex-col gap-2">
         <input type="hidden" name="shift_id" value="{{ shift.id }}" />
-        <label class="flex flex-col gap-1">
-          <span class="text-xs font-bold text-gray-600 uppercase tracking-wide">Select Cetaris CSV</span>
-          <input
-            type="file"
-            name="file"
-            accept=".csv,.xlsx,.xls"
-            required
-            class="text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0
-                   file:text-xs file:font-bold file:bg-wm-blue file:text-white hover:file:bg-blue-700
-                   file:cursor-pointer cursor-pointer"
-          />
-        </label>
-        <button type="submit"
-          class="flex items-center justify-center gap-2 bg-wm-blue hover:bg-blue-700
-                 text-white font-bold py-2 rounded-xl transition text-sm">
-          <span id="lead-cmms-spinner" class="htmx-indicator items-center gap-1 text-sm">
-            <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+        <input type="file" name="file" accept=".csv,.xlsx,.xls" required
+          class="text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg
+                 file:border-0 file:text-xs file:font-bold file:bg-wm-blue file:text-white
+                 hover:file:bg-blue-700 file:cursor-pointer cursor-pointer" />
+        <button type="submit" class="btn-primary">
+          <span id="lead-cmms-spinner" class="htmx-indicator items-center gap-1">
+            <svg class="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
             </svg>Importing...
@@ -179,365 +240,243 @@
           &#128228; Upload &amp; Import
         </button>
       </form>
-      <div id="lead-cmms-result" class="mt-3"></div>
+      <div id="lead-cmms-result" class="mt-2"></div>
     </div>
-    <!-- END CMMS CARD -->
 
-    <!-- PM'S TO BE COMPLETED CARD -->
-    <div class="bg-white rounded-2xl border-2 border-blue-200 shadow-sm p-4">
-      <h2 class="text-wm-dark font-bold text-sm mb-1 flex items-center gap-2">
-        <span>&#128196;</span> PM's Needing to be Completed
-        <span class="ml-auto bg-blue-100 text-blue-700 text-xs font-black px-2 py-0.5 rounded-full">PM</span>
-      </h2>
-      <p class="text-gray-400 text-xs mb-3">Upload the Cetaris open PM report (Excel/CSV). Table auto-parses and goes into the email.</p>
+    <!-- PM Upload -->
+    <div class="card" style="border-left:3px solid #6366f1;">
+      <div class="card-title">
+        <span>&#128196;</span> PM's Needing Completion
+        <span class="badge bg-indigo-100 text-indigo-700">PM</span>
+      </div>
+      <p class="text-slate-400 text-xs mb-3">Upload the Cetaris open PM report — table auto-parses into the email.</p>
 
-      <!-- Init loader: fires once on page load, replaces the whole #pm-file-list -->
       <div hx-get="/lead/pm-files?shift_id={{ shift.id }}"
-           hx-trigger="load"
-           hx-target="#pm-file-list"
-           hx-swap="outerHTML"></div>
-
-      <!-- Swap target — outerHTML means the whole div is replaced, no re-trigger -->
-      <div id="pm-file-list" class="min-h-[2rem] mb-3">
-        <p class="text-gray-300 text-xs italic">Loading...</p>
+           hx-trigger="load" hx-target="#pm-file-list" hx-swap="outerHTML"></div>
+      <div id="pm-file-list" class="min-h-[1.5rem] mb-2">
+        <p class="text-slate-300 text-xs italic">Loading...</p>
       </div>
 
-      <!-- Upload form -->
-      <form hx-post="/lead/pm-upload"
-        hx-target="#pm-file-list"
-        hx-swap="outerHTML"
-        hx-encoding="multipart/form-data"
-        hx-indicator="#pm-upload-spinner"
-        hx-on::after-request="this.reset()"
-        class="flex flex-col gap-2">
+      <form hx-post="/lead/pm-upload" hx-target="#pm-file-list" hx-swap="outerHTML"
+        hx-encoding="multipart/form-data" hx-indicator="#pm-upload-spinner"
+        hx-on::after-request="this.reset()" class="flex flex-col gap-2">
         <input type="hidden" name="shift_id" value="{{ shift.id }}">
-        <label class="flex flex-col gap-1">
-          <span class="text-xs font-bold text-gray-600 uppercase tracking-wide">Select PM Report</span>
-          <input type="file" name="pm_file" required
-            accept=".pdf,.xlsx,.xls,.csv,.png,.jpg,.jpeg"
-            class="text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg
-                   file:border-0 file:text-xs file:font-bold file:bg-wm-blue file:text-white
-                   file:cursor-pointer hover:file:bg-blue-700 cursor-pointer" />
-        </label>
-        <button type="submit"
-          style="background:#0053e2;color:#fff;font-weight:700;font-size:0.75rem;
-                 padding:0.5rem 1rem;border-radius:0.5rem;border:none;cursor:pointer;
-                 display:inline-flex;align-items:center;gap:0.5rem;width:fit-content;"
-          onmouseover="this.style.background='#003db5'"
-          onmouseout="this.style.background='#0053e2'">
-          <span id="pm-upload-spinner" class="htmx-indicator" style="display:none;align-items:center;gap:0.4rem;">
-            <svg style="animation:spin 1s linear infinite;width:14px;height:14px;" fill="none" viewBox="0 0 24 24">
-              <circle style="opacity:.25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-              <path style="opacity:.75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+        <input type="file" name="pm_file" required accept=".pdf,.xlsx,.xls,.csv,.png,.jpg,.jpeg"
+          class="text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg
+                 file:border-0 file:text-xs file:font-bold file:bg-wm-blue file:text-white
+                 file:cursor-pointer hover:file:bg-blue-700 cursor-pointer" />
+        <button type="submit" class="btn-primary">
+          <span id="pm-upload-spinner" class="htmx-indicator items-center gap-1">
+            <svg class="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
             </svg>
           </span>
           &#128228; Upload PM Report
         </button>
       </form>
-      <p class="text-xs text-gray-400 mt-2">PDF, Excel, CSV or image &mdash; stored on this shift's record.</p>
+      <p class="text-xs text-slate-400 mt-1.5">PDF, Excel, CSV or image accepted.</p>
     </div>
-    <!-- END PM CARD -->
 
-    <!-- LOTO KEY VERIFICATION CARD -->
-    <div class="bg-white rounded-2xl border-2 border-yellow-200 shadow-sm p-4">
-      <h2 class="text-wm-dark font-bold text-sm mb-1 flex items-center gap-2">
+    <!-- LOTO Verification -->
+    <div class="card" style="border-left:3px solid #f59e0b;">
+      <div class="card-title">
         <span>&#128273;</span> LOTO Key Verification
-        <span id="loto-badge" class="ml-auto text-xs font-black px-2 py-0.5 rounded-full
-          {% if loto.loto_verified %}bg-green-100 text-green-700{% else %}bg-yellow-100 text-yellow-700{% endif %}">
+        <span id="loto-badge" class="badge
+          {% if loto.loto_verified %}bg-green-100 text-green-700{% else %}bg-amber-100 text-amber-700{% endif %}">
           {% if loto.loto_verified %}&#10003; Verified{% else %}Pending{% endif %}
         </span>
-      </h2>
-      <div id="loto-status" class="text-xs text-gray-500 mb-3">
+      </div>
+      <div id="loto-status" class="text-xs text-slate-500 mb-3">
         {% if loto.loto_verified %}
           {% if loto.loto_missing_keys %}
-            <p class="font-bold text-sm text-green-700">&#10003; LOTO Verified &mdash; keys missing:</p>
-            <div class="flex flex-wrap gap-1 mt-1">
+            <p class="font-bold text-green-700 mb-1">&#10003; LOTO Verified — keys missing:</p>
+            <div class="flex flex-wrap gap-1">
               {% for key in loto.loto_missing_keys.split(',') %}
               {% set k = key.strip() %}{% if k %}
               <form method="POST" action="/lead/loto/remove-key"
-                hx-post="/lead/loto/remove-key"
-                hx-target="#loto-status"
-                hx-swap="innerHTML"
+                hx-post="/lead/loto/remove-key" hx-target="#loto-status" hx-swap="innerHTML"
                 style="display:inline;">
                 <input type="hidden" name="shift_id" value="{{ shift.id }}">
                 <input type="hidden" name="key_to_remove" value="{{ k }}">
-                <button type="submit" title="Key found &mdash; remove"
+                <button type="submit" title="Key found — remove"
                   class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs
-                         font-bold bg-red-50 border border-red-200 text-red-700
-                         hover:bg-red-100 cursor-pointer">
+                         font-bold bg-red-50 border border-red-200 text-red-700 hover:bg-red-100">
                   {{ k }} &times;
                 </button>
               </form>
               {% endif %}{% endfor %}
             </div>
-            <p class="text-xs text-gray-400 mt-1">Click a key to remove it once found.</p>
+            <p class="text-xs text-slate-400 mt-1">Click a key to remove once found.</p>
           {% else %}
-            <p class="font-bold text-sm text-green-700">&#10003; All LOTO Keys Verified</p>
+            <p class="font-bold text-green-700">&#10003; All LOTO Keys Verified</p>
           {% endif %}
         {% else %}
-          <p class="text-gray-400 italic">Not yet verified for this shift.</p>
+          <p class="text-slate-400 italic">Not yet verified for this shift.</p>
         {% endif %}
       </div>
-      <form hx-post="/lead/loto"
-        hx-target="#loto-status"
-        hx-swap="innerHTML"
-        class="flex flex-col gap-3">
+      <form hx-post="/lead/loto" hx-target="#loto-status" hx-swap="innerHTML" class="flex flex-col gap-2">
         <input type="hidden" name="shift_id" value="{{ shift.id }}">
         <label class="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" name="loto_verified" value="on"
             {% if loto.loto_verified %}checked{% endif %}
             class="w-4 h-4 accent-green-600" />
-          <span class="text-sm font-semibold text-gray-700">All LOTO Keys accounted for</span>
+          <span class="text-sm font-semibold text-slate-700">All LOTO Keys accounted for</span>
         </label>
-        <div class="flex flex-col gap-1">
-          <label class="text-xs font-bold text-gray-500">Missing keys
-            <span class="font-normal">(leave blank if none)</span></label>
-          <input name="missing_keys" type="text"
-            value="{{ loto.loto_missing_keys }}"
-            placeholder="e.g. CHAR0020 key, TK51 key..."
-            class="rounded-lg border border-gray-300 px-3 py-2 text-xs focus:border-yellow-400 outline-none" />
-        </div>
+        <input name="missing_keys" type="text" value="{{ loto.loto_missing_keys }}"
+          placeholder="Missing keys e.g. CHAR0020, TK51..."
+          class="input-sm" />
         <button type="submit"
-          class="w-fit px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-bold text-xs rounded-lg transition">
+          class="w-fit px-4 py-1.5 bg-amber-400 hover:bg-amber-500 text-amber-900 font-bold text-xs rounded-lg transition">
           &#128274; Save LOTO Status
         </button>
       </form>
     </div>
-    <!-- END LOTO CARD -->
 
-    <!-- PROBLEM ASSETS (moved from full-width) -->
-    <div class="bg-white rounded-2xl border-2 border-gray-200 shadow-sm p-4">
-      <div class="flex items-center justify-between mb-3">
-        <h2 class="text-wm-dark font-bold text-sm flex items-center gap-2">
-          <span>&#128200;</span> Problem Assets
-        </h2>
-        <span class="text-gray-400 text-xs">Every 30s</span>
-      </div>
-      <div
-        id="asset-stats"
-        hx-get="/lead/asset-stats?shift_id={{ shift.id }}"
-        hx-trigger="load, every 30s, refresh"
-        hx-swap="innerHTML"
-        style="min-height:5rem">
-        <div class="text-gray-400 italic text-sm text-center py-3">Loading...</div>
-      </div>
+    <!-- ── GROUP 3: Generate Report ───────────────────────────── -->
+    <div class="divider"></div>
+    <div class="flex items-center gap-2">
+      <p class="section-label mb-0" style="margin-bottom:0">Generate Passdown</p>
+      <span class="text-wm-spark text-base">&#9993;</span>
     </div>
 
-    <!-- TECH PARTICIPATION (moved from full-width) -->
-    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
-      <div class="flex items-center justify-between mb-2">
-        <h2 class="text-wm-dark font-bold text-sm flex items-center gap-2">
-          <span>&#128100;</span> Technicians On Shift
-        </h2>
-        <span class="text-gray-400 text-xs">Real-time</span>
-      </div>
-      <div id="tech-participation"
-        hx-get="/lead/tech-participation?shift_id={{ shift.id }}"
-        hx-trigger="load, every 30s, refresh"
-        hx-swap="innerHTML"
-        style="min-height:3rem;max-height:18rem;overflow-y:auto;">
-        <p class="text-gray-400 italic text-sm text-center py-3">Loading...</p>
-      </div>
-    </div>
-
-    <!-- GENERATE REPORT -->
-    <h2 class="text-wm-dark font-bold text-lg flex items-center gap-2">
-      <span class="text-wm-spark">&#9993;</span> Generate Passdown Report
-    </h2>
-
-    <!-- MST SHIFT NOTES -->
-    <div class="bg-white rounded-xl border border-blue-200 shadow-sm p-4">
-      <div class="flex items-center justify-between mb-2">
-        <p class="text-sm font-bold text-wm-dark flex items-center gap-1">&#128221; MST Shift Notes</p>
-        <span id="notes-status" class="text-xs"></span>
-      </div>
-      <textarea
-        id="shiftNotes"
-        name="notes"
-        rows="4"
-        placeholder="Add your context, leadership updates, or anything techs didn't log..."
+    <!-- Shift Notes -->
+    <div class="card">
+      <div class="card-title">&#128221; MST Shift Notes <span id="notes-status" class="text-xs font-normal text-slate-400 ml-auto"></span></div>
+      <textarea id="shiftNotes" name="notes" rows="3"
+        placeholder="Add context, leadership updates, or anything techs didn't log..."
         hx-post="/lead/shift-notes"
         hx-vals='{"shift_id": {{ shift.id }}}'
         hx-include="#shiftNotes"
         hx-target="#notes-status"
         hx-swap="innerHTML"
         hx-trigger="blur"
-        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-wm-blue outline-none transition resize-none"
+        class="input-sm resize-none" style="height:auto;"
       >{{ shift_notes }}</textarea>
-      <p class="text-xs text-gray-400 mt-1">Auto-saves on focus-out. Included in the final report.</p>
+      <p class="text-xs text-slate-400 mt-1">Auto-saves on focus-out. Included in the final report.</p>
     </div>
 
-    <form
-      hx-post="/lead/generate"
-      hx-target="#report-output"
-      hx-indicator="#gen-spinner"
-      hx-swap="innerHTML"
+    <!-- Generate form -->
+    <form hx-post="/lead/generate" hx-target="#report-output"
+      hx-indicator="#gen-spinner" hx-swap="innerHTML"
       hx-on:htmx:after-swap="if(event.detail.target.id==='report-output') document.body.dispatchEvent(new Event('oos-refresh'))"
-      autocomplete="off"
-      class="flex flex-col gap-4"
-    >
+      autocomplete="off" class="flex flex-col gap-3">
       <input type="hidden" name="shift_id" value="{{ shift.id }}" />
 
-      <!-- SHIFT HAPPENINGS: DB entries always auto-included at generate time -->
-      <details class="bg-white rounded-xl border border-gray-200 shadow-sm" open>
-        <summary class="px-4 py-3 font-semibold text-sm text-wm-dark cursor-pointer select-none">
-          &#9889; Shift Happenings
+      <!-- Shift Happenings -->
+      <details class="card" style="padding:0;" open>
+        <summary class="px-4 py-3 font-bold text-sm text-slate-700 cursor-pointer select-none flex items-center gap-2">
+          <span class="text-wm-blue">&#9889;</span> Shift Happenings
         </summary>
-        <div class="px-4 pb-4 flex flex-col gap-3 mt-1">
-
-          <!-- Static entry count — rendered at page load from DB.
-               Generate ALWAYS re-reads DB live, so this is informational only. -->
-          <div
-            id="happenings-preview"
+        <div class="px-4 pb-4 flex flex-col gap-3 border-t border-slate-100 mt-0 pt-3">
+          <div id="happenings-preview"
             hx-get="/lead/happenings-preview?shift_id={{ shift.id }}"
-            hx-trigger="load, refresh"
-            hx-swap="innerHTML"
-            class="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 min-h-[2.5rem]"
-          >
-            <p class="text-xs text-gray-400 italic">Loading…</p>
+            hx-trigger="load, refresh" hx-swap="innerHTML"
+            class="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 min-h-[2.5rem]">
+            <p class="text-xs text-slate-400 italic">Loading…</p>
           </div>
-
-          <!-- MST-only extra happenings (appended on top of DB entries) -->
-          <p class="text-xs font-semibold text-wm-dark mt-1">&#43; Extra happenings <span class="text-gray-400 font-normal">(MST additions only)</span></p>
-          <div class="flex flex-col gap-3" id="extra-happening-rows">
-            <div class="entry-row bg-gray-50 rounded-lg border border-gray-200 p-3 flex flex-col gap-2">
-              <div class="flex items-center justify-between gap-2">
-                <input name="extra_title" type="text" placeholder="Title (optional extra happening)"
-                  class="flex-1 rounded-lg border border-gray-300 px-2 py-1.5 text-xs
-                         focus:border-wm-blue outline-none font-semibold" />
+          <p class="text-xs font-semibold text-slate-600">&#43; Extra happenings <span class="text-slate-400 font-normal">(MST additions only)</span></p>
+          <div class="flex flex-col gap-2" id="extra-happening-rows">
+            <div class="entry-row bg-slate-50 rounded-lg border border-slate-200 p-3 flex flex-col gap-2">
+              <div class="flex items-center gap-2">
+                <input name="extra_title" type="text" placeholder="Title (optional)"
+                  class="flex-1 input-sm font-semibold" />
                 <button type="button" onclick="removeRow(this)"
-                  class="text-xs text-red-400 hover:text-red-600 font-bold px-2 shrink-0"
-                  title="Remove">&#10005;</button>
+                  class="text-xs text-red-400 hover:text-red-600 font-bold px-1 shrink-0" title="Remove">&#10005;</button>
               </div>
               <textarea name="extra_note" rows="2" placeholder="Describe what happened"
-                class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs
-                       focus:border-wm-blue outline-none resize-none"></textarea>
+                class="input-sm resize-none"></textarea>
             </div>
           </div>
           <button type="button" onclick="addExtraHappening()"
-            class="text-xs text-wm-blue font-semibold text-left">+ Add extra happening</button>
-
+            class="text-xs text-wm-blue font-semibold text-left hover:underline">+ Add extra happening</button>
         </div>
       </details>
 
-      <!-- VENDORS accordion -->
-      <details class="bg-white rounded-xl border border-gray-200 shadow-sm">
-        <summary class="px-4 py-3 font-semibold text-sm text-wm-dark cursor-pointer select-none">
-          &#128663; Vendors <span class="text-gray-400 font-normal">(optional)</span>
+      <!-- Vendors -->
+      <details class="card" style="padding:0;">
+        <summary class="px-4 py-3 font-bold text-sm text-slate-700 cursor-pointer select-none flex items-center gap-2">
+          <span>&#128663;</span> Vendors <span class="text-slate-400 font-normal text-xs">(optional)</span>
         </summary>
-        <div class="px-4 pb-4 flex flex-col gap-3" id="vendor-rows">
-          <div class="entry-row mt-2">
-            <input name="vendor_name" type="text" placeholder="Vendor name / company"
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs
-                     focus:border-wm-blue outline-none" />
+        <div class="px-4 pb-4 flex flex-col gap-2 border-t border-slate-100 pt-3" id="vendor-rows">
+          <div class="entry-row">
+            <input name="vendor_name" type="text" placeholder="Vendor name / company" class="input-sm" />
           </div>
           <button type="button" onclick="addRow('vendor-rows')"
-            class="text-xs text-wm-blue font-semibold text-left">+ Add vendor</button>
+            class="text-xs text-wm-blue font-semibold text-left hover:underline">+ Add vendor</button>
         </div>
       </details>
 
-      <!-- Reliable Operations accordion -->
-      <details class="bg-white rounded-xl border border-gray-200 shadow-sm">
-        <summary class="px-4 py-3 font-semibold text-sm text-wm-dark cursor-pointer select-none">
-          &#128203; Reliable Operations <span class="text-gray-400 font-normal">(optional)</span>
+      <!-- Reliable Operations -->
+      <details class="card" style="padding:0;">
+        <summary class="px-4 py-3 font-bold text-sm text-slate-700 cursor-pointer select-none flex items-center gap-2">
+          <span>&#128203;</span> Reliable Operations <span class="text-slate-400 font-normal text-xs">(optional)</span>
         </summary>
-        <div class="px-4 pb-4 flex flex-col gap-3" id="ro-rows">
-          <div class="entry-row mt-2">
-            <input name="ro_item" type="text" placeholder="RO # or description"
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs
-                     focus:border-wm-blue outline-none" />
+        <div class="px-4 pb-4 flex flex-col gap-2 border-t border-slate-100 pt-3" id="ro-rows">
+          <div class="entry-row">
+            <input name="ro_item" type="text" placeholder="RO # or description" class="input-sm" />
           </div>
           <button type="button" onclick="addRow('ro-rows')"
-            class="text-xs text-wm-blue font-semibold text-left">+ Add Reliable Operation</button>
+            class="text-xs text-wm-blue font-semibold text-left hover:underline">+ Add Reliable Operation</button>
         </div>
       </details>
 
-      <!-- RTS accordion -->
-      <details class="bg-white rounded-xl border border-green-200 shadow-sm" id="rts-accordion">
-        <summary class="px-4 py-3 font-semibold text-sm text-wm-dark cursor-pointer select-none flex items-center gap-2">
+      <!-- RTS -->
+      <details class="card" style="padding:0;" id="rts-accordion">
+        <summary class="px-4 py-3 font-bold text-sm text-slate-700 cursor-pointer select-none flex items-center gap-2">
           <span class="text-green-600">&#10003;</span> Returned to Service
           <span id="rts-badge" class="hidden bg-green-600 text-white text-xs font-bold rounded-full px-2 py-0.5 ml-1"></span>
-          <span class="text-gray-400 font-normal text-xs ml-auto">(auto-tracked)</span>
+          <span class="text-slate-400 font-normal text-xs ml-auto">(auto-tracked)</span>
         </summary>
-        <div class="px-4 pb-4 flex flex-col gap-3">
-
-          <!-- Live RTS log — updated via HTMX OOB when ✕ RTS is clicked -->
-          <div id="rts-log-content"
-               class="flex flex-col gap-2 mt-2"
-               hx-get="/lead/rts-log"
-               hx-trigger="load"
-               hx-swap="innerHTML">
-            <p class="text-xs text-gray-400 italic">Loading&hellip;</p>
+        <div class="px-4 pb-4 flex flex-col gap-2 border-t border-slate-100 pt-3">
+          <div id="rts-log-content" class="flex flex-col gap-2"
+               hx-get="/lead/rts-log" hx-trigger="load" hx-swap="innerHTML">
+            <p class="text-xs text-slate-400 italic">Loading&hellip;</p>
           </div>
-
-          <hr class="border-green-100">
-
-          <p class="text-xs text-gray-500">
-            Add anything that came back outside the OOS panel:
-          </p>
+          <hr class="border-slate-100">
+          <p class="text-xs text-slate-500">Add anything outside the OOS panel:</p>
           <div class="flex flex-col gap-2" id="rts-rows">
-            <div class="entry-row mt-1">
-              <input name="rts_unit" type="text"
-                list="lead-asset-list" autocomplete="off"
-                placeholder="Extra asset ID (optional)"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs
-                       focus:border-wm-blue outline-none" />
+            <div class="entry-row">
+              <input name="rts_unit" type="text" list="lead-asset-list" autocomplete="off"
+                placeholder="Extra asset ID (optional)" class="input-sm" />
             </div>
           </div>
           <button type="button" onclick="addRow('rts-rows')"
-            class="text-xs text-green-700 font-semibold text-left hover:underline">+ Add extra RTS unit</button>
+            class="text-xs text-green-700 font-semibold hover:underline text-left">+ Add extra RTS unit</button>
         </div>
       </details>
 
-      <!-- OOS accordion - always open, always visible -->
-      <details class="bg-white rounded-xl border border-red-200 shadow-sm" open>
-        <summary class="px-4 py-3 font-semibold text-sm text-wm-dark cursor-pointer select-none">
+      <!-- OOS -->
+      <details class="card" style="padding:0;" open>
+        <summary class="px-4 py-3 font-bold text-sm text-slate-700 cursor-pointer select-none flex items-center gap-2">
           <span class="text-red-500">&#9940;</span> Out of Service
-          <span class="text-gray-400 font-normal">(persists until removed)</span>
+          <span class="text-slate-400 font-normal text-xs">(persists until removed)</span>
         </summary>
-        <div class="px-4 pb-4 flex flex-col gap-3">
-
-          <!-- Live OOS list — reloads on page load and after every report generate -->
-          <div
-            id="oos-list"
-            hx-get="/oos/list"
-            hx-trigger="load, oos-refresh from:body"
+        <div class="px-4 pb-4 flex flex-col gap-3 border-t border-slate-100 pt-3">
+          <div id="oos-list"
+            hx-get="/oos/list" hx-trigger="load, oos-refresh from:body"
             hx-swap="innerHTML"
-            class="flex flex-col gap-2 mt-2 min-h-[2rem]">
-            <p class="text-gray-300 italic text-xs">Loading...</p>
+            class="flex flex-col gap-2 min-h-[2rem]">
+            <p class="text-slate-300 italic text-xs">Loading...</p>
           </div>
-
-          <!-- Add a unit -->
-          <div class="flex gap-2 mt-1">
-            <input
-              id="oos-add-input"
-              type="text"
-              name="unit"
-              list="lead-asset-list"
-              autocomplete="off"
+          <div class="flex gap-2">
+            <input id="oos-add-input" type="text" name="unit"
+              list="lead-asset-list" autocomplete="off"
               placeholder="Asset ID to add to OOS..."
-              class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-xs
-                     focus:border-red-400 focus:ring-2 focus:ring-red-100 outline-none transition" />
-            <button
-              type="button"
-              hx-post="/oos/add"
-              hx-include="#oos-add-input"
-              hx-target="#oos-list"
-              hx-swap="innerHTML"
+              class="flex-1 input-sm focus:border-red-400" />
+            <button type="button"
+              hx-post="/oos/add" hx-include="#oos-add-input"
+              hx-target="#oos-list" hx-swap="innerHTML"
               hx-on:htmx:after-request="document.getElementById('oos-add-input').value=''"
-              class="px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold
-                     rounded-lg transition shrink-0">
+              class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition shrink-0">
               + Add OOS
             </button>
           </div>
-
         </div>
       </details>
 
-      <button type="submit"
-        class="flex items-center justify-center gap-2 bg-wm-blue hover:bg-blue-700
-               text-white font-bold py-3 rounded-xl transition shadow-md focus:outline-none
-               focus:ring-4 focus:ring-blue-300 text-sm">
+      <!-- Generate button -->
+      <button type="submit" class="btn-primary-lg shadow-md focus:outline-none focus:ring-4 focus:ring-blue-200">
         <span id="gen-spinner" class="htmx-indicator items-center gap-2">
           <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
@@ -548,29 +487,29 @@
       </button>
     </form>
 
-    <!-- REPORT OUTPUT -->
+    <!-- Report output -->
     <div id="report-output" class="flex flex-col gap-3"></div>
 
-    <!-- END SHIFT -->
-    <div class="mt-4 rounded-2xl border-2 border-red-200 bg-red-50 p-4 flex flex-col gap-3">
+    <!-- ── END SHIFT ───────────────────────────────────────────── -->
+    <div class="rounded-xl border border-red-200 bg-red-50 p-4 flex flex-col gap-3 mt-2">
       <div class="flex items-center gap-2">
-        <span class="text-red-600 text-lg">&#9888;&#65039;</span>
-        <p class="text-red-700 font-black text-sm uppercase tracking-widest">Danger Zone</p>
+        <span class="text-red-600">&#9888;&#65039;</span>
+        <p class="text-red-700 font-black text-xs uppercase tracking-widest">Danger Zone</p>
       </div>
       <p class="text-red-600 text-xs leading-relaxed">
-        Ending the shift will lock all entries and finalize the passdown report.
-        Use the <strong>Send Email</strong> button in the report card to send it out.
+        Ending the shift locks all entries and finalizes the passdown. Use
+        <strong>Send Email</strong> in the report card to send it out first.
         <strong>This cannot be undone.</strong>
       </p>
       <form method="POST" action="/shift/end">
         <input type="hidden" name="shift_id" value="{{ shift.id }}" />
         <button type="submit"
-          onclick="return confirm('&#9888; End this shift?\n\nThis will lock all entries. Use the Send Email button to send the report.\n\nAre you sure?')"
+          onclick="return confirm('⚠ End this shift?\n\nThis will lock all entries. Use the Send Email button to send the report.\n\nAre you sure?')"
           class="w-full flex items-center justify-center gap-3
                  bg-red-600 hover:bg-red-700 active:bg-red-800
-              text-white font-black py-4 rounded-xl transition
-                 shadow-lg focus:outline-none focus:ring-4 focus:ring-red-300
-                 border-b-4 border-red-800 text-lg tracking-wide">
+                 text-white font-black py-3 rounded-xl transition
+                 shadow-md focus:outline-none focus:ring-4 focus:ring-red-300
+                 border-b-4 border-red-800 tracking-wide text-sm">
           &#128274;&nbsp; END SHIFT
         </button>
       </form>
@@ -580,18 +519,18 @@
 
 </main>
 
-<footer class="bg-wm-dark text-blue-300 text-center text-xs py-3">
+<footer class="bg-wm-dark text-blue-400 text-center text-xs py-3 mt-4">
   Shift Passdown Generator &bull; MST Dashboard &bull; Walmart &copy; 2026
 </footer>
 
-<!-- Shared asset datalist — used by RTS and OOS unit inputs -->
+<!-- Shared asset datalist -->
 <datalist id="lead-asset-list">
   {% for asset in assets %}<option value="{{ asset }}">{% endfor %}
 </datalist>
 
 <script src="/static/app.js"></script>
 <script>
-// ── Dark mode ────────────────────────────────────────────
+// ── Dark mode ──────────────────────────────────────────────────────────
 function toggleDark() {
   const on = document.body.classList.toggle('dark-mode');
   document.getElementById('dark-css').disabled = !on;
@@ -602,72 +541,60 @@ if (localStorage.getItem('dark')) {
   document.getElementById('dark-css').disabled = false;
 }
 
-// ── Live feed search / filter ────────────────────────────
+// ── Live feed filter ───────────────────────────────────────────────────
 function filterFeed(q) {
   q = q.toLowerCase().trim();
   document.querySelectorAll('#live-feed [data-entry]').forEach(row => {
     const unit = (row.dataset.unit || '').toLowerCase();
     const tech = (row.dataset.tech || '').toLowerCase();
-    const match = !q || unit.includes(q) || tech.includes(q);
-    row.style.display = match ? '' : 'none';
+    row.style.display = (!q || unit.includes(q) || tech.includes(q)) ? '' : 'none';
   });
 }
 
-// ── Browser Notifications ───────────────────────────────
+// ── Browser Notifications ──────────────────────────────────────────────
 function _pushNotif(priority, tech, unit) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   if (priority !== 'down' && priority !== 'degraded') return;
   const isDown = priority === 'down';
   const title  = isDown ? '🔴 UNIT DOWN — ' + unit : '🟡 Degraded — ' + unit;
   const notif  = new Notification(title, {
-    body: 'Logged by ' + tech,
-    icon: '/static/wrench.svg',
-    requireInteraction: isDown,
+    body: 'Logged by ' + tech, icon: '/static/wrench.svg', requireInteraction: isDown,
   });
   notif.onclick = () => { window.focus(); notif.close(); };
 }
-
 function requestNotifPermission() {
   const btn = document.getElementById('notif-btn');
   if (!('Notification' in window)) { btn.title = 'Not supported'; return; }
-  if (Notification.permission === 'granted') {
-    btn.innerHTML = '🔔 On'; btn.title = 'Notifications are ON'; return;
-  }
+  if (Notification.permission === 'granted') { btn.innerHTML = '🔔 On'; return; }
   if (Notification.permission === 'denied') {
-    btn.innerHTML = '🔕 Blocked'; btn.title = 'Notifications blocked';
-    alert('Notifications are blocked.\nClick the lock icon in your address bar → allow notifications for this site.');
+    alert('Notifications blocked — click the lock icon in your address bar to allow.');
     return;
   }
   Notification.requestPermission().then(p => {
-    if (p === 'granted') { btn.innerHTML = '🔔 On'; btn.title = 'Notifications are ON'; }
-    else                 { btn.innerHTML = '🔕 Off'; btn.title = 'Permission denied'; }
+    btn.innerHTML = p === 'granted' ? '🔔 On' : '🔕 Off';
   });
 }
-
-// Set bell label on page load
 (function () {
   const btn = document.getElementById('notif-btn');
   if (!btn || !('Notification' in window)) return;
-  if (Notification.permission === 'granted') { btn.innerHTML = '🔔 On';      btn.title = 'Notifications ON'; }
-  if (Notification.permission === 'denied')  { btn.innerHTML = '🔕 Blocked'; btn.title = 'Notifications blocked — fix in browser settings'; }
+  if (Notification.permission === 'granted') btn.innerHTML = '🔔 On';
+  if (Notification.permission === 'denied')  btn.innerHTML = '🔕';
 }());
 
-// ── WebSocket — real-time new entry signal ───────────────
+// ── WebSocket — real-time feed ─────────────────────────────────────────
 (function () {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   let ws;
-
   function connect() {
     ws = new WebSocket(`${proto}://${location.host}/ws/feed`);
-
     ws.onmessage = (event) => {
       const msg = JSON.parse(event.data);
       if (msg.type === 'new_entry') {
-        htmx.trigger(document.getElementById('live-feed'),           'refresh');
-        htmx.trigger(document.getElementById('asset-stats'),         'refresh');
-        htmx.trigger(document.getElementById('tech-participation'),  'refresh');
-        htmx.trigger(document.getElementById('summary-strip'),       'refresh');
-        htmx.trigger(document.getElementById('happenings-preview'),  'refresh');
+        htmx.trigger(document.getElementById('live-feed'),          'refresh');
+        htmx.trigger(document.getElementById('asset-stats'),        'refresh');
+        htmx.trigger(document.getElementById('tech-participation'), 'refresh');
+        htmx.trigger(document.getElementById('summary-strip'),      'refresh');
+        htmx.trigger(document.getElementById('happenings-preview'), 'refresh');
         document.getElementById('new-entry-msg').textContent =
           `\uD83D\uDD14 ${msg.tech} logged ${msg.unit}`;
         const toast = document.getElementById('new-entry-toast');
@@ -676,11 +603,11 @@ function requestNotifPermission() {
         _pushNotif(msg.priority, msg.tech, msg.unit);
       }
       if (msg.type === 'cmms_import') {
-        htmx.trigger(document.getElementById('live-feed'),           'refresh');
-        htmx.trigger(document.getElementById('asset-stats'),         'refresh');
-        htmx.trigger(document.getElementById('tech-participation'),  'refresh');
-        htmx.trigger(document.getElementById('summary-strip'),       'refresh');
-        htmx.trigger(document.getElementById('happenings-preview'),  'refresh');
+        htmx.trigger(document.getElementById('live-feed'),          'refresh');
+        htmx.trigger(document.getElementById('asset-stats'),        'refresh');
+        htmx.trigger(document.getElementById('tech-participation'), 'refresh');
+        htmx.trigger(document.getElementById('summary-strip'),      'refresh');
+        htmx.trigger(document.getElementById('happenings-preview'), 'refresh');
         const parts = [];
         if (msg.count)    parts.push(`${msg.count} WO${msg.count !== 1 ? 's' : ''} imported`);
         if (msg.pm_count) parts.push(`${msg.pm_count} PM${msg.pm_count !== 1 ? 's' : ''} completed`);
@@ -691,39 +618,32 @@ function requestNotifPermission() {
         setTimeout(() => toast.classList.add('hidden'), 8000);
       }
       if (msg.type === 'tech_done') {
-        htmx.trigger(document.getElementById('tech-participation'),  'refresh');
-        htmx.trigger(document.getElementById('summary-strip'),       'refresh');
-        htmx.trigger(document.getElementById('happenings-preview'),  'refresh');
+        htmx.trigger(document.getElementById('tech-participation'), 'refresh');
+        htmx.trigger(document.getElementById('summary-strip'),      'refresh');
+        htmx.trigger(document.getElementById('happenings-preview'), 'refresh');
       }
     };
-
-    ws.onclose = () => { setTimeout(connect, 3000); };  // auto-reconnect
+    ws.onclose = () => { setTimeout(connect, 3000); };
     ws.onerror = () => { ws.close(); };
-
-    // Keep-alive ping every 25s
     setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.send('ping'); }, 25000);
   }
-
   connect();
 })();
 
-// ── New entry alert from HTMX polling (fallback) ────────
-let _lastEntryCount = 0;
-
-// ── Shift running timer ────────────────────────────────
+// ── Shift running timer ────────────────────────────────────────────────
 function updateShiftTimer() {
   const el = document.getElementById('shift-timer');
   if (!el) return;
   const started = new Date(el.dataset.started.replace(' ', 'T'));
   const diff    = Math.floor((Date.now() - started) / 1000);
-  const h       = Math.floor(diff / 3600);
-  const m       = Math.floor((diff % 3600) / 60);
-  el.textContent = `⏱ ${h}h ${String(m).padStart(2,'0')}m`;
+  const h = Math.floor(diff / 3600);
+  const m = Math.floor((diff % 3600) / 60);
+  el.textContent = `\u23F1 ${h}h ${String(m).padStart(2,'0')}m`;
 }
 updateShiftTimer();
 setInterval(updateShiftTimer, 60000);
 
-// ── Relative timestamps ───────────────────────────────
+// ── Relative timestamps ────────────────────────────────────────────────
 function relTime(iso) {
   const diff = Math.floor((Date.now() - new Date(iso.replace(' ','T'))) / 60000);
   if (diff < 1)  return 'just now';
@@ -742,20 +662,17 @@ document.addEventListener('htmx:afterSwap', refreshRelTimes);
 document.body.addEventListener('htmx:afterSwap', function (e) {
   if (e.detail.target.id !== 'live-feed') return;
   const q = document.getElementById('feedSearch')?.value || '';
-  if (q) filterFeed(q);  // re-apply filter after swap
-  const count = e.detail.target.querySelectorAll('[data-entry]').length;
-  _lastEntryCount = count;
+  if (q) filterFeed(q);
+  _lastEntryCount = e.detail.target.querySelectorAll('[data-entry]').length;
 });
+let _lastEntryCount = 0;
 
-// RTS badge + auto-open accordion whenever rts-log-content is updated
+// ── RTS badge ─────────────────────────────────────────────────────────
 document.body.addEventListener('rtsUpdated', function (e) {
   const count  = e.detail?.count ?? 0;
   const badge  = document.getElementById('rts-badge');
   const drawer = document.getElementById('rts-accordion');
-  if (badge) {
-    badge.textContent = count;
-    badge.classList.toggle('hidden', count === 0);
-  }
+  if (badge) { badge.textContent = count; badge.classList.toggle('hidden', count === 0); }
   if (drawer && count > 0) drawer.open = true;
 });
 </script>
