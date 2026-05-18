@@ -1931,6 +1931,29 @@ async def report_open_in_outlook(
 # ── Compose in Outlook via OWA or Graph API draft ─────────────────────────────
 
 
+@app.get("/report/{report_id}/email-html", response_class=HTMLResponse)
+async def report_email_html(request: Request, report_id: int):
+    """Return the raw HTML email body for clipboard copy.
+    Used by the one-click button to pre-copy formatted content
+    before opening OWA, so the lead can paste it with Ctrl+V.
+    """
+    if not _is_lead_authed(request):
+        return HTMLResponse("Unauthorized", status_code=401)
+    rec = db.get_report(report_id)
+    if not rec or not rec.get("report_json"):
+        return HTMLResponse("Not found", status_code=404)
+    data      = ReportData.model_validate_json(rec["report_json"])
+    loto      = db.get_loto(rec["shift_id"])
+    pms       = db.get_pending_pms(rec["shift_id"])
+    body_html = format_email_passdown_html(
+        data,
+        loto_missing=loto.get("loto_missing_keys", ""),
+        pending_pms=pms or None,
+        loto_verified=bool(loto.get("loto_verified", 0)),
+    )
+    return HTMLResponse(body_html)
+
+
 @app.get("/report/{report_id}/compose-outlook")
 async def report_compose_outlook_get(request: Request, report_id: int):
     """GET — one-click button opens this in a new tab.
@@ -1992,7 +2015,6 @@ async def _build_owa_redirect(report_id: int, subject: str, html_body: str) -> R
         "https://outlook.office.com/mail/deeplink/compose?"
         f"to={quote(to_addrs, safe='@,;')}"
         f"&subject={quote(subject, safe='')}"
-        f"&body={quote(plain, safe='')}"
     )
     return RedirectResponse(owa_url)
 
