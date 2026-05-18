@@ -1402,11 +1402,7 @@ async def lead_delete_entry(
 async def lead_entry_edit_form(request: Request, entry_id: int):
     if not _is_lead_authed(request):
         raise HTTPException(status_code=403)
-    shift = db.get_active_shift()
-    if not shift:
-        raise HTTPException(status_code=404)
-    entries = db.get_entries(shift["id"])
-    entry = next((e for e in entries if e["id"] == entry_id), None)
+    entry = db.get_entry(entry_id)
     if not entry:
         raise HTTPException(status_code=404)
     return templates.TemplateResponse(
@@ -1419,11 +1415,7 @@ async def lead_entry_edit_cancel(request: Request, entry_id: int):
     """Cancel edit — re-render the normal read-only row."""
     if not _is_lead_authed(request):
         raise HTTPException(status_code=403)
-    shift = db.get_active_shift()
-    if not shift:
-        raise HTTPException(status_code=404)
-    entries = db.get_entries(shift["id"])
-    entry = next((e for e in entries if e["id"] == entry_id), None)
+    entry = db.get_entry(entry_id)
     if not entry:
         raise HTTPException(status_code=404)
     return templates.TemplateResponse(
@@ -1440,14 +1432,12 @@ async def lead_entry_update(
     """MST updates the issue text of an entry in place."""
     if not _is_lead_authed(request):
         raise HTTPException(status_code=403)
-    shift = db.get_active_shift()
-    if not shift:
-        raise HTTPException(status_code=404)
     db.update_entry_issue(entry_id, issue.strip())
-    entries = db.get_entries(shift["id"])
-    entry = next((e for e in entries if e["id"] == entry_id), None)
+    # Fetch the entry directly — never rely on get_active_shift() here
+    # because the entry may belong to any shift (overlap window, etc.)
+    entry = db.get_entry(entry_id)
     if not entry:
-        return HTMLResponse("")
+        raise HTTPException(status_code=404)
     return templates.TemplateResponse(
         request, "partials/live_feed_row.html", {"e": entry}
     )
