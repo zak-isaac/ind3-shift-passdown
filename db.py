@@ -368,6 +368,12 @@ def save_pending_pms(shift_id: int, rows: list[dict]) -> None:
         )
 
 
+def clear_pending_pms(shift_id: int) -> None:
+    """Remove all extracted PM rows for a shift (called when the PM file is deleted)."""
+    with _conn() as c:
+        c.execute("DELETE FROM pending_pms WHERE shift_id=?", (shift_id,))
+
+
 def get_pending_pms(shift_id: int) -> list[dict]:
     with _conn() as c:
         rows = c.execute(

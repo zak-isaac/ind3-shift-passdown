@@ -1732,6 +1732,8 @@ async def lead_pm_delete(request: Request, file_id: int, shift_id: int = Form(..
         p = PM_UPLOAD_DIR / stored
         if p.exists():
             p.unlink()
+        # Also wipe the PMs that were extracted from this file
+        db.clear_pending_pms(shift_id)
     return HTMLResponse(_render_pm_section(shift_id))
 
 
