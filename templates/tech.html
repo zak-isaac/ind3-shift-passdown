@@ -71,12 +71,36 @@
 
 {% if oos_units %}
 <!-- OOS BANNER -->
-<div class="bg-red-600 text-white px-4 py-2 shrink-0">
-  <div class="max-w-full mx-auto flex flex-wrap items-center gap-2">
-    <span class="font-black text-xs uppercase tracking-widest shrink-0">&#9940; Out of Service:</span>
-    {% for u in oos_units %}
-    <span class="bg-white bg-opacity-20 border border-white border-opacity-30 text-white text-xs font-bold px-2.5 py-1 rounded-full">{{ u }}</span>
-    {% endfor %}
+<div class="shrink-0" style="background:linear-gradient(135deg,#1a0505 0%,#3b0a0a 50%,#1a0505 100%);
+     border-bottom:2px solid #ef4444; box-shadow:0 4px 24px rgba(239,68,68,0.18);">
+  <div class="max-w-screen-2xl mx-auto px-5 flex items-center gap-3 flex-wrap" style="min-height:40px;">
+
+    <!-- Icon + label -->
+    <div class="flex items-center gap-2 shrink-0">
+      <span class="relative flex h-2.5 w-2.5">
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+      </span>
+      <span class="text-red-400 font-black text-xs uppercase tracking-widest">Out of Service</span>
+      <span class="text-red-600 font-black text-xs">&bull;</span>
+      <span class="text-red-300 font-bold text-xs">{{ oos_units | length }} unit{{ 's' if oos_units | length != 1 }}</span>
+    </div>
+
+    <!-- Divider -->
+    <div class="w-px bg-red-800 self-stretch my-1.5 shrink-0"></div>
+
+    <!-- Asset chips -->
+    <div class="flex flex-wrap items-center gap-1.5">
+      {% for u in oos_units %}
+      <span class="inline-flex items-center gap-1 text-xs font-black text-white
+                   px-2.5 py-0.5 rounded-md"
+            style="background:rgba(239,68,68,0.18); border:1px solid rgba(239,68,68,0.45);
+                   letter-spacing:0.04em;">
+        <span style="color:#f87171;">&#9940;</span> {{ u }}
+      </span>
+      {% endfor %}
+    </div>
+
   </div>
 </div>
 {% endif %}
