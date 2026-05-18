@@ -48,13 +48,31 @@
     }
     .btn-primary-lg:hover { background:#003db5; }
     .divider { height:1px; background:#f1f5f9; margin:0.75rem 0; }
+
+    /* ── Collapsible details cards ── */
+    details.card { padding:0; }
+    details.card > summary {
+      list-style:none; padding:0.75rem 1rem; cursor:pointer; user-select:none;
+      display:flex; align-items:center; gap:0.5rem;
+      font-weight:700; font-size:0.8rem; color:#1e293b;
+    }
+    details.card > summary::-webkit-details-marker { display:none; }
+    details.card > summary .arr {
+      margin-left:auto; color:#94a3b8; font-size:0.65rem;
+      transition:transform 0.2s ease; display:inline-block;
+    }
+    details.card[open] > summary .arr { transform:rotate(90deg); }
+    details.card > .card-body {
+      padding:0 1rem 1rem; border-top:1px solid #f1f5f9;
+      padding-top:0.75rem;
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col">
 
 <!-- ░░ HEADER ░░ -->
-<header class="bg-wm-blue sticky top-0 z-20 shadow-md">
-  <div class="max-w-screen-2xl mx-auto px-5 flex items-center justify-between" style="height:56px;">
+<header class="bg-wm-blue sticky top-0 shadow-md" style="z-index:9999;">
+  <div class="max-w-screen-2xl mx-auto px-5 flex items-center justify-between" style="min-height:56px;">
 
     <!-- Left: hamburger + logo + shift context -->
     <div class="flex items-center gap-3 min-w-0">
@@ -71,7 +89,7 @@
         <!-- Dropdown opens to the right from left edge -->
         <div id="hamburger-menu"
           class="hidden absolute left-0 top-full mt-1 w-52 bg-wm-dark border border-blue-700
-                 rounded-xl shadow-2xl overflow-hidden z-50">
+                 rounded-xl shadow-2xl" style="z-index:99999;">
           <div class="flex flex-col py-1">
             <button id="notif-btn" onclick="requestNotifPermission()"
               class="text-left text-blue-200 hover:bg-blue-900 hover:text-white px-4 py-2.5 text-xs transition">
@@ -222,208 +240,222 @@
     <p class="section-label">Shift Monitoring</p>
 
     <!-- Problem Assets -->
-    <div class="card">
-      <div class="card-title">
+    <details class="card" open>
+      <summary>
         <span class="text-red-500">&#128200;</span> Problem Assets
-        <span class="text-slate-400 text-xs font-normal ml-auto">Every 30s</span>
+        <span class="text-slate-400 text-xs font-normal">Every 30s</span>
+        <i class="arr">&#9654;</i>
+      </summary>
+      <div class="card-body">
+        <div id="asset-stats"
+          hx-get="/lead/asset-stats?shift_id={{ shift.id }}"
+          hx-trigger="load, every 30s, refresh"
+          hx-swap="innerHTML"
+          style="min-height:4rem">
+          <div class="text-slate-400 italic text-xs text-center py-3">Loading...</div>
+        </div>
       </div>
-      <div id="asset-stats"
-        hx-get="/lead/asset-stats?shift_id={{ shift.id }}"
-        hx-trigger="load, every 30s, refresh"
-        hx-swap="innerHTML"
-        style="min-height:4rem">
-        <div class="text-slate-400 italic text-xs text-center py-3">Loading...</div>
-      </div>
-    </div>
+    </details>
 
     <!-- Technicians -->
-    <div class="card">
-      <div class="card-title">
+    <details class="card" open>
+      <summary>
         <span>&#128100;</span> Technicians On Shift
-        <span class="text-slate-400 text-xs font-normal ml-auto">Real-time</span>
+        <span class="text-slate-400 text-xs font-normal">Real-time</span>
+        <i class="arr">&#9654;</i>
+      </summary>
+      <div class="card-body">
+        <div id="tech-participation"
+          hx-get="/lead/tech-participation?shift_id={{ shift.id }}"
+          hx-trigger="load, every 30s, refresh"
+          hx-swap="innerHTML"
+          style="min-height:3rem;max-height:16rem;overflow-y:auto;">
+          <p class="text-slate-400 italic text-xs text-center py-3">Loading...</p>
+        </div>
       </div>
-      <div id="tech-participation"
-        hx-get="/lead/tech-participation?shift_id={{ shift.id }}"
-        hx-trigger="load, every 30s, refresh"
-        hx-swap="innerHTML"
-        style="min-height:3rem;max-height:16rem;overflow-y:auto;">
-        <p class="text-slate-400 italic text-xs text-center py-3">Loading...</p>
-      </div>
-    </div>
+    </details>
 
     <!-- ── GROUP 2: Data Inputs ────────────────────────────────── -->
     <div class="divider"></div>
     <p class="section-label">Data Inputs</p>
 
     <!-- CMMS Import -->
-    <div class="card" style="border-left:3px solid #0053e2;">
-      <div class="card-title">
+    <details class="card" style="border-left:3px solid #0053e2;">
+      <summary>
         <span class="text-wm-blue">&#128196;</span> Cetaris CMMS Import
-        <span class="badge bg-blue-100 text-wm-blue">CMMS</span>
+        <span class="badge bg-blue-100 text-wm-blue" style="margin-left:auto;margin-right:0.25rem;">CMMS</span>
+        <i class="arr" style="margin-left:0;">&#9654;</i>
+      </summary>
+      <div class="card-body">
+        <p class="text-slate-400 text-xs mb-3">Upload a Cetaris CSV export to auto-fill shift happenings.</p>
+        <form hx-post="/lead/cmms-upload" hx-target="#lead-cmms-result" hx-swap="innerHTML"
+          hx-encoding="multipart/form-data" hx-indicator="#lead-cmms-spinner"
+          hx-push-url="false" class="flex flex-col gap-2">
+          <input type="hidden" name="shift_id" value="{{ shift.id }}" />
+          <input type="file" name="file" accept=".csv,.xlsx,.xls" required
+            class="text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg
+                   file:border-0 file:text-xs file:font-bold file:bg-wm-blue file:text-white
+                   hover:file:bg-blue-700 file:cursor-pointer cursor-pointer" />
+          <button type="submit" class="btn-primary">
+            <span id="lead-cmms-spinner" class="htmx-indicator items-center gap-1">
+              <svg class="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+              </svg>Importing...
+            </span>
+            &#128228; Upload &amp; Import
+          </button>
+        </form>
+        <div id="lead-cmms-result" class="mt-2"></div>
       </div>
-      <p class="text-slate-400 text-xs mb-3">Upload a Cetaris CSV export to auto-fill shift happenings.</p>
-      <form hx-post="/lead/cmms-upload" hx-target="#lead-cmms-result" hx-swap="innerHTML"
-        hx-encoding="multipart/form-data" hx-indicator="#lead-cmms-spinner"
-        hx-push-url="false" class="flex flex-col gap-2">
-        <input type="hidden" name="shift_id" value="{{ shift.id }}" />
-        <input type="file" name="file" accept=".csv,.xlsx,.xls" required
-          class="text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg
-                 file:border-0 file:text-xs file:font-bold file:bg-wm-blue file:text-white
-                 hover:file:bg-blue-700 file:cursor-pointer cursor-pointer" />
-        <button type="submit" class="btn-primary">
-          <span id="lead-cmms-spinner" class="htmx-indicator items-center gap-1">
-            <svg class="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-            </svg>Importing...
-          </span>
-          &#128228; Upload &amp; Import
-        </button>
-      </form>
-      <div id="lead-cmms-result" class="mt-2"></div>
-    </div>
+    </details>
 
     <!-- PM Upload -->
-    <div class="card" style="border-left:3px solid #6366f1;">
-      <div class="card-title">
+    <details class="card" style="border-left:3px solid #6366f1;">
+      <summary>
         <span>&#128196;</span> PM's Needing Completion
-        <span class="badge bg-indigo-100 text-indigo-700">PM</span>
+        <span class="badge bg-indigo-100 text-indigo-700" style="margin-left:auto;margin-right:0.25rem;">PM</span>
+        <i class="arr" style="margin-left:0;">&#9654;</i>
+      </summary>
+      <div class="card-body">
+        <p class="text-slate-400 text-xs mb-3">Upload the Cetaris open PM report — table auto-parses into the email.</p>
+        <div hx-get="/lead/pm-files?shift_id={{ shift.id }}"
+             hx-trigger="load" hx-target="#pm-file-list" hx-swap="outerHTML"></div>
+        <div id="pm-file-list" class="min-h-[1.5rem] mb-2">
+          <p class="text-slate-300 text-xs italic">Loading...</p>
+        </div>
+        <form hx-post="/lead/pm-upload" hx-target="#pm-file-list" hx-swap="outerHTML"
+          hx-encoding="multipart/form-data" hx-indicator="#pm-upload-spinner"
+          hx-on::after-request="this.reset()" class="flex flex-col gap-2">
+          <input type="hidden" name="shift_id" value="{{ shift.id }}">
+          <input type="file" name="pm_file" required accept=".pdf,.xlsx,.xls,.csv,.png,.jpg,.jpeg"
+            class="text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg
+                   file:border-0 file:text-xs file:font-bold file:bg-wm-blue file:text-white
+                   file:cursor-pointer hover:file:bg-blue-700 cursor-pointer" />
+          <button type="submit" class="btn-primary">
+            <span id="pm-upload-spinner" class="htmx-indicator items-center gap-1">
+              <svg class="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+              </svg>
+            </span>
+            &#128228; Upload PM Report
+          </button>
+        </form>
+        <p class="text-xs text-slate-400 mt-1.5">PDF, Excel, CSV or image accepted.</p>
       </div>
-      <p class="text-slate-400 text-xs mb-3">Upload the Cetaris open PM report — table auto-parses into the email.</p>
-
-      <div hx-get="/lead/pm-files?shift_id={{ shift.id }}"
-           hx-trigger="load" hx-target="#pm-file-list" hx-swap="outerHTML"></div>
-      <div id="pm-file-list" class="min-h-[1.5rem] mb-2">
-        <p class="text-slate-300 text-xs italic">Loading...</p>
-      </div>
-
-      <form hx-post="/lead/pm-upload" hx-target="#pm-file-list" hx-swap="outerHTML"
-        hx-encoding="multipart/form-data" hx-indicator="#pm-upload-spinner"
-        hx-on::after-request="this.reset()" class="flex flex-col gap-2">
-        <input type="hidden" name="shift_id" value="{{ shift.id }}">
-        <input type="file" name="pm_file" required accept=".pdf,.xlsx,.xls,.csv,.png,.jpg,.jpeg"
-          class="text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg
-                 file:border-0 file:text-xs file:font-bold file:bg-wm-blue file:text-white
-                 file:cursor-pointer hover:file:bg-blue-700 cursor-pointer" />
-        <button type="submit" class="btn-primary">
-          <span id="pm-upload-spinner" class="htmx-indicator items-center gap-1">
-            <svg class="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-            </svg>
-          </span>
-          &#128228; Upload PM Report
-        </button>
-      </form>
-      <p class="text-xs text-slate-400 mt-1.5">PDF, Excel, CSV or image accepted.</p>
-    </div>
+    </details>
 
     <!-- LOTO Verification -->
-    <div class="card" style="border-left:3px solid #f59e0b;">
-      <div class="card-title">
+    <details class="card" style="border-left:3px solid #f59e0b;" open>
+      <summary>
         <span>&#128273;</span> LOTO Key Verification
         <span id="loto-badge" class="badge
-          {% if loto.loto_verified %}bg-green-100 text-green-700{% else %}bg-amber-100 text-amber-700{% endif %}">
+          {% if loto.loto_verified %}bg-green-100 text-green-700{% else %}bg-amber-100 text-amber-700{% endif %}"
+          style="margin-left:auto;margin-right:0.25rem;">
           {% if loto.loto_verified %}&#10003; Verified{% else %}Pending{% endif %}
         </span>
-      </div>
-      <div id="loto-status" class="text-xs text-slate-500 mb-3">
-        {% if loto.loto_verified %}
-          {% if loto.loto_missing_keys %}
-            <p class="font-bold text-green-700 mb-1">&#10003; LOTO Verified — keys missing:</p>
-            <div class="flex flex-wrap gap-1">
-              {% for key in loto.loto_missing_keys.split(',') %}
-              {% set k = key.strip() %}{% if k %}
-              <form method="POST" action="/lead/loto/remove-key"
-                hx-post="/lead/loto/remove-key" hx-target="#loto-status" hx-swap="innerHTML"
-                style="display:inline;">
-                <input type="hidden" name="shift_id" value="{{ shift.id }}">
-                <input type="hidden" name="key_to_remove" value="{{ k }}">
-                <button type="submit" title="Key found — remove"
-                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs
-                         font-bold bg-red-50 border border-red-200 text-red-700 hover:bg-red-100">
-                  {{ k }} &times;
-                </button>
-              </form>
-              {% endif %}{% endfor %}
-            </div>
-            <p class="text-xs text-slate-400 mt-1">Click a key to remove once found.</p>
+        <i class="arr" style="margin-left:0;">&#9654;</i>
+      </summary>
+      <div class="card-body">
+        <div id="loto-status" class="text-xs text-slate-500 mb-3">
+          {% if loto.loto_verified %}
+            {% if loto.loto_missing_keys %}
+              <p class="font-bold text-green-700 mb-1">&#10003; LOTO Verified — keys missing:</p>
+              <div class="flex flex-wrap gap-1">
+                {% for key in loto.loto_missing_keys.split(',') %}
+                {% set k = key.strip() %}{% if k %}
+                <form method="POST" action="/lead/loto/remove-key"
+                  hx-post="/lead/loto/remove-key" hx-target="#loto-status" hx-swap="innerHTML"
+                  style="display:inline;">
+                  <input type="hidden" name="shift_id" value="{{ shift.id }}">
+                  <input type="hidden" name="key_to_remove" value="{{ k }}">
+                  <button type="submit" title="Key found — remove"
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs
+                           font-bold bg-red-50 border border-red-200 text-red-700 hover:bg-red-100">
+                    {{ k }} &times;
+                  </button>
+                </form>
+                {% endif %}{% endfor %}
+              </div>
+              <p class="text-xs text-slate-400 mt-1">Click a key to remove once found.</p>
+            {% else %}
+              <p class="font-bold text-green-700">&#10003; All LOTO Keys Verified</p>
+            {% endif %}
           {% else %}
-            <p class="font-bold text-green-700">&#10003; All LOTO Keys Verified</p>
+            <p class="text-slate-400 italic">Not yet verified for this shift.</p>
           {% endif %}
-        {% else %}
-          <p class="text-slate-400 italic">Not yet verified for this shift.</p>
-        {% endif %}
-      </div>
-      <form id="loto-form" hx-post="/lead/loto" hx-target="#loto-status" hx-swap="innerHTML"
-        class="flex flex-col gap-3"
-        onsubmit="serializeLotoKeys()">
-        <input type="hidden" name="shift_id" value="{{ shift.id }}">
-        <input type="hidden" name="missing_keys" id="missing-keys-hidden" value="{{ loto.loto_missing_keys }}">
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" name="loto_verified" value="on"
-            {% if loto.loto_verified %}checked{% endif %}
-            class="w-4 h-4 accent-green-600" />
-          <span class="text-sm font-semibold text-slate-700">All LOTO Keys accounted for</span>
-        </label>
-
-        <!-- Key 1–20 checkbox grid -->
-        <div>
-          <p class="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">Missing Keys <span class="font-normal text-slate-400">(select any not found)</span></p>
-          <div class="grid grid-cols-4 gap-1.5">
-            {% for n in range(1, 21) %}
-            {% set kname = "Key " ~ n %}
-            <label class="flex items-center gap-1.5 cursor-pointer bg-slate-50 hover:bg-amber-50
-                          border border-slate-200 rounded-lg px-2 py-1.5 transition
-                          {% if kname in (loto.loto_missing_keys or '') %}ring-2 ring-amber-400{% endif %}">
-              <input type="checkbox" name="loto_key_item" value="{{ kname }}"
-                {% if kname in (loto.loto_missing_keys or '') %}checked{% endif %}
-                class="w-3.5 h-3.5 accent-amber-500" />
-              <span class="text-xs font-semibold text-slate-700">{{ kname }}</span>
-            </label>
-            {% endfor %}
-          </div>
         </div>
+        <form id="loto-form" hx-post="/lead/loto" hx-target="#loto-status" hx-swap="innerHTML"
+          class="flex flex-col gap-3" onsubmit="serializeLotoKeys()">
+          <input type="hidden" name="shift_id" value="{{ shift.id }}">
+          <input type="hidden" name="missing_keys" id="missing-keys-hidden" value="{{ loto.loto_missing_keys }}">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" name="loto_verified" value="on"
+              {% if loto.loto_verified %}checked{% endif %}
+              class="w-4 h-4 accent-green-600" />
+            <span class="text-sm font-semibold text-slate-700">All LOTO Keys accounted for</span>
+          </label>
+          <div>
+            <p class="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">Missing Keys <span class="font-normal text-slate-400">(select any not found)</span></p>
+            <div class="grid grid-cols-4 gap-1.5">
+              {% for n in range(1, 21) %}
+              {% set kname = "Key " ~ n %}
+              <label class="flex items-center gap-1.5 cursor-pointer bg-slate-50 hover:bg-amber-50
+                            border border-slate-200 rounded-lg px-2 py-1.5 transition
+                            {% if kname in (loto.loto_missing_keys or '') %}ring-2 ring-amber-400{% endif %}">
+                <input type="checkbox" name="loto_key_item" value="{{ kname }}"
+                  {% if kname in (loto.loto_missing_keys or '') %}checked{% endif %}
+                  class="w-3.5 h-3.5 accent-amber-500" />
+                <span class="text-xs font-semibold text-slate-700">{{ kname }}</span>
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+          <button type="submit"
+            class="w-fit px-4 py-1.5 bg-amber-400 hover:bg-amber-500 text-amber-900 font-bold text-xs rounded-lg transition">
+            &#128274; Save LOTO Status
+          </button>
+        </form>
+      </div>
+    </details>
 
-        <button type="submit"
-          class="w-fit px-4 py-1.5 bg-amber-400 hover:bg-amber-500 text-amber-900 font-bold text-xs rounded-lg transition">
-          &#128274; Save LOTO Status
-        </button>
-      </form>
-    </div>
-
-    <!-- ── GROUP 3: Out of Service (persistent) ───────────────── -->
+    <!-- ── GROUP 3: Out of Service (persistent) ─────────────── -->
     <div class="divider"></div>
     <p class="section-label">Out of Service</p>
 
-    <div class="card" style="border-left:3px solid #ef4444;">
-      <div class="card-title">
-        <span class="text-red-500">&#9940;</span> Out of Service Units
-        <span class="text-slate-400 text-xs font-normal ml-auto">Persists until removed</span>
-      </div>
-      <div id="oos-list"
-        hx-get="/oos/list"
-        hx-trigger="load, oos-refresh from:body"
-        hx-swap="innerHTML"
-        class="flex flex-col gap-2 min-h-[2rem] mb-3">
-        <p class="text-slate-300 italic text-xs">Loading...</p>
-      </div>
-      <div class="flex gap-2">
-        <input id="oos-add-input" type="text" name="unit"
-          list="lead-asset-list" autocomplete="off"
-          placeholder="Asset ID to mark out of service..."
-          class="flex-1 input-sm focus:border-red-400" />
-        <button type="button"
-          hx-post="/oos/add"
-          hx-include="#oos-add-input"
-          hx-target="#oos-list"
+    <!-- Out of Service -->
+    <details class="card" style="border-left:3px solid #ef4444;" open>
+      <summary>
+        <span class="text-red-500">&#9940;</span> Out of Service
+        <span class="text-slate-400 text-xs font-normal">Persists until removed</span>
+        <i class="arr">&#9654;</i>
+      </summary>
+      <div class="card-body">
+        <div id="oos-list"
+          hx-get="/oos/list"
+          hx-trigger="load, oos-refresh from:body"
           hx-swap="innerHTML"
-          hx-on:htmx:after-request="document.getElementById('oos-add-input').value=''"
-          class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition shrink-0">
-          + Add OOS
-        </button>
+          class="flex flex-col gap-2 min-h-[2rem] mb-3">
+          <p class="text-slate-300 italic text-xs">Loading...</p>
+        </div>
+        <div class="flex gap-2">
+          <input id="oos-add-input" type="text" name="unit"
+            list="lead-asset-list" autocomplete="off"
+            placeholder="Asset ID to mark out of service..."
+            class="flex-1 input-sm focus:border-red-400" />
+          <button type="button"
+            hx-post="/oos/add"
+            hx-include="#oos-add-input"
+            hx-target="#oos-list"
+            hx-swap="innerHTML"
+            hx-on:htmx:after-request="document.getElementById('oos-add-input').value=''"
+            class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition shrink-0">
+            + Add OOS
+          </button>
+        </div>
       </div>
-    </div>
+    </details>
 
     <!-- ── GROUP 4: Generate Report ───────────────────────────── -->
     <div class="divider"></div>
@@ -433,20 +465,26 @@
     </div>
 
     <!-- Shift Notes -->
-    <div class="card">
-      <div class="card-title">&#128221; MST Shift Notes <span id="notes-status" class="text-xs font-normal text-slate-400 ml-auto"></span></div>
-      <textarea id="shiftNotes" name="notes" rows="3"
-        placeholder="Add context, leadership updates, or anything techs didn't log..."
-        hx-post="/lead/shift-notes"
-        hx-vals='{"shift_id": {{ shift.id }}}'
-        hx-include="#shiftNotes"
-        hx-target="#notes-status"
-        hx-swap="innerHTML"
-        hx-trigger="blur"
-        class="input-sm resize-none" style="height:auto;"
-      >{{ shift_notes }}</textarea>
-      <p class="text-xs text-slate-400 mt-1">Auto-saves on focus-out. Included in the final report.</p>
-    </div>
+    <details class="card" open>
+      <summary>
+        &#128221; MST Shift Notes
+        <span id="notes-status" class="text-xs font-normal text-slate-400"></span>
+        <i class="arr">&#9654;</i>
+      </summary>
+      <div class="card-body">
+        <textarea id="shiftNotes" name="notes" rows="3"
+          placeholder="Add context, leadership updates, or anything techs didn't log..."
+          hx-post="/lead/shift-notes"
+          hx-vals='{"shift_id": {{ shift.id }}}'
+          hx-include="#shiftNotes"
+          hx-target="#notes-status"
+          hx-swap="innerHTML"
+          hx-trigger="blur"
+          class="input-sm resize-none" style="height:auto;"
+        >{{ shift_notes }}</textarea>
+        <p class="text-xs text-slate-400 mt-1">Auto-saves on focus-out. Included in the final report.</p>
+      </div>
+    </details>
 
     <!-- Generate form -->
     <form hx-post="/lead/generate" hx-target="#report-output"
@@ -456,11 +494,13 @@
       <input type="hidden" name="shift_id" value="{{ shift.id }}" />
 
       <!-- Vendors -->
-      <details class="card" style="padding:0;">
-        <summary class="px-4 py-3 font-bold text-sm text-slate-700 cursor-pointer select-none flex items-center gap-2">
-          <span>&#128663;</span> Vendors <span class="text-slate-400 font-normal text-xs">(optional)</span>
+      <details class="card">
+        <summary>
+          <span>&#128663;</span> Vendors
+          <span class="text-slate-400 font-normal text-xs">(optional)</span>
+          <i class="arr">&#9654;</i>
         </summary>
-        <div class="px-4 pb-4 flex flex-col gap-2 border-t border-slate-100 pt-3" id="vendor-rows">
+        <div class="card-body flex flex-col gap-2" id="vendor-rows">
           <div class="entry-row">
             <input name="vendor_name" type="text" placeholder="Vendor name / company" class="input-sm" />
           </div>
@@ -470,11 +510,13 @@
       </details>
 
       <!-- Reliable Operations -->
-      <details class="card" style="padding:0;">
-        <summary class="px-4 py-3 font-bold text-sm text-slate-700 cursor-pointer select-none flex items-center gap-2">
-          <span>&#128203;</span> Reliable Operations <span class="text-slate-400 font-normal text-xs">(optional)</span>
+      <details class="card">
+        <summary>
+          <span>&#128203;</span> Reliable Operations
+          <span class="text-slate-400 font-normal text-xs">(optional)</span>
+          <i class="arr">&#9654;</i>
         </summary>
-        <div class="px-4 pb-4 flex flex-col gap-2 border-t border-slate-100 pt-3" id="ro-rows">
+        <div class="card-body flex flex-col gap-2" id="ro-rows">
           <div class="entry-row">
             <input name="ro_item" type="text" placeholder="RO # or description" class="input-sm" />
           </div>
@@ -484,13 +526,14 @@
       </details>
 
       <!-- RTS -->
-      <details class="card" style="padding:0;" id="rts-accordion">
-        <summary class="px-4 py-3 font-bold text-sm text-slate-700 cursor-pointer select-none flex items-center gap-2">
+      <details class="card" id="rts-accordion">
+        <summary>
           <span class="text-green-600">&#10003;</span> Returned to Service
-          <span id="rts-badge" class="hidden bg-green-600 text-white text-xs font-bold rounded-full px-2 py-0.5 ml-1"></span>
-          <span class="text-slate-400 font-normal text-xs ml-auto">(auto-tracked)</span>
+          <span id="rts-badge" class="hidden bg-green-600 text-white text-xs font-bold rounded-full px-2 py-0.5"></span>
+          <span class="text-slate-400 font-normal text-xs">(auto-tracked)</span>
+          <i class="arr">&#9654;</i>
         </summary>
-        <div class="px-4 pb-4 flex flex-col gap-2 border-t border-slate-100 pt-3">
+        <div class="card-body flex flex-col gap-2">
           <div id="rts-log-content" class="flex flex-col gap-2"
                hx-get="/lead/rts-log" hx-trigger="load" hx-swap="innerHTML">
             <p class="text-xs text-slate-400 italic">Loading&hellip;</p>
