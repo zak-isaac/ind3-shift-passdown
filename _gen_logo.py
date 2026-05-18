@@ -28,7 +28,7 @@ if not drawing:
     print('ERROR: svg2rlg returned None'); sys.exit(1)
 
 print(f'SVG size: {drawing.width:.1f} x {drawing.height:.1f}')
-TARGET_W = 200
+TARGET_W = 600   # 4× display size → crisp on retina + Outlook HiDPI
 scale          = TARGET_W / drawing.width
 drawing.width  = TARGET_W
 drawing.height = drawing.height * scale
