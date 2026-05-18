@@ -525,8 +525,8 @@ function closeEmailModal() {
   ['email-modal','email-backdrop'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.remove();
   });
-  const wrap=document.getElementById('email-modal-wrap');
-  if(wrap)wrap.innerHTML='';
+  // Clear whichever mount point was used
+  document.querySelectorAll('[id^="email-modal-wrap"]').forEach(el => el.innerHTML = '');
 }
 
 // ── COMPOSE IN OUTLOOK ───────────────────────────────────────────────
