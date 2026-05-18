@@ -12,6 +12,17 @@
       <span class="text-white font-black text-xs uppercase tracking-widest">Report Ready</span>
     </div>
 
+    {% if no_happenings %}
+    <!-- Warning: no entries logged -->
+    <div class="bg-amber-50 border-b border-amber-200 px-5 py-3 flex items-center gap-2">
+      <span class="text-amber-600 text-base">&#9888;</span>
+      <p class="text-amber-800 text-xs font-semibold">
+        No shift happenings were logged yet — the email will have empty sections.
+        Consider adding entries before sending.
+      </p>
+    </div>
+    {% endif %}
+
     <!-- Body -->
     <div class="bg-wm-dark px-5 py-5 flex flex-col gap-4">
 

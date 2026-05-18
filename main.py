@@ -2461,10 +2461,11 @@ async def lead_generate(
     email_text   = format_email(data)
     report_json  = data.model_dump_json()
     report_id    = db.save_report(shift_id, email_text, report_json)
+    no_happenings = not happenings
 
     return templates.TemplateResponse(
         request, "partials/report_output.html",
-        {"report_id": report_id},
+        {"report_id": report_id, "no_happenings": no_happenings},
     )
 
 

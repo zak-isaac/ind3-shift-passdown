@@ -1,5 +1,13 @@
 <!-- email_preview_modal.html — loaded via HTMX into #email-modal-wrap -->
 
+<!--
+  Email body is stored in a hidden textarea — much more robust than
+  embedding HTML inside a JSON string inside a script tag (which can
+  break silently if the HTML contains quote characters).
+-->
+<textarea id="_email-body-store" style="display:none;" aria-hidden="true"
+>{{ html_body | e }}</textarea>
+
 <!-- Backdrop -->
 <div id="email-backdrop" onclick="closeEmailModal()"
   style="position:fixed;inset:0;background:rgba(0,0,0,.2);z-index:9998;"></div>
@@ -416,9 +424,22 @@ function updateToolbar() {
 // ── EMAIL INIT ────────────────────────────────────────────────────
 
 (function () {
-  const raw = {{ html_body | tojson }};
+  // Read from textarea — immune to script-tag injection issues
+  const raw = document.getElementById('_email-body-store').value;
   window._emailRaw = raw;
-  document.getElementById('email-iframe').srcdoc = raw;
+
+  // Populate iframe via Blob URL — more reliable than srcdoc on all browsers
+  function loadIframe(html) {
+    const blob = new Blob([html], { type: 'text/html' });
+    const url  = URL.createObjectURL(blob);
+    const iframe = document.getElementById('email-iframe');
+    iframe.onload = () => URL.revokeObjectURL(url);
+    iframe.src = url;
+  }
+  window._loadIframe = loadIframe;
+  loadIframe(raw);
+
+  // Pre-load editable pane (strip outer html/body wrappers)
   const bodyMatch = raw.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
   document.getElementById('email-editable').innerHTML = bodyMatch ? bodyMatch[1] : raw;
 })();
@@ -482,10 +503,10 @@ function toggleEditMode() {
     document.getElementById('email-editable').focus();
   } else {
     const edited = document.getElementById('email-editable').innerHTML;
-    document.getElementById('email-iframe').srcdoc =
-      '<html><body style="font-family:Calibri,Arial,sans-serif;font-size:14px;'
+    const fullHtml = '<html><body style="font-family:Calibri,Arial,sans-serif;font-size:14px;'
       +'color:#111;max-width:700px;line-height:1.6;padding:24px;">'
       +edited+'</body></html>';
+    window._loadIframe(fullHtml);
     prev.style.display    = '';
     edit.style.display    = 'none';
     toolbar.style.display = 'none';
