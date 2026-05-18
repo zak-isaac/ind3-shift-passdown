@@ -1,79 +1,51 @@
-"""Convert the Walmart SVG logo to a base64 PNG for email embedding."""
-import sys, os, io, base64, math
-sys.stdout.reconfigure(encoding='utf-8')
+"""Convert the Walmart SVG logo to a base64 PNG for email embedding.
+Run from the project root: python _gen_logo.py
+"""
+import sys, os, io, base64, re
 
-SVG_PATH = r'C:\Users\ins0002\Downloads\walmart-logo-svgrepo-com.svg'
-OUT_B64  = os.path.join(os.path.dirname(__file__), 'static', 'walmart-logo.b64')
-OUT_PNG  = os.path.join(os.path.dirname(__file__), 'static', 'walmart-logo.png')
+SVG_SRC  = r'C:\Users\ins0002\Downloads\walmart-logo-svgrepo-com (1).svg'
+STATIC   = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
+SVG_DEST = os.path.join(STATIC, 'walmart-logo.svg')
+OUT_PNG  = os.path.join(STATIC, 'walmart-logo.png')
+OUT_B64  = os.path.join(STATIC, 'walmart-logo.b64')
 
-os.makedirs(os.path.join(os.path.dirname(__file__), 'static'), exist_ok=True)
+os.makedirs(STATIC, exist_ok=True)
 
-# ── Try svglib first ───────────────────────────────────────────────────────────
-try:
-    from svglib.svglib import svg2rlg
-    from reportlab.graphics import renderPM
+# ── 1. Fix SVG: strip root stroke/fill defaults that cause black rendering ─────
+svg = open(SVG_SRC, encoding='utf-8').read()
+svg = re.sub(r' stroke=["\']#000000["\']', '', svg)
+svg = re.sub(r' fill=["\']#000000["\']',   '', svg)
+with open(SVG_DEST, 'w', encoding='utf-8') as f:
+    f.write(svg)
+print(f'SVG saved: {SVG_DEST}')
 
-    drawing = svg2rlg(SVG_PATH)
-    if not drawing:
-        raise RuntimeError("svg2rlg returned None")
+# ── 2. Convert to PNG via svglib ───────────────────────────────────────────────
+from svglib.svglib import svg2rlg
+from reportlab.graphics import renderPM
 
-    print(f"SVG size: {drawing.width:.1f} x {drawing.height:.1f}")
-    scale          = 180.0 / drawing.width
-    drawing.width  = 180
-    drawing.height = drawing.height * scale
-    drawing.transform = (scale, 0, 0, scale, 0, 0)
+drawing = svg2rlg(SVG_DEST)
+if not drawing:
+    print('ERROR: svg2rlg returned None'); sys.exit(1)
 
-    buf = io.BytesIO()
-    renderPM.drawToFile(drawing, buf, fmt='PNG')
-    png_bytes = buf.getvalue()
-    print(f"PNG size: {len(png_bytes)} bytes")
+print(f'SVG size: {drawing.width:.1f} x {drawing.height:.1f}')
+TARGET_W = 200
+scale          = TARGET_W / drawing.width
+drawing.width  = TARGET_W
+drawing.height = drawing.height * scale
+drawing.transform = (scale, 0, 0, scale, 0, 0)
 
-except Exception as e:
-    print(f"svglib failed: {e} — falling back to Pillow spark draw")
+buf = io.BytesIO()
+renderPM.drawToFile(drawing, buf, fmt='PNG', bg=0xFFFFFF)
+png_bytes = buf.getvalue()
+print(f'PNG: {len(png_bytes)} bytes')
 
-    # ── Fallback: draw the Walmart spark + wordmark with Pillow ───────────────
-    from PIL import Image, ImageDraw, ImageFont
-
-    W, H   = 200, 55
-    YELLOW = (253, 187, 48)
-    BLUE   = (26, 117, 207)
-    img    = Image.new("RGBA", (W, H), (255, 255, 255, 0))
-    draw   = ImageDraw.Draw(img)
-
-    # Draw 6-petal spark at left side (each petal = rotated thin ellipse)
-    cx, cy = 27, 27
-    for angle in range(0, 180, 30):
-        rad = math.radians(angle)
-        # Create petal as a thin ellipse on a temp image, then paste rotated
-        petal = Image.new("RGBA", (54, 54), (255, 255, 255, 0))
-        pd    = ImageDraw.Draw(petal)
-        pd.ellipse([20, 2, 34, 52], fill=YELLOW)
-        rotated = petal.rotate(angle, expand=False)
-        img.paste(rotated, (cx - 27, cy - 27), rotated)
-
-    # Draw "Walmart" text
-    try:
-        font_lg = ImageFont.truetype("C:/Windows/Fonts/calibrib.ttf", 20)
-        font_sm = ImageFont.truetype("C:/Windows/Fonts/calibri.ttf",  13)
-    except Exception:
-        font_lg = ImageFont.load_default()
-        font_sm = font_lg
-
-    draw.text((60, 4),  "Walmart",       font=font_lg, fill=BLUE)
-    draw.text((60, 30), "Supply Chain",  font=font_sm, fill=BLUE)
-
-    buf = io.BytesIO()
-    img.save(buf, format='PNG')
-    png_bytes = buf.getvalue()
-    print(f"Pillow PNG size: {len(png_bytes)} bytes")
-
-# ── Save outputs ──────────────────────────────────────────────────────────────
 with open(OUT_PNG, 'wb') as f:
     f.write(png_bytes)
-print(f"Saved PNG: {OUT_PNG}")
 
 b64 = base64.b64encode(png_bytes).decode('ascii')
 with open(OUT_B64, 'w') as f:
     f.write(b64)
-print(f"Saved B64: {OUT_B64}  ({len(b64)} chars)")
-print("DONE")
+
+print(f'Saved: {OUT_PNG}')
+print(f'Saved: {OUT_B64}  ({len(b64)} chars)')
+print('DONE')
