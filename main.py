@@ -2417,15 +2417,12 @@ async def lead_generate(
     )
 
     email_text   = format_email(data)
-    preview_html = format_html_preview(data)
     report_json  = data.model_dump_json()
     report_id    = db.save_report(shift_id, email_text, report_json)
 
     return templates.TemplateResponse(
         request, "partials/report_output.html",
-        {"preview_html": preview_html,
-         "email_text":   email_text,
-         "report_id":    report_id},
+        {"report_id": report_id},
     )
 
 

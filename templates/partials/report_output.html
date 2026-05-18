@@ -1,109 +1,31 @@
-<!-- partials/report_output.html – Polished document preview -->
-<div class="flex flex-col gap-3">
+<!-- partials/report_output.html -->
+<div class="flex flex-col gap-2">
 
-  <!-- Action bar -->
+  <!-- Action bar: just Send Email -->
   <div class="bg-wm-dark rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-2">
     <div class="flex items-center gap-2">
       <span class="text-wm-spark text-base">&#9989;</span>
       <span class="text-white font-bold text-sm">Report Generated</span>
     </div>
-    <div class="flex flex-wrap gap-2">
-      <button onclick="copyEmail()"
-        id="copy-email-btn"
-        class="text-xs bg-wm-spark text-gray-900 font-bold px-3 py-1.5 rounded-lg
-               hover:bg-yellow-400 transition whitespace-nowrap">
-        &#128203; Copy Email Version
-      </button>
-      <!-- Send Email — opens preview modal -->
-      <button
-        hx-get="/report/{{ report_id }}/email-preview"
-        hx-target="#email-modal-wrap"
-        hx-swap="innerHTML"
-        hx-indicator="#email-btn-spinner"
-        class="text-xs bg-green-600 hover:bg-green-700 text-white font-bold px-3 py-1.5
-               rounded-lg transition whitespace-nowrap flex items-center gap-1">
-        <span id="email-btn-spinner" class="htmx-indicator"
-          style="display:none;">
-          <svg style="animation:spin 1s linear infinite;width:12px;height:12px;" fill="none" viewBox="0 0 24 24">
-            <circle style="opacity:.25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-            <path style="opacity:.75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-          </svg>
-        </span>
-        &#9993; Send Email
-      </button>
-      <a href="/report/{{ report_id }}/print" target="_blank"
-        class="text-xs bg-white text-wm-dark font-bold px-3 py-1.5 rounded-lg
-               hover:bg-gray-100 transition whitespace-nowrap">
-        &#128438; Print / PDF
-      </a>
-      <a href="/report/{{ report_id }}/docx" download
-        class="text-xs bg-white text-wm-dark font-bold px-3 py-1.5 rounded-lg
-               hover:bg-gray-100 transition whitespace-nowrap">
-        &#128196; Export Word (.doc)
-      </a>
-      <a href="/report/{{ report_id }}/pdf" download
-        class="text-xs bg-white text-wm-dark font-bold px-3 py-1.5 rounded-lg
-               hover:bg-gray-100 transition whitespace-nowrap">
-        &#128196; Export PDF
-      </a>
-      <a href="/report/{{ report_id }}/download" download
-        class="text-xs text-blue-200 font-semibold px-2 py-1.5 rounded-lg
-               hover:text-white transition whitespace-nowrap">
-        &#128190; .txt
-      </a>
-    </div>
+    <button
+      hx-get="/report/{{ report_id }}/email-preview"
+      hx-target="#email-modal-wrap"
+      hx-swap="innerHTML"
+      hx-indicator="#email-btn-spinner"
+      class="text-xs bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-2
+             rounded-lg transition whitespace-nowrap flex items-center gap-2">
+      <span id="email-btn-spinner" class="htmx-indicator" style="display:none;">
+        <svg style="animation:spin 1s linear infinite;width:12px;height:12px;" fill="none" viewBox="0 0 24 24">
+          <circle style="opacity:.25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+          <path style="opacity:.75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+        </svg>
+      </span>
+      &#9993; Send Email
+    </button>
   </div>
-
-  <!-- Document preview (paper card) -->
-  <div class="bg-white rounded-xl border border-gray-200 shadow-sm
-              overflow-y-auto max-h-[68vh] p-6"
-       style="font-family:'Times New Roman',Times,serif">
-    {{ preview_html | safe }}
-  </div>
-
-  <!-- Hidden email text for copy -->
-  <textarea id="email-text-hidden" class="sr-only" aria-hidden="true"
-    tabindex="-1" readonly>{{ email_text | e }}</textarea>
 
   <!-- Email modal mount point -->
   <div id="email-modal-wrap"></div>
 
 </div>
 <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
-
-<script>
-function copyEmail() {
-  const ta  = document.getElementById('email-text-hidden');
-  const btn = document.getElementById('copy-email-btn');
-
-  function flash(ok) {
-    const orig = btn.innerHTML;
-    btn.innerHTML = ok ? '\u2713 Copied!' : '\u26a0 Select + copy manually';
-    setTimeout(() => { btn.innerHTML = orig; }, 2400);
-  }
-
-  // Modern Clipboard API (HTTPS / localhost only)
-  if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(ta.value).then(() => flash(true)).catch(() => legacyCopy());
-  } else {
-    legacyCopy();
-  }
-
-  function legacyCopy() {
-    // Works on plain HTTP — select the textarea and execCommand
-    ta.classList.remove('sr-only');
-    ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0.01;width:1px;height:1px';
-    ta.select();
-    ta.setSelectionRange(0, ta.value.length);
-    try {
-      const ok = document.execCommand('copy');
-      flash(ok);
-    } catch (_) {
-      flash(false);
-    } finally {
-      ta.style.cssText = '';
-      ta.classList.add('sr-only');
-    }
-  }
-}
-</script>

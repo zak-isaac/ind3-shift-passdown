@@ -216,10 +216,14 @@ def format_email_passdown_html(
         h_items.append(f"{data.pm_count} PM{'s' if data.pm_count != 1 else ''} completed this shift")
     for h in data.happenings:
         prefix = h.title.split("\u2013")[0].split("-")[0].strip()
+        wo_tag = (
+            f" <span style='color:#6b7280;font-size:12px;'>(WO# {h.wo_number})</span>"
+            if getattr(h, "wo_number", "") else ""
+        )
         if prefix and " " not in prefix and "," not in prefix:
-            h_items.append(f"<strong>{prefix}:</strong> {h.paragraph}")
+            h_items.append(f"<strong>{prefix}:</strong> {h.paragraph}{wo_tag}")
         else:
-            h_items.append(h.paragraph)
+            h_items.append(f"{h.paragraph}{wo_tag}")
 
     # PM section: proper bordered table or bullet fallback
     today  = _date.today().strftime("%m/%d/%Y")
