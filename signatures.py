@@ -2,6 +2,25 @@
 MST email signatures — embedded into .eml so leads don't need
 Outlook configured. Matched by lead_name (case-insensitive, partial).
 """
+import os as _os
+
+# ── Walmart logo (base64 PNG, rendered from SVG via svglib) ────────────────────
+# Embedded as data URI so the logo shows in Outlook without external requests.
+_LOGO_B64_PATH = _os.path.join(_os.path.dirname(__file__), "static", "walmart-logo.b64")
+try:
+    with open(_LOGO_B64_PATH) as _f:
+        _LOGO_B64 = _f.read().strip()
+except FileNotFoundError:
+    _LOGO_B64 = ""  # graceful fallback — logo just won't appear
+
+_WM_LOGO = (
+    f"<img src='data:image/png;base64,{_LOGO_B64}' "
+    "alt='Walmart Supply Chain' "
+    "width='150' style='display:block;margin-top:6px;' />"
+) if _LOGO_B64 else (
+    "<span style='font-size:18px;font-weight:900;color:#0053e2;"
+    "font-family:Calibri,Arial,sans-serif;'>Walmart Supply Chain</span>"
+)
 
 # ── Shared address block ────────────────────────────────────────────────────────
 _ADDR = "5259 W. 500 N.<br>McCordsville, IN&nbsp; 46055"
