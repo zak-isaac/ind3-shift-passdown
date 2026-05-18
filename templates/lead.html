@@ -234,8 +234,12 @@
   <!-- ══════════════════════════════════════════════════════════════
        COL B — Right sidebar (5 cols, sticky)
   ══════════════════════════════════════════════════════════════ -->
-  <section class="lg:col-span-5 flex flex-col gap-4 self-start sticky overflow-y-auto"
-    style="top:56px; max-height:calc(100vh - 56px); scrollbar-width:thin; scrollbar-color:#e2e8f0 transparent;">
+  <!-- sticky outer: NO overflow here — overflow kills sticky -->
+  <section class="lg:col-span-5 self-start"
+    style="position:sticky; top:56px; max-height:calc(100vh - 56px);">
+    <!-- inner wrapper handles scrolling -->
+    <div class="flex flex-col gap-4 overflow-y-auto h-full pb-6"
+      style="max-height:calc(100vh - 56px); scrollbar-width:thin; scrollbar-color:#e2e8f0 transparent;">
 
     <!-- ── GROUP 1: Monitoring ─────────────────────────────────── -->
     <p class="section-label">Shift Monitoring</p>
@@ -574,7 +578,7 @@
           &#128274;&nbsp; END SHIFT
         </button>
       </form>
-    </div>
+    </div><!-- /inner scroll wrapper -->
 
   </section>
 
