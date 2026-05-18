@@ -56,40 +56,21 @@
 <header class="bg-wm-blue sticky top-0 z-20 shadow-md">
   <div class="max-w-screen-2xl mx-auto px-5 flex items-center justify-between" style="height:56px;">
 
-    <!-- Left: logo + shift context -->
-    <div class="flex items-center gap-4 min-w-0">
-      <a href="/" class="hover:opacity-80 transition shrink-0">
-        <img src="/static/walmart-logo-white.svg" alt="Walmart" style="height:80px;width:auto;" />
-      </a>
-      <div class="w-px bg-blue-500 self-stretch my-2"></div>
-      <div class="min-w-0">
-        <p class="text-white font-black text-sm leading-tight tracking-wide">MST Dashboard</p>
-        <p class="text-blue-200 text-xs truncate">
-          <span class="text-wm-spark font-bold">{{ shift.shift_type }}</span>
-          &nbsp;&bull;&nbsp;{{ shift.date }}
-          &nbsp;&bull;&nbsp;<span class="font-semibold text-white">{{ shift.lead_name }}</span>
-          &nbsp;&bull;&nbsp;<span class="text-wm-spark">Started {{ shift.created_at | fmt_time }}</span>
-        </p>
-      </div>
-    </div>
-
-    <!-- Right: always-visible badges + hamburger -->
-    <div class="flex items-center gap-2 shrink-0 ml-4">
-      <span class="text-wm-spark font-black font-mono bg-white bg-opacity-10 px-2.5 py-1 rounded-full border border-wm-spark border-opacity-40 text-xs">{{ dc_number }}</span>
-      <span class="bg-green-400 text-green-900 text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">LIVE</span>
+    <!-- Left: hamburger + logo + shift context -->
+    <div class="flex items-center gap-3 min-w-0">
 
       <!-- Hamburger button -->
-      <div class="relative">
+      <div class="relative shrink-0">
         <button id="hamburger-btn" onclick="toggleHamburger()"
           class="text-blue-100 hover:text-white border border-blue-500 rounded-lg px-2.5 py-1.5
                  text-sm transition flex items-center gap-1.5 font-bold">
-          <span id="hamburger-icon">&#9776;</span>
+          <span>&#9776;</span>
           <span class="text-xs">Menu</span>
         </button>
 
-        <!-- Dropdown -->
+        <!-- Dropdown opens to the right from left edge -->
         <div id="hamburger-menu"
-          class="hidden absolute right-0 top-full mt-1 w-52 bg-wm-dark border border-blue-700
+          class="hidden absolute left-0 top-full mt-1 w-52 bg-wm-dark border border-blue-700
                  rounded-xl shadow-2xl overflow-hidden z-50">
           <div class="flex flex-col py-1">
             <button id="notif-btn" onclick="requestNotifPermission()"
@@ -132,6 +113,26 @@
           </div>
         </div>
       </div>
+
+      <a href="/" class="hover:opacity-80 transition shrink-0">
+        <img src="/static/walmart-logo-white.svg" alt="Walmart" style="height:80px;width:auto;" />
+      </a>
+      <div class="w-px bg-blue-500 self-stretch my-2"></div>
+      <div class="min-w-0">
+        <p class="text-white font-black text-sm leading-tight tracking-wide">MST Dashboard</p>
+        <p class="text-blue-200 text-xs truncate">
+          <span class="text-wm-spark font-bold">{{ shift.shift_type }}</span>
+          &nbsp;&bull;&nbsp;{{ shift.date }}
+          &nbsp;&bull;&nbsp;<span class="font-semibold text-white">{{ shift.lead_name }}</span>
+          &nbsp;&bull;&nbsp;<span class="text-wm-spark">Started {{ shift.created_at | fmt_time }}</span>
+        </p>
+      </div>
+    </div>
+
+    <!-- Right: always-visible badges only -->
+    <div class="flex items-center gap-2 shrink-0">
+      <span class="text-wm-spark font-black font-mono bg-white bg-opacity-10 px-2.5 py-1 rounded-full border border-wm-spark border-opacity-40 text-xs">{{ dc_number }}</span>
+      <span class="bg-green-400 text-green-900 text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">LIVE</span>
     </div>
   </div>
 </header>
