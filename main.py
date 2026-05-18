@@ -1938,16 +1938,17 @@ async def report_compose_outlook(
     subject:   str = Form(""),
     html_body: str = Form(""),
 ):
-    """Smart router: Graph API draft (full HTML) if client_id configured,
-    else OWA compose URL (plain text fallback). Opens in a new browser tab."""
+    """Build an OWA compose deeplink and return it as plain text.
+    Client calls window.open(url) — Outlook Web opens with To + Subject pre-filled.
+    No OAuth, no admin consent, no Microsoft drama.
+    """
     rec = db.get_report(report_id)
     if not rec:
-        return HTMLResponse("Report not found", status_code=404)
+        return Response("Report not found", status_code=404, media_type="text/plain")
 
-    client_id = db.get_setting("ms_client_id", "").strip()
-    to_addrs  = db.get_setting("email_to", "").strip()
+    to_addrs = db.get_setting("email_to", "").strip()
 
-    # Build body if the caller didn’t send one (preview mode, no edits)
+    # Regenerate body/subject from DB if not supplied (direct one-click path)
     if not html_body.strip() and rec.get("report_json"):
         data = ReportData.model_validate_json(rec["report_json"])
         loto = db.get_loto(rec["shift_id"])
@@ -1966,55 +1967,25 @@ async def report_compose_outlook(
             f"{data.lead_name} – {data.date}"
         )
 
-    if client_id:
-        # ── Path A: Graph API draft — full HTML, lead’s own account ──
-        redirect_uri = str(request.base_url).rstrip("/") + "/outlook-draft-callback"
-        auth_url = ms_auth.build_draft_auth_url(
-            client_id=client_id,
-            redirect_uri=redirect_uri,
-            html_body=html_body,
-            subject=subject,
-            to_addrs=to_addrs,
-        )
-        return Response(content=auth_url, media_type="text/plain")
-    else:
-        # ── Path B: OWA compose URL — plain text, zero auth needed ──
-        import re as _re
-        from urllib.parse import urlencode
-        plain  = _re.sub(r"<[^>]+>", "", html_body).strip()
-        params = urlencode({"to": to_addrs, "subject": subject, "body": plain[:1800]})
-        owa_url = f"https://outlook.office.com/mail/deeplink/compose?{params}"
-        return Response(content=owa_url, media_type="text/plain")
+    # Strip HTML tags — OWA body param is plain text
+    import re as _re
+    plain = _re.sub(r"<[^>]+>", "", html_body)
+    # Clean up excess blank lines
+    plain = _re.sub(r"\n{3,}", "\n\n", plain).strip()
+
+    from urllib.parse import urlencode
+    params  = urlencode({"to": to_addrs, "subject": subject, "body": plain[:2000]})
+    owa_url = f"https://outlook.office.com/mail/deeplink/compose?{params}"
+    return Response(content=owa_url, media_type="text/plain")
 
 
 @app.get("/outlook-draft-callback")
 async def outlook_draft_callback(request: Request, code: str = "", state: str = "", error: str = ""):
-    """OAuth callback: exchange code → create Graph draft → redirect to OWA draft."""
-    if error:
-        return HTMLResponse(
-            f"<h3 style='color:#c00;font-family:sans-serif;padding:40px'>'"
-            f"Microsoft login failed: {error}</h3>"
-            f"<p style='font-family:sans-serif;padding:0 40px;'>You can close this tab and try again.</p>"
-        )
-
-    client_id    = db.get_setting("ms_client_id", "").strip()
-    redirect_uri = str(request.base_url).rstrip("/") + "/outlook-draft-callback"
-
-    try:
-        draft_url = await ms_auth.create_user_draft(
-            client_id=client_id,
-            code=code,
-            state=state,
-            redirect_uri=redirect_uri,
-        )
-        return RedirectResponse(draft_url)
-    except Exception as exc:
-        return HTMLResponse(
-            f"<h3 style='color:#c00;font-family:sans-serif;padding:40px'>'"
-            f"Could not create draft: {exc}</h3>"
-            f"<p style='font-family:sans-serif;padding:0 40px;'>'"
-            f"Close this tab and try again, or ask your admin to check the Microsoft app registration.</p>"
-        )
+    """Kept as a stub in case the old OAuth flow is ever revisited."""
+    return HTMLResponse(
+        "<p style='font-family:sans-serif;padding:40px;'>'"
+        "OAuth flow is disabled. Close this tab.</p>"
+    )
 
 
 @app.post("/report/{report_id}/send-email", response_class=HTMLResponse)
