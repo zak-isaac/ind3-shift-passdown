@@ -385,20 +385,34 @@
               class="w-4 h-4 accent-green-600" />
             <span class="text-sm font-semibold text-slate-700">All LOTO Keys accounted for</span>
           </label>
-          <div>
-            <p class="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">Missing Keys <span class="font-normal text-slate-400">(select any not found)</span></p>
-            <div class="grid grid-cols-4 gap-1.5">
-              {% for n in range(1, 21) %}
-              {% set kname = "Key " ~ n %}
-              <label class="flex items-center gap-1.5 cursor-pointer bg-slate-50 hover:bg-amber-50
-                            border border-slate-200 rounded-lg px-2 py-1.5 transition
-                            {% if kname in (loto.loto_missing_keys or '') %}ring-2 ring-amber-400{% endif %}">
-                <input type="checkbox" name="loto_key_item" value="{{ kname }}"
-                  {% if kname in (loto.loto_missing_keys or '') %}checked{% endif %}
-                  class="w-3.5 h-3.5 accent-amber-500" />
-                <span class="text-xs font-semibold text-slate-700">{{ kname }}</span>
-              </label>
-              {% endfor %}
+          <!-- Missing keys compact dropdown -->
+          <div class="relative" id="loto-key-dropdown">
+            <p class="text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">Missing Keys</p>
+            <button type="button" onclick="toggleLotoDropdown()"
+              class="w-full flex items-center justify-between gap-2 px-3 py-2
+                     border border-slate-200 rounded-lg bg-slate-50 hover:bg-amber-50
+                     text-xs font-semibold text-slate-700 transition text-left">
+              <span id="loto-key-label">Select missing keys...</span>
+              <span class="text-slate-400 shrink-0">&#9660;</span>
+            </button>
+            <div id="loto-key-panel"
+              class="hidden absolute left-0 top-full mt-1 bg-white border border-slate-200
+                     rounded-xl shadow-xl p-2 w-full max-h-48 overflow-y-auto"
+              style="z-index:9999;">
+              <div class="grid grid-cols-2 gap-0.5">
+                {% for n in range(1, 21) %}
+                {% set kname = "Key " ~ n %}
+                <label class="flex items-center gap-1.5 cursor-pointer px-2 py-1.5 rounded-lg
+                              hover:bg-amber-50 transition select-none
+                              {% if kname in (loto.loto_missing_keys or '') %}bg-amber-50{% endif %}">
+                  <input type="checkbox" name="loto_key_item" value="{{ kname }}"
+                    {% if kname in (loto.loto_missing_keys or '') %}checked{% endif %}
+                    onchange="updateLotoLabel()"
+                    class="w-3.5 h-3.5 accent-amber-500 shrink-0" />
+                  <span class="text-xs font-semibold text-slate-700">{{ kname }}</span>
+                </label>
+                {% endfor %}
+              </div>
             </div>
           </div>
           <button type="submit"
@@ -611,6 +625,32 @@ document.addEventListener('click', function(e) {
 });
 
 // ── LOTO key serializer ──────────────────────────────────────────
+// ── LOTO missing-keys dropdown ──────────────────────────────────────────
+function toggleLotoDropdown() {
+  document.getElementById('loto-key-panel').classList.toggle('hidden');
+}
+function updateLotoLabel() {
+  const checked = document.querySelectorAll('input[name="loto_key_item"]:checked');
+  const label   = document.getElementById('loto-key-label');
+  if (!label) return;
+  if (checked.length === 0) {
+    label.textContent = 'Select missing keys...';
+  } else {
+    const names = Array.from(checked).map(c => c.value).join(', ');
+    label.textContent = checked.length + (checked.length === 1 ? ' key missing' : ' keys missing') + ': ' + names;
+  }
+}
+// Close dropdown when clicking anywhere outside it
+document.addEventListener('click', function(e) {
+  const dd = document.getElementById('loto-key-dropdown');
+  if (dd && !dd.contains(e.target)) {
+    const p = document.getElementById('loto-key-panel');
+    if (p) p.classList.add('hidden');
+  }
+});
+// Set label on page load (handles pre-checked keys on reload)
+document.addEventListener('DOMContentLoaded', updateLotoLabel);
+
 function serializeLotoKeys() {
   const boxes   = document.querySelectorAll('input[name="loto_key_item"]:checked');
   const keys    = Array.from(boxes).map(b => b.value).join(', ');
