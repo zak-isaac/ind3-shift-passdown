@@ -812,15 +812,17 @@ async def _process_cmms_upload(
 
     content = await file.read()
     result: ParseResult = parse_cetaris(content)
-    work_orders = result.work_orders
-    skipped     = result.skipped
-    pm_count    = result.pm_count
-    pm_wos      = result.pm_wo_numbers
+    work_orders          = result.work_orders
+    skipped              = result.skipped
+    pm_count             = result.pm_count
+    pm_wos               = result.pm_wo_numbers
+    manager_task_count   = result.manager_task_count
 
-    if not work_orders and pm_count == 0:
+    if not work_orders and pm_count == 0 and manager_task_count == 0:
         return templates.TemplateResponse(
             request, "partials/cmms_import_result.html",
             {"imported": [], "skipped": skipped, "pm_count": 0,
+             "manager_task_count": 0,
              "error": "No reliability work orders found in this file.",
              "include_entries_oob": False},
         )
@@ -876,14 +878,15 @@ async def _process_cmms_upload(
     resp = templates.TemplateResponse(
         request, "partials/cmms_import_result.html",
         {
-            "imported":          imported,
-            "skipped":           skipped,
-            "skipped_unchanged": skipped_unchanged,
-            "pm_count":          pm_count,
-            "error":             "",
+            "imported":            imported,
+            "skipped":             skipped,
+            "skipped_unchanged":   skipped_unchanged,
+            "pm_count":            pm_count,
+            "manager_task_count":  manager_task_count,
+            "error":               "",
             "include_entries_oob": include_entries_oob,
-            "entries":           entries,
-            "tech_name":         uploader_name,
+            "entries":             entries,
+            "tech_name":           uploader_name,
         },
     )
     return resp
