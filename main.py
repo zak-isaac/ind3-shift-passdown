@@ -18,7 +18,7 @@ import httpx
 import associates as assoc_mod
 import db
 import emailer
-import ms_auth
+import signatures as _sigs
 import outlook_sender
 import pm_pending_parser
 import registry
@@ -1956,11 +1956,11 @@ async def report_email_html(request: Request, report_id: int):
 
 @app.get("/report/{report_id}/compose-outlook")
 async def report_compose_outlook_get(request: Request, report_id: int):
-    """GET — one-click button opens this in a new tab.
-    Redirects to OWA compose with To, Subject, and body pre-filled.
-    OWA automatically injects the user's saved Outlook signature.
+    """GET — one-click button triggers this as a download.
+    Returns a .eml file (X-Unsent:1) with full HTML body + lead signature.
+    Desktop Outlook opens it in compose mode. Lead hits Send.
     """
-    return await _build_owa_redirect(report_id, subject="", html_body="")
+    return await _build_eml_response(report_id, subject="", html_body="")
 
 
 @app.post("/report/{report_id}/compose-outlook")
@@ -1971,52 +1971,76 @@ async def report_compose_outlook(
     html_body: str = Form(""),
 ):
     """POST — preview modal uses this when the lead has edited the body."""
-    return await _build_owa_redirect(report_id, subject=subject, html_body=html_body)
+    return await _build_eml_response(report_id, subject=subject, html_body=html_body)
 
 
-async def _build_owa_redirect(report_id: int, subject: str, html_body: str) -> Response:
-    """Build an OWA compose deeplink and redirect to it.
-    OWA automatically appends the user's configured Outlook signature.
-    Body is plain text (OWA does not render HTML in the body param).
+async def _build_eml_response(report_id: int, subject: str, html_body: str) -> Response:
+    """Build a .eml (X-Unsent:1) with full HTML body + embedded lead signature.
+    Desktop Outlook opens it directly in compose mode.
     """
     rec = db.get_report(report_id)
     if not rec:
         return Response("Report not found", status_code=404, media_type="text/plain")
 
-    to_addrs = db.get_setting("email_to", "").strip()
+    to_addrs  = db.get_setting("email_to", "").strip()
+    lead_name = ""
 
-    # -- Subject --
+    # ── Subject ──
     if not subject.strip() and rec.get("report_json"):
-        data    = ReportData.model_validate_json(rec["report_json"])
-        subject = (
+        data      = ReportData.model_validate_json(rec["report_json"])
+        lead_name = data.lead_name
+        subject   = (
             f"IND3 Passdown \u2013 {data.shift_type} Shift \u2013 "
             f"{data.lead_name} \u2013 {data.date}"
         )
 
-    # -- Body: clean plain text --
+    # ── HTML body ──
     if html_body.strip():
-        plain = _html_to_plain(html_body)
+        body_html = html_body
+        if not lead_name and rec.get("report_json"):
+            lead_name = ReportData.model_validate_json(rec["report_json"]).lead_name
     elif rec.get("report_json"):
         data      = ReportData.model_validate_json(rec["report_json"])
+        lead_name = data.lead_name
         loto      = db.get_loto(rec["shift_id"])
         pms       = db.get_pending_pms(rec["shift_id"])
-        full_html = format_email_passdown_html(
+        body_html = format_email_passdown_html(
             data,
             loto_missing=loto.get("loto_missing_keys", ""),
             pending_pms=pms or None,
             loto_verified=bool(loto.get("loto_verified", 0)),
         )
-        plain = _html_to_plain(full_html)
     else:
-        plain = (rec.get("content") or "").strip()
+        body_html = f"<pre>{rec.get('content', '')}</pre>"
 
-    from urllib.parse import quote
-    owa_url = (
-        "https://outlook.office.com/mail/deeplink/compose?"
-        f"to={quote(to_addrs, safe='@,;')}"
-        f"&subject={quote(subject, safe='')}"
+    # ── Inject lead's signature before </body> ──
+    sig_html  = _sigs.get_signature_html(lead_name)
+    body_html = body_html.replace("</body>", sig_html + "</body>")
+
+    # ── Build .eml ──
+    import base64 as _b64
+    body_b64        = _b64.b64encode(body_html.encode("utf-8")).decode("ascii")
+    body_b64_folded = "\r\n".join(body_b64[i:i+76] for i in range(0, len(body_b64), 76))
+    eml = (
+        f"X-Unsent: 1\r\n"
+        f"To: {to_addrs}\r\n"
+        f"Subject: {subject}\r\n"
+        f"MIME-Version: 1.0\r\n"
+        f'Content-Type: text/html; charset="utf-8"\r\n'
+        f"Content-Transfer-Encoding: base64\r\n"
+        f"\r\n"
+        f"{body_b64_folded}\r\n"
     )
-    return RedirectResponse(owa_url)
+    shift_label = ""
+    if rec.get("report_json"):
+        d = ReportData.model_validate_json(rec["report_json"])
+        shift_label = f"{d.shift_type}-{d.date}-"
+    filename = f"passdown-{shift_label}{report_id}.eml"
+    return Response(
+        content=eml.encode("utf-8"),
+        media_type="message/rfc822",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 def _html_to_plain(html: str) -> str:

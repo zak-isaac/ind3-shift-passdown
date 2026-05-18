@@ -41,21 +41,24 @@
         </div>
       </div>
 
-      <!-- ONE-CLICK: iframe triggers .eml download -> Windows auto-opens in Outlook -->
-      <button id="compose-btn-{{ report_id }}"
-        onclick="openComposeNow({{ report_id }})"
+      <!-- ONE-CLICK: downloads .eml -> opens in desktop Outlook compose -->
+      <a id="compose-btn-{{ report_id }}"
+        href="/report/{{ report_id }}/compose-outlook"
+        download
+        onclick="onEmlClick(this, {{ report_id }})"
         class="w-full flex items-center justify-center gap-3 py-4 px-6
                bg-wm-blue hover:bg-blue-700 active:bg-blue-800
                text-white font-black text-base rounded-xl
                shadow-lg border-b-4 border-blue-800
-               transition focus:outline-none focus:ring-4 focus:ring-blue-300">
+               transition focus:outline-none focus:ring-4 focus:ring-blue-300
+               cursor-pointer no-underline">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
           stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
           <polyline points="22,6 12,13 2,6"/>
         </svg>
         <span id="compose-btn-label-{{ report_id }}">Open &amp; Compose in Outlook</span>
-      </button>
+      </a>
 
       <!-- Status feedback -->
       <div id="compose-status-{{ report_id }}" class="text-center text-xs min-h-[16px]"></div>
@@ -80,52 +83,27 @@
 </div>
 
 <script>
-async function openComposeNow(reportId) {
-  const btn    = document.getElementById('compose-btn-' + reportId);
+function onEmlClick(el, reportId) {
   const label  = document.getElementById('compose-btn-label-' + reportId);
   const status = document.getElementById('compose-status-' + reportId);
 
-  btn.disabled      = true;
-  label.textContent = 'Preparing...';
-
-  try {
-    // Step 1: fetch the full HTML body from the server
-    const res  = await fetch('/report/' + reportId + '/email-html');
-    const html = await res.text();
-
-    // Step 2: copy it to clipboard as text/html so Ctrl+V pastes formatted
-    await navigator.clipboard.write([
-      new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }) })
-    ]);
-
-    // Step 3: open OWA compose with To + Subject pre-filled (no body — user pastes)
-    window.open('/report/' + reportId + '/compose-outlook', '_blank');
-
-    label.textContent     = '\u2713 OWA opening!';
-    btn.style.background  = '#2a8703';
-    btn.style.borderColor = '#1a5c02';
-    status.innerHTML = `
-      <span class="text-green-400 font-semibold">
-        &#128203; Body copied! — paste it in OWA with
-        <kbd style="background:#1e3a5f;border:1px solid #60a5fa;border-radius:4px;
-                    padding:1px 5px;font-family:monospace;font-size:11px;">Ctrl+V</kbd>
-        then hit Send
-      </span>`;
-
-  } catch (err) {
-    // Clipboard write failed (e.g. user denied permission) — fall back to OWA only
-    console.warn('Clipboard copy failed:', err);
-    window.open('/report/' + reportId + '/compose-outlook', '_blank');
-    label.textContent = '\u2713 OWA opened';
-    status.innerHTML  = '<span class="text-yellow-400">Could not auto-copy body — type or paste your message in OWA</span>';
-  }
+  label.textContent = 'Downloading...';
+  status.innerHTML  =
+    '<span class="text-yellow-300 font-semibold">' +
+    '&#128229; Click the downloaded file in your browser bar to open in Outlook' +
+    '</span>';
 
   setTimeout(() => {
-    label.textContent     = 'Open & Compose in Outlook';
-    btn.style.background  = '';
-    btn.style.borderColor = '';
-    btn.disabled          = false;
-    status.innerHTML      = '';
+    label.textContent = '\u2713 File downloaded!';
+    el.style.background   = '#2a8703';
+    el.style.borderColor  = '#1a5c02';
+  }, 800);
+
+  setTimeout(() => {
+    label.textContent    = 'Open & Compose in Outlook';
+    el.style.background  = '';
+    el.style.borderColor = '';
+    status.innerHTML     = '';
   }, 10000);
 }
 </script>
