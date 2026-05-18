@@ -1586,30 +1586,70 @@ async def lead_save_loto(
 ):
     if not _is_lead_authed(request):
         return HTMLResponse("Unauthorized", status_code=401)
-    verified = loto_verified.lower() in ("on", "true", "1", "yes")
-    db.save_loto(shift_id, verified, missing_keys)
 
-    check  = "&#10003;" if verified else "&#9744;"
-    label  = "All LOTO Keys Verified" if verified else "LOTO Not Verified"
-    colour = "text-green-700" if verified else "text-red-600"
-    missing_html = ""
-    if missing_keys.strip():
-        missing_html = f'<p class="text-xs text-red-600 mt-1"><strong>Missing:</strong> {missing_keys.strip()}</p>'
+    # If any missing keys recorded — LOTO was checked (just missing some)
+    keys_clean = ", ".join(k.strip() for k in missing_keys.split(",") if k.strip())
+    verified   = bool(keys_clean) or loto_verified.lower() in ("on", "true", "1", "yes")
+    db.save_loto(shift_id, verified, keys_clean)
+    return HTMLResponse(_loto_status_html(verified, keys_clean, shift_id))
 
-    # Main status update (inside accordion)
-    status_html = (
-        f'<p class="font-bold text-sm {colour}">{check} {label}</p>'
-        + missing_html
-        + '<p class="text-xs text-gray-400 mt-1">Saved</p>'
-    )
-    # OOB badge update (summary tag badge, updates without page reload)
-    badge_colour = "text-green-600" if verified else "text-yellow-600"
-    badge_label  = "&#10003; Verified" if verified else "Pending"
+
+@app.post("/lead/loto/remove-key", response_class=HTMLResponse)
+async def lead_loto_remove_key(
+    request:        Request,
+    shift_id:       int = Form(...),
+    key_to_remove:  str = Form(...),
+):
+    if not _is_lead_authed(request):
+        return HTMLResponse("Unauthorized", status_code=401)
+    loto = db.get_loto(shift_id)
+    existing = loto.get("loto_missing_keys", "")
+    keys     = [k.strip() for k in existing.split(",") if k.strip()]
+    keys     = [k for k in keys if k.lower() != key_to_remove.strip().lower()]
+    keys_clean = ", ".join(keys)
+    # Keep verified=True even after removing — they still did the check
+    db.save_loto(shift_id, loto.get("loto_verified", True), keys_clean)
+    return HTMLResponse(_loto_status_html(True, keys_clean, shift_id))
+
+
+def _loto_status_html(verified: bool, missing_keys: str, shift_id: int) -> str:
+    """Shared HTML for the loto-status div + OOB badge update."""
+    keys = [k.strip() for k in missing_keys.split(",") if k.strip()]
+
+    if verified:
+        if keys:
+            chips = "".join(
+                f'<form method="POST" action="/lead/loto/remove-key" '
+                f'hx-post="/lead/loto/remove-key" hx-target="#loto-status" hx-swap="innerHTML" '
+                f'style="display:inline;">'
+                f'<input type="hidden" name="shift_id" value="{shift_id}">'
+                f'<input type="hidden" name="key_to_remove" value="{k}">'
+                f'<button type="submit" title="Key found — remove" '
+                f'style="display:inline-flex;align-items:center;gap:4px;margin:2px;'
+                f'padding:3px 8px;background:#fef2f2;border:1px solid #fca5a5;'
+                f'border-radius:999px;font-size:11px;font-weight:700;color:#b91c1c;'
+                f'cursor:pointer;">'
+                f'{k} &times;</button></form>'
+                for k in keys
+            )
+            status_html = (
+                '<p class="font-bold text-sm text-green-700">&#10003; LOTO Verified — keys missing:</p>'
+                f'<div class="flex flex-wrap gap-1 mt-1">{chips}</div>'
+                '<p class="text-xs text-gray-400 mt-1">Click a key to remove it once found.</p>'
+            )
+            badge_label, badge_cls = "&#10003; Verified", "bg-green-100 text-green-700"
+        else:
+            status_html = '<p class="font-bold text-sm text-green-700">&#10003; All LOTO Keys Verified</p>'
+            badge_label, badge_cls = "&#10003; Verified", "bg-green-100 text-green-700"
+    else:
+        status_html = '<p class="text-gray-400 italic text-xs">Not yet verified for this shift.</p>'
+        badge_label, badge_cls = "Pending", "bg-yellow-100 text-yellow-700"
+
     oob_badge = (
         f'<span id="loto-badge" hx-swap-oob="true" '
-        f'class="ml-2 text-xs font-bold {badge_colour}">{badge_label}</span>'
+        f'class="ml-auto text-xs font-black px-2 py-0.5 rounded-full {badge_cls}">{badge_label}</span>'
     )
-    return HTMLResponse(status_html + oob_badge)
+    return status_html + oob_badge
 
 
 # ── PM file upload ──────────────────────────────────────────────────────────

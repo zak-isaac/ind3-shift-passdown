@@ -249,12 +249,33 @@
       </h2>
       <div id="loto-status" class="text-xs text-gray-500 mb-3">
         {% if loto.loto_verified %}
-        <p class="font-bold text-green-700">&#10003; All LOTO Keys Verified</p>
-        {% if loto.loto_missing_keys %}
-        <p class="text-red-600 mt-1"><strong>Missing:</strong> {{ loto.loto_missing_keys }}</p>
-        {% endif %}
+          {% if loto.loto_missing_keys %}
+            <p class="font-bold text-sm text-green-700">&#10003; LOTO Verified &mdash; keys missing:</p>
+            <div class="flex flex-wrap gap-1 mt-1">
+              {% for key in loto.loto_missing_keys.split(',') %}
+              {% set k = key.strip() %}{% if k %}
+              <form method="POST" action="/lead/loto/remove-key"
+                hx-post="/lead/loto/remove-key"
+                hx-target="#loto-status"
+                hx-swap="innerHTML"
+                style="display:inline;">
+                <input type="hidden" name="shift_id" value="{{ shift.id }}">
+                <input type="hidden" name="key_to_remove" value="{{ k }}">
+                <button type="submit" title="Key found &mdash; remove"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs
+                         font-bold bg-red-50 border border-red-200 text-red-700
+                         hover:bg-red-100 cursor-pointer">
+                  {{ k }} &times;
+                </button>
+              </form>
+              {% endif %}{% endfor %}
+            </div>
+            <p class="text-xs text-gray-400 mt-1">Click a key to remove it once found.</p>
+          {% else %}
+            <p class="font-bold text-sm text-green-700">&#10003; All LOTO Keys Verified</p>
+          {% endif %}
         {% else %}
-        <p class="text-gray-400 italic">Not yet verified for this shift.</p>
+          <p class="text-gray-400 italic">Not yet verified for this shift.</p>
         {% endif %}
       </div>
       <form hx-post="/lead/loto"
