@@ -577,13 +577,16 @@ async def shift_end(request: Request, shift_id: int = Form(...)):
             if last.get("report_json") else None
         )
     else:
-        raw_entries = db.get_entries(shift_id)
+        from wo_consolidator import consolidate_entries, consolidated_to_happenings
+        raw_entries   = db.get_entries(shift_id)
+        co_result     = consolidate_entries(raw_entries)
+        co_happenings = consolidated_to_happenings(co_result, wo_prefix_re=_WO_PREFIX_RE)
         happenings_input = [
             HappeningInput(
-                title=f"{e['unit']} \u2013 {e['issue'][:50]}",
-                raw_note=f"{e['issue']}. {e['action']}. {e['result']}.",
+                title=h["title"],
+                raw_note=h["paragraph"],
             )
-            for e in raw_entries
+            for h in co_happenings
         ]
         rewritten = rewrite_all(happenings_input)
         email_data = ReportData(
@@ -2734,26 +2737,35 @@ async def lead_generate(
     # Remove any RTS'd units that are still in OOS (edge case: form-only entries)
     db.remove_rts_from_oos(rts_from_form)
 
-    # ── Pull FRESH entries straight from DB — no rewriting, no templates.
-    # Show exactly what the technician typed: asset ID + their summary + their name.
-    db_entries = db.get_entries(shift_id)
-    # Deduplicate by WO number: same WO from multiple techs → one report line
-    seen_wo: set[str] = set()
+    # ── Pull FRESH entries and consolidate duplicate WOs ──────────────────
+    # Same WO from multiple techs → one merged block with all remarks + tech list.
+    # Raw rows are never deleted; consolidation is view-only.
+    from wo_consolidator import consolidate_entries, consolidated_to_happenings
+    db_entries  = db.get_entries(shift_id)
+    co_result   = consolidate_entries(db_entries)   # handles excluded filter internally
+    co_happenings = consolidated_to_happenings(co_result, wo_prefix_re=_WO_PREFIX_RE)
+
+    # Optional: upgrade merged summaries via Element LLM if key is configured
+    from summarizer import summarize_remarks as _summarize, _ELEMENT_API_KEY as _EL_KEY
     happenings: list[RewrittenHappening] = []
-    for e in db_entries:
-        if e.get("excluded"):
-            continue
-        wo = e.get("wo_number", "")
-        if wo and wo in seen_wo:
-            continue   # already have this WO in the report
-        if wo:
-            seen_wo.add(wo)
-        clean = _WO_PREFIX_RE.sub('', e["issue"]).strip().rstrip(".")
+    for h in co_happenings:
+        para = h["paragraph"]
+        if _EL_KEY and h["wo_number"] and len(co_result.consolidated) > 0:
+            # Find the matching ConsolidatedWO and upgrade its summary async
+            for cwo in co_result.consolidated:
+                if cwo.wo_number == h["wo_number"] and len(cwo.all_remarks) > 1:
+                    try:
+                        para = await _summarize(cwo.all_remarks)
+                        if h["conflicting"]:
+                            para += " [⚠ Conflicting notes — verify status]"
+                    except Exception:
+                        pass  # fall back to _smart_concat result already in h
+                    break
         happenings.append(RewrittenHappening(
-            title=e["unit"],
-            paragraph=clean,
-            wo_number=wo,
-            tech_name=e.get("tech_name", ""),
+            title=h["title"],
+            paragraph=para,
+            wo_number=h["wo_number"],
+            tech_name=h["tech_name"],
         ))
 
     # Append any MST-authored extra happenings from the form
