@@ -47,16 +47,6 @@
       {{ 'Down' if is_down else ('Degraded' if is_deg else 'Monitor') }}
     </span>
 
-    <!-- Edit -->
-    <button
-      hx-get="/lead/entry/{{ e.id }}/edit-form"
-      hx-target="#feed-entry-{{ e.id }}"
-      hx-swap="outerHTML"
-      title="Edit entry"
-      class="text-[10px] px-1.5 py-0.5 rounded border border-gray-200 text-gray-400 hover:border-blue-400 hover:text-blue-500 transition">
-      &#9998;
-    </button>
-
     <!-- Exclude -->
     <button
       hx-post="/lead/entry/{{ e.id }}/exclude"
