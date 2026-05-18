@@ -221,9 +221,13 @@
     </div>
 
     <!-- Live feed -->
+    <!-- hx-trigger: 'every 10s' is conditional — skipped silently when any
+         edit form is open inside the feed so typing is never interrupted.
+         The 'refresh' event is still fired unconditionally by JS after
+         save / cancel so the feed catches up immediately. -->
     <div id="live-feed"
       hx-get="/lead/feed?shift_id={{ shift.id }}"
-      hx-trigger="load, every 10s, refresh"
+      hx-trigger="load, every 10s[!document.querySelector('#live-feed form')], refresh"
       hx-swap="innerHTML"
       class="flex flex-col gap-2">
       <div class="text-slate-400 text-sm italic p-4">Loading entries...</div>
