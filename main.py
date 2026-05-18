@@ -997,11 +997,13 @@ async def lead_auth_json(request: Request, pin: str = Form(...)):
     if _check_lead_credential(pin):
         resp = JSONResponse({"ok": True})
         resp.set_cookie(_LEAD_COOKIE, _get_pin_hash(),
-                        httponly=True, samesite="lax", path="/")
+                        httponly=True, samesite="lax", path="/",
+                        max_age=86400 * 30)  # 30 days — survives browser/PC restarts
         # Manager cookie — set ONLY when the hardcoded 8972 code is entered
         if pin.strip() == _EMERGENCY_CODE:
             resp.set_cookie(_MGR_COOKIE, _MGR_TOKEN,
-                            httponly=True, samesite="lax", path="/")
+                            httponly=True, samesite="lax", path="/",
+                            max_age=86400 * 30)
         else:
             resp.delete_cookie(_MGR_COOKIE, path="/")
         return resp
@@ -1066,7 +1068,8 @@ async def lead_login_post(
         """
         resp = HTMLResponse(content=html)
         resp.set_cookie(_LEAD_COOKIE, _get_pin_hash(),
-                        httponly=True, samesite="lax", path="/")
+                        httponly=True, samesite="lax", path="/",
+                        max_age=86400 * 30)  # 30 days
         resp.delete_cookie("__pending_shift", path="/")
         # Bind this session to the shift — prevents cross-shift mutations
         if bound_shift_id:
