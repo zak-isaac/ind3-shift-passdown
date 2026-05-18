@@ -80,10 +80,10 @@
       <!-- Hamburger button -->
       <div class="relative shrink-0">
         <button id="hamburger-btn" onclick="toggleHamburger()"
-          class="text-blue-100 hover:text-white border border-blue-500 rounded-lg px-2.5 py-1.5
-                 text-sm transition flex items-center gap-1.5 font-bold">
-          <span>&#9776;</span>
-          <span class="text-xs">Menu</span>
+          class="text-blue-100 hover:text-white border border-blue-400 rounded-xl px-3 py-2
+                 transition flex items-center gap-2 font-bold">
+          <span style="font-size:1.35rem;line-height:1;">&#9776;</span>
+          <span class="text-sm font-bold">Menu</span>
         </button>
 
         <!-- Dropdown opens to the right from left edge -->
@@ -240,7 +240,7 @@
     <p class="section-label">Shift Monitoring</p>
 
     <!-- Problem Assets -->
-    <details class="card" open>
+    <details class="card">
       <summary>
         <span class="text-red-500">&#128200;</span> Problem Assets
         <span class="text-slate-400 text-xs font-normal">Every 30s</span>
@@ -257,23 +257,7 @@
       </div>
     </details>
 
-    <!-- Technicians -->
-    <details class="card" open>
-      <summary>
-        <span>&#128100;</span> Technicians On Shift
-        <span class="text-slate-400 text-xs font-normal">Real-time</span>
-        <i class="arr">&#9654;</i>
-      </summary>
-      <div class="card-body">
-        <div id="tech-participation"
-          hx-get="/lead/tech-participation?shift_id={{ shift.id }}"
-          hx-trigger="load, every 30s, refresh"
-          hx-swap="innerHTML"
-          style="min-height:3rem;max-height:16rem;overflow-y:auto;">
-          <p class="text-slate-400 italic text-xs text-center py-3">Loading...</p>
-        </div>
-      </div>
-    </details>
+
 
     <!-- ── GROUP 2: Data Inputs ────────────────────────────────── -->
     <div class="divider"></div>
@@ -347,7 +331,7 @@
     </details>
 
     <!-- LOTO Verification -->
-    <details class="card" style="border-left:3px solid #f59e0b;" open>
+    <details class="card" style="border-left:3px solid #f59e0b;">
       <summary>
         <span>&#128273;</span> LOTO Key Verification
         <span id="loto-badge" class="badge
@@ -425,7 +409,7 @@
     <p class="section-label">Out of Service</p>
 
     <!-- Out of Service -->
-    <details class="card" style="border-left:3px solid #ef4444;" open>
+    <details class="card" style="border-left:3px solid #ef4444;">
       <summary>
         <span class="text-red-500">&#9940;</span> Out of Service
         <span class="text-slate-400 text-xs font-normal">Persists until removed</span>
@@ -465,7 +449,7 @@
     </div>
 
     <!-- Shift Notes -->
-    <details class="card" open>
+    <details class="card">
       <summary>
         &#128221; MST Shift Notes
         <span id="notes-status" class="text-xs font-normal text-slate-400"></span>
