@@ -2492,6 +2492,76 @@ async def download_docx(report_id: int):
     )
 
 
+# ── EML download (opens in Outlook as a pre-filled draft) ────────────────
+
+def _build_eml(subject: str, to_addrs: str, html_body: str) -> bytes:
+    """Build a standards-compliant EML file. Outlook opens it as a ready draft."""
+    import base64
+    encoded = base64.b64encode(html_body.encode("utf-8")).decode("ascii")
+    # Wrap base64 at 76 chars per RFC 2045
+    wrapped = "\r\n".join(encoded[i:i+76] for i in range(0, len(encoded), 76))
+    lines = [
+        "MIME-Version: 1.0",
+        f"To: {to_addrs}",
+        f"Subject: {subject}",
+        "Content-Type: text/html; charset=UTF-8",
+        "Content-Transfer-Encoding: base64",
+        "",
+        wrapped,
+    ]
+    return "\r\n".join(lines).encode("utf-8")
+
+
+@app.get("/report/{report_id}/eml")
+async def download_eml(report_id: int):
+    """Generate .eml from saved report — opens Outlook as a pre-filled draft."""
+    rec = db.get_report(report_id)
+    if not rec or not rec.get("report_json"):
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    data = ReportData.model_validate_json(rec["report_json"])
+    loto = db.get_loto(rec["shift_id"])
+    pms  = db.get_pending_pms(rec["shift_id"])
+    html_body = format_email_passdown_html(
+        data,
+        loto_missing=loto.get("loto_missing_keys", ""),
+        pending_pms=pms or None,
+        loto_verified=bool(loto.get("loto_verified", 0)),
+    )
+    to_addrs = db.get_setting("email_to", "").strip()
+    subject  = (
+        f"IND3 Passdown – {data.shift_type} Shift – "
+        f"{data.lead_name} – {data.date}"
+    )
+    eml  = _build_eml(subject, to_addrs, html_body)
+    fname = f"passdown_{rec['generated_at'].replace(' ', '_').replace(':', '-')}.eml"
+    return Response(
+        content=eml,
+        media_type="message/rfc822",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
+@app.post("/report/{report_id}/eml")
+async def download_eml_edited(
+    report_id: int,
+    subject:   str = Form(...),
+    html_body: str = Form(...),
+):
+    """Generate .eml from the modal’s editor content (may contain manual edits)."""
+    rec = db.get_report(report_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail="Report not found")
+    to_addrs = db.get_setting("email_to", "").strip()
+    eml  = _build_eml(subject, to_addrs, html_body)
+    fname = f"passdown_{rec['generated_at'].replace(' ', '_').replace(':', '-')}.eml"
+    return Response(
+        content=eml,
+        media_type="message/rfc822",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
 @app.get("/report/{report_id}/pdf")
 async def download_pdf(report_id: int):
     rec = db.get_report(report_id)

@@ -131,16 +131,19 @@
     <div style="flex:1;"></div>
     <div id="email-send-result" style="font-size:12px;"></div>
 
-    <!-- Send -->
-    <button id="email-send-btn" onclick="emailConfirmSend({{ report_id }})"
-      style="display:flex;align-items:center;gap:7px;padding:8px 22px;
+    <!-- Open in Outlook -->
+    <button id="outlook-btn" onclick="openInOutlook({{ report_id }})"
+      style="display:flex;align-items:center;gap:7px;padding:8px 20px;
              border:none;border-radius:9px;border-bottom:3px solid #003db5;
-             background:#0053e2;color:#fff;font-weight:800;font-size:13px;cursor:pointer;">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff"
-        stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+             background:#0053e2;color:#fff;font-weight:800;font-size:13px;cursor:pointer;
+             white-space:nowrap;">
+      <!-- Outlook envelope icon -->
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff"
+        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+        <polyline points="22,6 12,13 2,6"/>
       </svg>
-      Send Email
+      Open in Outlook
     </button>
   </div>
 
@@ -527,36 +530,57 @@ function closeEmailModal() {
   if(wrap)wrap.innerHTML='';
 }
 
-// ── SEND ─────────────────────────────────────────────────────────
+// ── OPEN IN OUTLOOK ───────────────────────────────────────────────
+//
+// Builds an EML file server-side (includes any edits the lead made)
+// and downloads it. Outlook opens EML files as a pre-filled draft —
+// the lead’s own account, their own signature, they click Send.
 
-function emailConfirmSend(reportId) {
-  if (!confirm('Send this passdown email to all configured recipients?\n\nThis cannot be undone.')) return;
-  const btn    = document.getElementById('email-send-btn');
+function openInOutlook(reportId) {
+  const btn    = document.getElementById('outlook-btn');
   const result = document.getElementById('email-send-result');
   const subj   = document.getElementById('email-subject').value;
   const isEdit = document.getElementById('pane-edit').style.display !== 'none';
-  const body   = isEdit
-    ? '<html><body style="font-family:Calibri,Arial,sans-serif;font-size:14px;'
-      +'color:#111;max-width:700px;line-height:1.6;">'
-      +document.getElementById('email-editable').innerHTML+'</body></html>'
-    : window._emailRaw;
 
-  btn.disabled=true;btn.textContent='Sending…';
-  result.innerHTML='<span style="color:#6b7280;">Sending via Outlook…</span>';
+  // If in edit mode, POST the edited HTML body so the EML reflects changes
+  // If in preview mode, GET the saved report EML directly
+  if (isEdit) {
+    const body = '<html><body style="font-family:Calibri,Arial,sans-serif;'
+      + 'font-size:14px;color:#111;max-width:700px;line-height:1.6;">'
+      + document.getElementById('email-editable').innerHTML
+      + '</body></html>';
 
-  const fd=new FormData();
-  fd.append('subject',subj);fd.append('html_body',body);
-
-  fetch(`/report/${reportId}/send-email`,{method:'POST',body:fd})
-    .then(r=>r.text())
-    .then(html=>{
-      result.innerHTML=html;
-      btn.innerHTML='&#10003; Sent';
-      btn.style.background='#2a8703';btn.style.borderColor='#1a5c02';
-    })
-    .catch(err=>{
-      result.innerHTML=`<span style="color:#c00;">&#10060; ${err}</span>`;
-      btn.disabled=false;btn.innerHTML='&#9993; Send Email';
+    // Create a hidden form, POST it — browser handles the file download
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/report/${reportId}/eml`;
+    form.style.display = 'none';
+    [['subject', subj], ['html_body', body]].forEach(([k, v]) => {
+      const inp = document.createElement('input');
+      inp.type = 'hidden'; inp.name = k; inp.value = v;
+      form.appendChild(inp);
     });
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+  } else {
+    // No edits — just download the saved EML directly
+    window.location.href = `/report/${reportId}/eml`;
+  }
+
+  // Friendly status nudge
+  result.innerHTML =
+    '<span style="color:#2a8703;font-weight:700;">'
+    + '&#9989; Opening in Outlook… add your signature and click Send!'
+    + '</span>';
+  btn.innerHTML = '&#10003; Opened';
+  btn.style.background  = '#2a8703';
+  btn.style.borderColor = '#1a5c02';
+  setTimeout(() => {
+    btn.innerHTML = 'Open in Outlook';
+    btn.style.background  = '#0053e2';
+    btn.style.borderColor = '#003db5';
+    result.innerHTML = '';
+  }, 4000);
 }
 </script>
