@@ -72,7 +72,8 @@
 {% if oos_units %}
 <!-- OOS BANNER -->
 <div class="shrink-0" style="background:linear-gradient(135deg,#1a0505 0%,#3b0a0a 50%,#1a0505 100%);
-     border-bottom:2px solid #ef4444; box-shadow:0 4px 24px rgba(239,68,68,0.18);">
+     border-bottom:2px solid #ef4444; box-shadow:0 4px 24px rgba(239,68,68,0.18);
+     font-family:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
   <div class="max-w-screen-2xl mx-auto px-5 flex items-center gap-3 flex-wrap" style="min-height:40px;">
 
     <!-- Icon + label -->
@@ -81,9 +82,9 @@
         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
         <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
       </span>
-      <span class="text-red-400 font-black text-xs uppercase tracking-widest">Out of Service</span>
-      <span class="text-red-600 font-black text-xs">&bull;</span>
-      <span class="text-red-300 font-bold text-xs">{{ oos_units | length }} unit{{ 's' if oos_units | length != 1 }}</span>
+      <span style="color:#fca5a5;font-size:0.7rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;">Out of Service</span>
+      <span style="color:#7f1d1d;font-size:0.7rem;">&#8226;</span>
+      <span style="color:#f87171;font-size:0.7rem;font-weight:500;">{{ oos_units | length }} unit{{ 's' if oos_units | length != 1 }}</span>
     </div>
 
     <!-- Divider -->
@@ -92,11 +93,11 @@
     <!-- Asset chips -->
     <div class="flex flex-wrap items-center gap-1.5">
       {% for u in oos_units %}
-      <span class="inline-flex items-center gap-1 text-xs font-black text-white
-                   px-2.5 py-0.5 rounded-md"
-            style="background:rgba(239,68,68,0.18); border:1px solid rgba(239,68,68,0.45);
-                   letter-spacing:0.04em;">
-        <span style="color:#f87171;">&#9940;</span> {{ u }}
+      <span style="display:inline-flex;align-items:center;gap:0.3rem;
+                   background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4);
+                   color:#fecaca;font-size:0.72rem;font-weight:500;letter-spacing:0.03em;
+                   padding:0.2rem 0.6rem;border-radius:0.375rem;">
+        <span style="color:#f87171;font-size:0.65rem;">&#9940;</span> {{ u }}
       </span>
       {% endfor %}
     </div>
