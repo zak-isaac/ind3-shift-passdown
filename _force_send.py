@@ -78,7 +78,7 @@ def main():
     ).fetchall()]
 
     body    = format_email_passdown_html(data, loto_missing=loto_missing, pending_pms=pending_pms or None)
-    subject = f"IND3 Passdown - {shift['shift_type']} Shift - {shift['lead_name']} - {shift['date']}"
+    subject = f"{shift['shift_type']} Passdown"
 
     # ── Recipients ─────────────────────────────────────────────────────────────
     settings_row = con.execute(

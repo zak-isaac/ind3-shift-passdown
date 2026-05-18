@@ -1951,9 +1951,8 @@ async def report_email_preview(request: Request, report_id: int):
     ) if email_data else rec["content"]
 
     subj = (
-        f"IND3 Passdown – {shift['shift_type']} Shift – "
-        f"{shift['lead_name']} – {shift['date']}"
-    ) if shift else "IND3 Passdown"
+        f"{shift['shift_type']} Passdown"
+    ) if shift else "Passdown"
 
     return templates.TemplateResponse(
         request, "partials/email_preview_modal.html",
@@ -2008,7 +2007,7 @@ async def report_open_in_outlook(
     try:
         await outlook_sender.display_email(
             to_addrs=to_addrs,
-            subject=subject or f"IND3 Passdown – {rec.get('generated_at', '')[:10]}",
+            subject=subject or "Passdown",
             body=body,
             reply_to=reply_to,
         )
@@ -2086,8 +2085,7 @@ async def _build_eml_response(report_id: int, subject: str, html_body: str) -> R
         data      = ReportData.model_validate_json(rec["report_json"])
         lead_name = data.lead_name
         subject   = (
-            f"IND3 Passdown \u2013 {data.shift_type} Shift \u2013 "
-            f"{data.lead_name} \u2013 {data.date}"
+            f"{data.shift_type} Passdown"
         )
 
     # ── HTML body ──
@@ -2344,7 +2342,7 @@ async def admin_email_preview(request: Request):
           </div>
           <div class="flex gap-2">
             <span class="text-gray-400 w-12 shrink-0">Subject:</span>
-            <span class="font-semibold text-gray-800">IND3 Passdown – S2 Shift – Isaac S. – {sample.date}</span>
+            <span class="font-semibold text-gray-800">S2 Passdown</span>
           </div>
         </div>
       </div>
@@ -2861,8 +2859,7 @@ async def download_eml(report_id: int):
     )
     to_addrs = db.get_setting("email_to", "").strip()
     subject  = (
-        f"IND3 Passdown – {data.shift_type} Shift – "
-        f"{data.lead_name} – {data.date}"
+        f"{data.shift_type} Passdown"
     )
     eml  = _build_eml(subject, to_addrs, html_body)
     fname = f"passdown_{rec['generated_at'].replace(' ', '_').replace(':', '-')}.eml"
