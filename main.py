@@ -1938,8 +1938,8 @@ async def report_compose_outlook(
     subject:   str = Form(""),
     html_body: str = Form(""),
 ):
-    """Build an OWA compose deeplink and return it as plain text.
-    Client calls window.open(url) — Outlook Web opens with To + Subject pre-filled.
+    """Build a mailto: URI and return it as plain text.
+    Client calls window.open(url) — desktop Outlook opens with To + Subject + Body pre-filled.
     No OAuth, no admin consent, no Microsoft drama.
     """
     rec = db.get_report(report_id)
@@ -1948,43 +1948,78 @@ async def report_compose_outlook(
 
     to_addrs = db.get_setting("email_to", "").strip()
 
-    # Regenerate body/subject from DB if not supplied (direct one-click path)
-    if not html_body.strip() and rec.get("report_json"):
+    # ── Subject ──
+    if not subject.strip() and rec.get("report_json"):
+        data    = ReportData.model_validate_json(rec["report_json"])
+        subject = (
+            f"IND3 Passdown \u2013 {data.shift_type} Shift \u2013 "
+            f"{data.lead_name} \u2013 {data.date}"
+        )
+
+    # ── Body ──
+    # Generate the full HTML email (includes PMs, OOS, LOTO etc.)
+    # then convert to clean plain text.
+    # If the lead edited the body in the modal use that instead.
+    if html_body.strip():
+        plain = _html_to_plain(html_body)
+    elif rec.get("report_json"):
         data = ReportData.model_validate_json(rec["report_json"])
         loto = db.get_loto(rec["shift_id"])
         pms  = db.get_pending_pms(rec["shift_id"])
-        html_body = format_email_passdown_html(
+        full_html = format_email_passdown_html(
             data,
             loto_missing=loto.get("loto_missing_keys", ""),
             pending_pms=pms or None,
             loto_verified=bool(loto.get("loto_verified", 0)),
         )
-
-    if not subject.strip() and rec.get("report_json"):
-        data = ReportData.model_validate_json(rec["report_json"])
-        subject = (
-            f"IND3 Passdown – {data.shift_type} Shift – "
-            f"{data.lead_name} – {data.date}"
-        )
-
-    # Strip HTML tags — mailto/OWA body param is plain text
-    import re as _re
-    plain = _re.sub(r"<[^>]+>", "", html_body)
-    # Clean up excess blank lines
-    plain = _re.sub(r"\n{3,}", "\n\n", plain).strip()
+        plain = _html_to_plain(full_html)
+    else:
+        plain = (rec.get("content") or "").strip()
 
     from urllib.parse import quote
-    # Use quote() not urlencode() — encodes spaces as %20, not +
-    # OWA and mailto: both need %20 to render spaces correctly
     body_encoded    = quote(plain[:2000], safe="")
     subject_encoded = quote(subject,      safe="")
     to_encoded      = quote(to_addrs,     safe="@,;")
 
-    # mailto: opens desktop Outlook (OS default mail app)
-    # OWA deeplink opens Outlook on the web
-    # Using mailto: — opens whichever Outlook the machine has set as default
     mailto_url = f"mailto:{to_encoded}?subject={subject_encoded}&body={body_encoded}"
     return Response(content=mailto_url, media_type="text/plain")
+
+
+def _html_to_plain(html: str) -> str:
+    """Convert HTML email to readable plain text matching the passdown format."""
+    import re as _re
+    import html as _hl
+
+    t = html
+    # <br> → newline
+    t = _re.sub(r'<br\s*/?>', '\n', t, flags=_re.I)
+    # Section headings (strong/b on their own line) → UPPERCASE + dashes
+    t = _re.sub(
+        r'<(strong|b)>([^<]{4,60})</(strong|b)>',
+        lambda m: f'\n{m.group(2).upper()}\n{"-"*40}',
+        t, flags=_re.I
+    )
+    # List items → bullet
+    t = _re.sub(r'<li[^>]*>', '\n\u2022 ', t, flags=_re.I)
+    # Table header cells → padded columns
+    t = _re.sub(r'<th[^>]*>', '  ', t, flags=_re.I)
+    # Table data cells → padded columns  
+    t = _re.sub(r'<td[^>]*>', '  ', t, flags=_re.I)
+    # Table rows → newline
+    t = _re.sub(r'<tr[^>]*>', '\n', t, flags=_re.I)
+    # Block elements → newline
+    t = _re.sub(r'</(p|div|h[1-6]|tr|li|ul|ol)>', '\n', t, flags=_re.I)
+    # HR → separator
+    t = _re.sub(r'<hr[^>]*>', '\n' + '-'*40 + '\n', t, flags=_re.I)
+    # Strip all remaining tags
+    t = _re.sub(r'<[^>]+>', '', t)
+    # Decode HTML entities (&amp; &#10003; etc.)
+    t = _hl.unescape(t)
+    # Collapse multiple spaces on same line
+    t = _re.sub(r'[ \t]{2,}', ' ', t)
+    # Max two consecutive newlines
+    t = _re.sub(r'\n{3,}', '\n\n', t)
+    return t.strip()
 
 
 @app.get("/outlook-draft-callback")
