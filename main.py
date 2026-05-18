@@ -1807,6 +1807,7 @@ async def report_email_preview(request: Request, report_id: int):
         email_data,
         loto_missing=loto.get("loto_missing_keys", ""),
         pending_pms=db.get_pending_pms(shift_id),
+        loto_verified=bool(loto.get("loto_verified", 0)),
     ) if email_data else rec["content"]
 
     subj = (
@@ -1876,6 +1877,7 @@ async def report_print_view(request: Request, report_id: int):
         email_data,
         loto_missing=loto.get("loto_missing_keys", ""),
         pending_pms=db.get_pending_pms(shift_id),
+        loto_verified=bool(loto.get("loto_verified", 0)),
     ) if email_data else rec["content"]
     # Strip outer html/body tags so we can wrap with print styles
     inner = html_body
@@ -2439,6 +2441,7 @@ async def download_docx(report_id: int):
         data,
         loto_missing=loto.get("loto_missing_keys", ""),
         pending_pms=pms or None,
+        loto_verified=bool(loto.get("loto_verified", 0)),
     )
     fname = f"passdown_{rec['generated_at'].replace(' ', '_').replace(':', '-')}.doc"
     return Response(

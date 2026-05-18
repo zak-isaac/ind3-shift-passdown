@@ -195,6 +195,7 @@ def format_email_passdown_html(
     loto_missing: str = "",
     pending_pms: list[dict] | None = None,
     lead_title: str = "MST Lead",
+    loto_verified: bool = False,
 ) -> str:
     """HTML passdown email: bold titles, real bordered PM table, signature block."""
     from datetime import date as _date
@@ -260,8 +261,11 @@ def format_email_passdown_html(
     else:
         pm_html = _bullet_sec("PM\u2019s Needing to be Completed", list(data.ro) if data.ro else [])
 
-    # LOTO
-    loto_html = "<p style='margin-top:18px;'><strong>All LOTO Keys Verified &#10003;</strong></p>"
+    # LOTO — only show verified if actually verified
+    if loto_verified:
+        loto_html = "<p style='margin-top:18px;'><strong style='color:#2a8703;'>&#10003; All LOTO Keys Verified</strong></p>"
+    else:
+        loto_html = "<p style='margin-top:18px;'><strong style='color:#b45309;'>&#9888; LOTO Verification Pending</strong></p>"
     if loto_missing:
         loto_html += f"<p style='color:#c00;margin:2px 0;'><strong>Missing keys:</strong> {loto_missing}</p>"
 
