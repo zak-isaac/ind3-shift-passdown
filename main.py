@@ -18,6 +18,7 @@ import httpx
 import associates as assoc_mod
 import db
 import emailer
+import ms_auth
 import outlook_sender
 import pm_pending_parser
 import registry
@@ -1921,6 +1922,109 @@ async def report_open_in_outlook(
         return HTMLResponse(
             f'<span style="color:#c00;font-weight:700;">&#10060; {exc}</span>',
             status_code=500,
+        )
+
+
+# ── Compose in Outlook via OWA or Graph API draft ─────────────────────────────
+
+
+@app.post("/report/{report_id}/compose-outlook", response_class=HTMLResponse)
+async def report_compose_outlook(
+    request:   Request,
+    report_id: int,
+    subject:   str = Form(""),
+    html_body: str = Form(""),
+):
+    """Smart router: Graph API draft (full HTML) if client_id configured,
+    else OWA compose URL (plain text fallback). Opens in a new browser tab."""
+    rec = db.get_report(report_id)
+    if not rec:
+        return HTMLResponse("Report not found", status_code=404)
+
+    client_id = db.get_setting("ms_client_id", "").strip()
+    to_addrs  = db.get_setting("email_to", "").strip()
+
+    # Build body if the caller didn’t send one (preview mode, no edits)
+    if not html_body.strip() and rec.get("report_json"):
+        data = ReportData.model_validate_json(rec["report_json"])
+        loto = db.get_loto(rec["shift_id"])
+        pms  = db.get_pending_pms(rec["shift_id"])
+        html_body = format_email_passdown_html(
+            data,
+            loto_missing=loto.get("loto_missing_keys", ""),
+            pending_pms=pms or None,
+            loto_verified=bool(loto.get("loto_verified", 0)),
+        )
+
+    if not subject.strip() and rec.get("report_json"):
+        data = ReportData.model_validate_json(rec["report_json"])
+        subject = (
+            f"IND3 Passdown – {data.shift_type} Shift – "
+            f"{data.lead_name} – {data.date}"
+        )
+
+    if client_id:
+        # ── Path A: Graph API draft — full HTML, lead’s own account ──
+        redirect_uri = str(request.base_url).rstrip("/") + "/outlook-draft-callback"
+        auth_url = ms_auth.build_draft_auth_url(
+            client_id=client_id,
+            redirect_uri=redirect_uri,
+            html_body=html_body,
+            subject=subject,
+            to_addrs=to_addrs,
+        )
+        # Tell the browser (via HTMX response) to open OAuth in a new tab
+        return HTMLResponse(
+            f'<span style="color:#2a8703;font-weight:700;">'
+            f'&#9989; Opening Microsoft login…</span>'
+            f'<script>window.open({json.dumps(auth_url)}, "_blank");</script>'
+        )
+    else:
+        # ── Path B: OWA compose URL — plain text, zero auth needed ──
+        from urllib.parse import urlencode, quote
+        # Strip HTML — OWA body param is plain text only
+        import re as _re
+        plain = _re.sub(r"<[^>]+>", "", html_body).strip()
+        params = urlencode({
+            "to":      to_addrs,
+            "subject": subject,
+            "body":    plain[:1800],  # OWA URL limit
+        })
+        owa_url = f"https://outlook.office.com/mail/deeplink/compose?{params}"
+        return HTMLResponse(
+            f'<span style="color:#2a8703;font-weight:700;">'
+            f'&#9989; Opening Outlook…</span>'
+            f'<script>window.open({json.dumps(owa_url)}, "_blank");</script>'
+        )
+
+
+@app.get("/outlook-draft-callback")
+async def outlook_draft_callback(request: Request, code: str = "", state: str = "", error: str = ""):
+    """OAuth callback: exchange code → create Graph draft → redirect to OWA draft."""
+    if error:
+        return HTMLResponse(
+            f"<h3 style='color:#c00;font-family:sans-serif;padding:40px'>'"
+            f"Microsoft login failed: {error}</h3>"
+            f"<p style='font-family:sans-serif;padding:0 40px;'>You can close this tab and try again.</p>"
+        )
+
+    client_id    = db.get_setting("ms_client_id", "").strip()
+    redirect_uri = str(request.base_url).rstrip("/") + "/outlook-draft-callback"
+
+    try:
+        draft_url = await ms_auth.create_user_draft(
+            client_id=client_id,
+            code=code,
+            state=state,
+            redirect_uri=redirect_uri,
+        )
+        return RedirectResponse(draft_url)
+    except Exception as exc:
+        return HTMLResponse(
+            f"<h3 style='color:#c00;font-family:sans-serif;padding:40px'>'"
+            f"Could not create draft: {exc}</h3>"
+            f"<p style='font-family:sans-serif;padding:0 40px;'>'"
+            f"Close this tab and try again, or ask your admin to check the Microsoft app registration.</p>"
         )
 
 

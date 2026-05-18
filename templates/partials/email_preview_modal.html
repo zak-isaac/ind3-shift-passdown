@@ -132,7 +132,7 @@
     <div id="email-send-result" style="font-size:12px;"></div>
 
     <!-- Open in Outlook -->
-    <button id="outlook-btn" onclick="openInOutlook({{ report_id }})"
+    <button id="outlook-btn" onclick="composeOutlook({{ report_id }})"
       style="display:flex;align-items:center;gap:7px;padding:8px 20px;
              border:none;border-radius:9px;border-bottom:3px solid #003db5;
              background:#0053e2;color:#fff;font-weight:800;font-size:13px;cursor:pointer;
@@ -529,13 +529,16 @@ function closeEmailModal() {
   if(wrap)wrap.innerHTML='';
 }
 
-// ── OPEN IN OUTLOOK ───────────────────────────────────────────────
+// ── COMPOSE IN OUTLOOK ───────────────────────────────────────────────
 //
-// POSTs to the server which calls Outlook COM .Display() — Outlook
-// opens a new compose window with To, Subject, and the full HTML body
-// pre-filled. The lead’s own signature sits beneath it automatically.
+// POSTs the current email content to the server. Server decides:
+//   - If Azure client ID configured → starts per-user OAuth in a new tab
+//     On callback, Graph API creates a real draft in their mailbox →
+//     browser opens the draft compose window in OWA (full HTML, their
+//     own account, their own saved Outlook signature underneath)
+//   - No client ID → opens OWA compose URL in a new tab (plain text fallback)
 
-function openInOutlook(reportId) {
+function composeOutlook(reportId) {
   const btn    = document.getElementById('outlook-btn');
   const result = document.getElementById('email-send-result');
   const subj   = document.getElementById('email-subject').value;
@@ -548,33 +551,36 @@ function openInOutlook(reportId) {
       + '</body></html>'
     : window._emailRaw;
 
-  btn.disabled = true;
+  btn.disabled  = true;
   btn.innerHTML = '⏳ Opening…';
-  result.innerHTML = '<span style="color:#6b7280;">Launching Outlook…</span>';
+  result.innerHTML = '<span style="color:#6b7280;">Connecting to Outlook…</span>';
 
   const fd = new FormData();
   fd.append('subject',   subj);
   fd.append('html_body', body);
 
-  fetch(`/report/${reportId}/open-in-outlook`, { method: 'POST', body: fd })
+  fetch(`/report/${reportId}/compose-outlook`, { method: 'POST', body: fd })
     .then(r => r.text())
     .then(html => {
+      // Server returns HTML with an inline <script>window.open(...)</script>
+      // Inject it so the script fires and opens the new tab
       result.innerHTML     = html;
       btn.innerHTML        = '&#10003; Opened';
       btn.style.background = '#2a8703';
       btn.style.borderColor= '#1a5c02';
       btn.disabled         = false;
-      // Reset button after a few seconds
       setTimeout(() => {
         btn.innerHTML         = 'Open in Outlook';
         btn.style.background  = '#0053e2';
         btn.style.borderColor = '#003db5';
         result.innerHTML      = '';
-      }, 5000);
+      }, 6000);
     })
     .catch(err => {
       result.innerHTML  = `<span style="color:#c00;">&#10060; ${err}</span>`;
       btn.innerHTML     = 'Open in Outlook';
+      btn.style.background  = '#0053e2';
+      btn.style.borderColor = '#003db5';
       btn.disabled      = false;
     });
 }

@@ -27,9 +27,13 @@ _AUTH_BASE  = "https://login.microsoftonline.com/common/oauth2/v2.0"
 _GRAPH_ME   = "https://graph.microsoft.com/v1.0/me"
 _GRAPH_MAIL = "https://graph.microsoft.com/v1.0/me/sendMail"
 _SCOPES     = "openid profile email Mail.Send offline_access"
+_SCOPES_DRAFT = "openid profile Mail.ReadWrite offline_access"
 
 # In-memory PKCE state store  { state -> code_verifier }  — one entry per pending login
 _pending: dict[str, str] = {}
+
+# Per-user draft pending: { state -> {verifier, html_body, subject, to_addrs, expires} }
+_draft_pending: dict[str, dict] = {}
 
 # In-memory token store — cleared on server restart (no password ever on disk)
 _session: dict = {"access_token": "", "refresh_token": "", "expires_at": "", "account": ""}
@@ -170,3 +174,106 @@ def sign_out() -> None:
 def signed_in_as() -> str:
     """Return account email if signed in, else empty string."""
     return _session.get("account", "") if _session.get("access_token") else ""
+
+
+# ── Per-user draft creation (each lead uses their own Microsoft account) ────────
+
+def build_draft_auth_url(
+    client_id: str,
+    redirect_uri: str,
+    html_body: str,
+    subject: str,
+    to_addrs: str,
+) -> str:
+    """Start a per-user OAuth flow scoped to Mail.ReadWrite (draft creation).
+
+    The email content is stored server-side keyed by state so it survives
+    the OAuth redirect without bloating the URL.
+    Returns the Microsoft login URL to open in a new tab.
+    """
+    from urllib.parse import urlencode
+    from datetime import datetime, timezone, timedelta
+
+    verifier, challenge = _pkce()
+    state = secrets.token_urlsafe(24)
+
+    # Lazy-expire old draft entries (>15 min)
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=15)
+    expired = [k for k, v in _draft_pending.items()
+               if datetime.fromisoformat(v["expires"]) < cutoff]
+    for k in expired:
+        _draft_pending.pop(k, None)
+
+    _draft_pending[state] = {
+        "verifier":  verifier,
+        "html_body": html_body,
+        "subject":   subject,
+        "to_addrs":  to_addrs,
+        "expires":   (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat(),
+    }
+
+    params = urlencode({
+        "client_id":             client_id,
+        "response_type":         "code",
+        "redirect_uri":          redirect_uri,
+        "scope":                 _SCOPES_DRAFT,
+        "state":                 state,
+        "code_challenge":        challenge,
+        "code_challenge_method": "S256",
+        "prompt":                "select_account",
+    })
+    return f"{_AUTH_BASE}/authorize?{params}"
+
+
+async def create_user_draft(
+    client_id: str,
+    code: str,
+    state: str,
+    redirect_uri: str,
+) -> str:
+    """Exchange auth code for a per-user token, create a draft, return OWA draft URL.
+
+    The token is used once and discarded — never stored server-side.
+    """
+    entry = _draft_pending.pop(state, None)
+    if not entry:
+        raise ValueError("Draft session expired or invalid — please try again.")
+
+    # Exchange code → token (one-time, user-specific)
+    async with httpx.AsyncClient(timeout=15) as c:
+        r = await c.post(f"{_AUTH_BASE}/token", data={
+            "client_id":     client_id,
+            "grant_type":    "authorization_code",
+            "code":          code,
+            "redirect_uri":  redirect_uri,
+            "code_verifier": entry["verifier"],
+            "scope":         _SCOPES_DRAFT,
+        })
+        r.raise_for_status()
+        token = r.json()["access_token"]
+
+    # Build draft message
+    to_list = [a.strip() for a in entry["to_addrs"].split(",") if a.strip()]
+    payload = {
+        "subject": entry["subject"],
+        "body":    {"contentType": "HTML", "content": entry["html_body"]},
+        "toRecipients": [{"emailAddress": {"address": a}} for a in to_list],
+    }
+
+    # Create draft via Graph API
+    async with httpx.AsyncClient(timeout=20) as c:
+        r = await c.post(
+            "https://graph.microsoft.com/v1.0/me/messages",
+            json=payload,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        r.raise_for_status()
+        draft = r.json()
+
+    # Return the OWA compose deep-link for this specific draft
+    draft_id  = draft.get("id", "")
+    web_link  = draft.get("webLink", "")
+    if web_link:
+        return web_link
+    # Fallback: generic OWA drafts folder
+    return "https://outlook.office.com/mail/drafts"
