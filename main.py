@@ -1511,6 +1511,7 @@ async def admin_get(request: Request):
         "teams_webhook_url": db.get_setting("teams_webhook_url", ""),
         "email_to":          db.get_setting("email_to", ""),
         "email_from_name":   db.get_setting("email_from_name", "IND3 Shift Passdown"),
+        "ms_client_id":      db.get_setting("ms_client_id", ""),
         "outlook_ready":     _outlook_ready(),
         "msg":        request.query_params.get("msg", ""),
         "err":        request.query_params.get("err", ""),
@@ -1820,11 +1821,13 @@ async def admin_save_email_settings(
     request:         Request,
     email_from_name: str = Form("IND3 Shift Passdown"),
     email_to:        str = Form(""),
+    ms_client_id:    str = Form(""),
 ):
     if not _is_lead_authed(request):
         return _lead_redirect("/admin")
     db.set_setting("email_from_name", email_from_name.strip() or "IND3 Shift Passdown")
     db.set_setting("email_to",        email_to.strip())
+    db.set_setting("ms_client_id",    ms_client_id.strip())
     return RedirectResponse("/admin?msg=Email+settings+saved", status_code=303)
 
 

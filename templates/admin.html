@@ -263,6 +263,22 @@
           value="{{ email_to }}"
           class="rounded-xl border-2 border-gray-200 focus:border-wm-blue px-4 py-2.5 text-sm outline-none transition w-full" />
       </div>
+
+      <!-- Microsoft Graph API (per-user Outlook compose) -->
+      <div class="border-t border-gray-100 pt-4 flex flex-col gap-1">
+        <label class="text-xs font-bold text-gray-500 uppercase tracking-wide">
+          Microsoft App Client ID
+          <span class="normal-case font-normal text-gray-400">&nbsp;&mdash; enables "Open in Outlook" on any laptop</span>
+        </label>
+        <input name="ms_client_id" type="text"
+          placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+          value="{{ ms_client_id or '' }}"
+          class="rounded-xl border-2 border-gray-200 focus:border-wm-blue px-4 py-2.5 text-sm outline-none transition w-full font-mono" />
+        <p class="text-xs text-gray-400">
+          Azure Portal &rarr; App registrations &rarr; IND3 Passdown &rarr; Overview &rarr; Application (client) ID<br>
+          Redirect URI must be: <code class="bg-gray-100 px-1 rounded">http://localhost:8765/outlook-draft-callback</code>
+        </p>
+      </div>
       <button type="submit" class="w-fit bg-wm-blue hover:bg-blue-700 text-white font-black px-6 py-2.5 rounded-xl text-sm transition">
         Save
       </button>

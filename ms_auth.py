@@ -22,8 +22,9 @@ from datetime import datetime, timezone, timedelta
 
 import httpx
 
-# common = accepts both personal Microsoft accounts AND work/school (Walmart) accounts
-_AUTH_BASE  = "https://login.microsoftonline.com/common/oauth2/v2.0"
+# Walmart tenant — single-org app registration
+_WALMART_TENANT = "3cbcc3d3-094d-4006-9849-0d11d61f484d"
+_AUTH_BASE  = f"https://login.microsoftonline.com/{_WALMART_TENANT}/oauth2/v2.0"
 _GRAPH_ME   = "https://graph.microsoft.com/v1.0/me"
 _GRAPH_MAIL = "https://graph.microsoft.com/v1.0/me/sendMail"
 _SCOPES     = "openid profile email Mail.Send offline_access"
