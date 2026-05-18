@@ -1931,6 +1931,14 @@ async def report_open_in_outlook(
 # ── Compose in Outlook via OWA or Graph API draft ─────────────────────────────
 
 
+@app.get("/report/{report_id}/compose-outlook")
+async def report_compose_outlook_get(request: Request, report_id: int):
+    """GET — one-click button uses a hidden iframe pointing here.
+    Browser receives the .eml and Windows auto-opens it in Outlook compose.
+    """
+    return await _build_eml_response(report_id, subject="", html_body="")
+
+
 @app.post("/report/{report_id}/compose-outlook")
 async def report_compose_outlook(
     request:   Request,
@@ -1938,10 +1946,12 @@ async def report_compose_outlook(
     subject:   str = Form(""),
     html_body: str = Form(""),
 ):
-    """Return a .eml file (X-Unsent:1) so Outlook opens in compose mode
-    with the full HTML body intact. No OAuth, no admin consent needed.
-    Browser downloads; user double-clicks -> Outlook compose -> Send.
-    """
+    """POST — preview modal uses this when the lead has edited the body."""
+    return await _build_eml_response(report_id, subject=subject, html_body=html_body)
+
+
+async def _build_eml_response(report_id: int, subject: str, html_body: str) -> Response:
+    """Build and return a .eml (X-Unsent:1) so Outlook opens in compose mode."""
     rec = db.get_report(report_id)
     if not rec:
         return Response("Report not found", status_code=404, media_type="text/plain")
@@ -1973,11 +1983,9 @@ async def report_compose_outlook(
         body_html = f"<pre>{rec.get('content', '')}</pre>"
 
     # ── Build .eml ──
-    # X-Unsent: 1 tells Outlook to open in compose mode, not read mode
     import base64 as _b64
-    body_b64 = _b64.b64encode(body_html.encode("utf-8")).decode("ascii")
+    body_b64        = _b64.b64encode(body_html.encode("utf-8")).decode("ascii")
     body_b64_folded = "\r\n".join(body_b64[i:i+76] for i in range(0, len(body_b64), 76))
-
     eml = (
         f"X-Unsent: 1\r\n"
         f"To: {to_addrs}\r\n"
@@ -1988,13 +1996,11 @@ async def report_compose_outlook(
         f"\r\n"
         f"{body_b64_folded}\r\n"
     )
-
     shift_label = ""
     if rec.get("report_json"):
         d = ReportData.model_validate_json(rec["report_json"])
         shift_label = f"{d.shift_type}-{d.date}-"
     filename = f"passdown-{shift_label}{report_id}.eml"
-
     return Response(
         content=eml.encode("utf-8"),
         media_type="message/rfc822",

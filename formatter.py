@@ -269,13 +269,8 @@ def format_email_passdown_html(
     if loto_missing:
         loto_html += f"<p style='color:#c00;margin:2px 0;'><strong>Missing keys:</strong> {loto_missing}</p>"
 
-    # Signature — Outlook appends MST facility block automatically
-    sig = (
-        "<div style='margin-top:28px;padding-top:14px;border-top:2px solid #e5e7eb;'>"
-        f"<p style='margin:0;font-weight:bold;font-size:14px;'>{data.lead_name}</p>"
-        f"<p style='margin:2px 0;font-size:13px;color:#444;'>{lead_title}</p>"
-        "</div>"
-    )
+    # No sign-off block — Outlook appends the user's own signature automatically
+    # below the compose body. Putting a name here would create a duplicate.
 
     return (
         "<html><body style='font-family:Calibri,Arial,sans-serif;font-size:14px;"
@@ -287,7 +282,6 @@ def format_email_passdown_html(
         + _bullet_sec("Out of Service \u2014 Returned to Service (RTS)", list(data.rts))
         + _bullet_sec("Current Out of Service", [o.unit for o in data.oos])
         + loto_html
-        + sig
         + "</body></html>"
     )
 

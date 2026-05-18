@@ -41,7 +41,7 @@
         </div>
       </div>
 
-      <!-- ONE-CLICK: Open in Outlook immediately -->
+      <!-- ONE-CLICK: iframe triggers .eml download -> Windows auto-opens in Outlook -->
       <button id="compose-btn-{{ report_id }}"
         onclick="openComposeNow({{ report_id }})"
         class="w-full flex items-center justify-center gap-3 py-4 px-6
@@ -57,7 +57,7 @@
         <span id="compose-btn-label-{{ report_id }}">Open &amp; Compose in Outlook</span>
       </button>
 
-      <!-- Status feedback line -->
+      <!-- Status feedback -->
       <div id="compose-status-{{ report_id }}" class="text-center text-xs min-h-[16px]"></div>
 
       <!-- Secondary: preview/edit first -->
@@ -74,7 +74,7 @@
     </div>
   </div>
 
-  <!-- Modal mount (only used if "Preview & edit" is clicked) -->
+  <!-- Modal mount -->
   <div id="email-modal-wrap-{{ report_id }}"></div>
 
 </div>
@@ -85,38 +85,34 @@ function openComposeNow(reportId) {
   const label  = document.getElementById('compose-btn-label-' + reportId);
   const status = document.getElementById('compose-status-' + reportId);
 
-  btn.disabled  = true;
-  label.textContent = 'Opening Outlook\u2026';
-  status.innerHTML  = '<span class="text-blue-300">Connecting\u2026</span>';
+  btn.disabled      = true;
+  label.textContent = 'Opening Outlook...';
 
-  fetch('/report/' + reportId + '/compose-outlook', { method: 'POST', body: new FormData() })
-    .then(r => r.blob())
-    .then(blob => {
-      // Trigger .eml download — user double-clicks -> Outlook opens in compose
-      const a   = document.createElement('a');
-      a.href    = URL.createObjectURL(blob);
-      a.download = 'passdown.eml';
-      a.click();
-      URL.revokeObjectURL(a.href);
+  // Hidden iframe: the browser GETs the .eml endpoint which returns
+  // Content-Type: message/rfc822. Windows sees the file association and
+  // auto-opens it in Outlook compose — no popup blocker, no new tab needed.
+  let iframe = document.getElementById('eml-frame-' + reportId);
+  if (!iframe) {
+    iframe               = document.createElement('iframe');
+    iframe.id            = 'eml-frame-' + reportId;
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+  }
+  iframe.src = '/report/' + reportId + '/compose-outlook';
 
-      label.textContent     = '\u2713 Check your Downloads!';
-      btn.style.background  = '#2a8703';
-      btn.style.borderColor = '#1a5c02';
-      status.innerHTML      = '<span class="text-green-400 text-xs">Double-click the .eml file to open in Outlook</span>';
+  setTimeout(() => {
+    label.textContent     = '\u2713 Outlook is opening!';
+    btn.style.background  = '#2a8703';
+    btn.style.borderColor = '#1a5c02';
+    status.innerHTML      = '<span class="text-green-400">Check your taskbar \u2014 Outlook compose should appear shortly</span>';
+  }, 900);
 
-      setTimeout(() => {
-        label.textContent     = 'Open & Compose in Outlook';
-        btn.style.background  = '';
-        btn.style.borderColor = '';
-        btn.disabled          = false;
-        status.innerHTML      = '';
-      }, 8000);
-    })
-    .catch(err => {
-      label.textContent = 'Open & Compose in Outlook';
-      btn.disabled      = false;
-      status.innerHTML  = '<span class="text-red-400">\u274c ' + err + '</span>';
-    });
+  setTimeout(() => {
+    label.textContent     = 'Open & Compose in Outlook';
+    btn.style.background  = '';
+    btn.style.borderColor = '';
+    btn.disabled          = false;
+    status.innerHTML      = '';
+  }, 6000);
 }
 </script>
-<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
