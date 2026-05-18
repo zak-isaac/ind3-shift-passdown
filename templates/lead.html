@@ -799,14 +799,17 @@ refreshRelTimes();
 setInterval(refreshRelTimes, 60000);
 document.addEventListener('htmx:afterSwap', refreshRelTimes);
 
-// After any feed-entry row is swapped (save or cancel), immediately
-// re-poll the feed so new entries appear without waiting 10 seconds.
-// This replaces the broken hx-on:htmx:after-swap inline attributes.
+// After a feed-entry row is swapped, immediately re-poll the feed —
+// but ONLY when the result is a read-only row (save / cancel).
+// If the swapped content contains a <form> it means the edit form just
+// opened; refreshing at that point would wipe it before the user types.
 document.addEventListener('htmx:afterSwap', function (e) {
   var target = e.detail && e.detail.target;
   if (target && target.id && target.id.startsWith('feed-entry-')) {
-    var feed = document.getElementById('live-feed');
-    if (feed) htmx.trigger(feed, 'refresh');
+    if (!target.querySelector('form')) {
+      var feed = document.getElementById('live-feed');
+      if (feed) htmx.trigger(feed, 'refresh');
+    }
   }
 });
 document.body.addEventListener('htmx:afterSwap', function (e) {
