@@ -1967,16 +1967,24 @@ async def report_compose_outlook(
             f"{data.lead_name} – {data.date}"
         )
 
-    # Strip HTML tags — OWA body param is plain text
+    # Strip HTML tags — mailto/OWA body param is plain text
     import re as _re
     plain = _re.sub(r"<[^>]+>", "", html_body)
     # Clean up excess blank lines
     plain = _re.sub(r"\n{3,}", "\n\n", plain).strip()
 
-    from urllib.parse import urlencode
-    params  = urlencode({"to": to_addrs, "subject": subject, "body": plain[:2000]})
-    owa_url = f"https://outlook.office.com/mail/deeplink/compose?{params}"
-    return Response(content=owa_url, media_type="text/plain")
+    from urllib.parse import quote
+    # Use quote() not urlencode() — encodes spaces as %20, not +
+    # OWA and mailto: both need %20 to render spaces correctly
+    body_encoded    = quote(plain[:2000], safe="")
+    subject_encoded = quote(subject,      safe="")
+    to_encoded      = quote(to_addrs,     safe="@,;")
+
+    # mailto: opens desktop Outlook (OS default mail app)
+    # OWA deeplink opens Outlook on the web
+    # Using mailto: — opens whichever Outlook the machine has set as default
+    mailto_url = f"mailto:{to_encoded}?subject={subject_encoded}&body={body_encoded}"
+    return Response(content=mailto_url, media_type="text/plain")
 
 
 @app.get("/outlook-draft-callback")
