@@ -721,14 +721,22 @@ function requestNotifPermission() {
 function updateShiftTimer() {
   const el = document.getElementById('shift-timer');
   if (!el) return;
-  const started = new Date(el.dataset.started.replace(' ', 'T'));
-  const diff    = Math.floor((Date.now() - started) / 1000);
+  const raw = el.dataset.started;
+  if (!raw) return;
+  const started = new Date(raw.replace(' ', 'T'));
+  if (isNaN(started.getTime())) return;
+  const diff = Math.floor((Date.now() - started) / 1000);
+  if (diff < 0) return;
   const h = Math.floor(diff / 3600);
   const m = Math.floor((diff % 3600) / 60);
-  el.textContent = `\u23F1 ${h}h ${String(m).padStart(2,'0')}m`;
+  const s = diff % 60;
+  el.textContent = `\u23F1 ${h}h ${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s`;
 }
+// Run immediately + every second for a live clock
 updateShiftTimer();
-setInterval(updateShiftTimer, 60000);
+setInterval(updateShiftTimer, 1000);
+// Also fire after every HTMX swap so the strip reset never shows --:--
+document.addEventListener('htmx:afterSettle', updateShiftTimer);
 
 // ── Relative timestamps ────────────────────────────────────────────────
 function relTime(iso) {

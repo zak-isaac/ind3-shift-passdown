@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WO Consolidation Demo — IND3 Passdown</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Segoe UI',system-ui,sans-serif; background:#f8fafc; color:#1e293b; }
+  .hero { background:#0053e2; color:white; padding:32px 40px; }
+  .hero h1 { font-size:24px; font-weight:900; }
+  .hero p { font-size:14px; opacity:0.85; margin-top:6px; }
+  .container { max-width:1100px; margin:0 auto; padding:32px 20px; }
+  .cols { display:grid; grid-template-columns:1fr 1fr; gap:32px; }
+  .col-head { font-size:14px; font-weight:800; text-transform:uppercase;
+               letter-spacing:0.08em; margin-bottom:16px; padding-bottom:10px;
+               border-bottom:3px solid; }
+  .before .col-head { color:#ea1100; border-color:#ea1100; }
+  .after  .col-head { color:#0053e2; border-color:#0053e2; }
+  .stat-bar { display:flex; gap:16px; margin-bottom:28px; flex-wrap:wrap; }
+  .stat { background:white; border-radius:10px; padding:14px 20px;
+           border:1px solid #e2e8f0; flex:1; min-width:160px; }
+  .stat .num { font-size:28px; font-weight:900; }
+  .stat .lbl { font-size:12px; color:#64748b; margin-top:2px; }
+  .arrow { display:flex; align-items:center; justify-content:center;
+            font-size:40px; color:#0053e2; padding-top:60px; }
+  .section-label { font-size:12px; font-weight:700; color:#64748b;
+                    text-transform:uppercase; letter-spacing:0.08em;
+                    margin:16px 0 8px; }
+  @media(max-width:700px){ .cols{grid-template-columns:1fr;} .arrow{padding:0;transform:rotate(90deg);} }
+</style>
+</head>
+<body>
+<div class="hero">
+  <h1>WO Consolidation — Live Demo</h1>
+  <p>IND3 Shift Passdown · S5 · 2026-05-17 · MST: Stanley A &nbsp;·&nbsp;
+     Shift ID #42 &nbsp;·&nbsp; 7 raw DB entries &nbsp;→&nbsp;
+     2 consolidated WO blocks + 1 passthrough</p>
+</div>
+
+<div class="container">
+
+  <!-- Stats -->
+  <div class="stat-bar">
+    <div class="stat">
+      <div class="num" style="color:#ea1100;">7</div>
+      <div class="lbl">Raw DB entries (what techs uploaded)</div>
+    </div>
+    <div class="stat">
+      <div class="num" style="color:#ea1100;">1</div>
+      <div class="lbl">Excluded by MST (never in report)</div>
+    </div>
+    <div class="stat">
+      <div class="num" style="color:#0053e2;">2</div>
+      <div class="lbl">Unique WOs consolidated</div>
+    </div>
+    <div class="stat">
+      <div class="num" style="color:#64748b;">1</div>
+      <div class="lbl">Passthrough (no WO number)</div>
+    </div>
+    <div class="stat">
+      <div class="num" style="color:#2a8703;">3</div>
+      <div class="lbl">Final report happenings</div>
+    </div>
+  </div>
+
+  <!-- Side by side -->
+  <div class="cols">
+    <div class="before">
+      <div class="col-head">❌ BEFORE — What the report used to show</div>
+      <p style="font-size:13px;color:#64748b;margin-bottom:14px;">
+        The old <code>seen_wo</code> set picked whichever entry arrived first and
+        silently dropped everything else. Isaac's first upload won; Stanley's and
+        Marcus's remarks were gone forever from the report.
+      </p>
+      
+    <div style="border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;
+                margin-bottom:10px;background:white;opacity:0.45;filter:grayscale(1);position:relative;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <span style="background:#ea1100;color:white;font-size:11px;font-weight:700;
+                     padding:2px 8px;border-radius:999px;">EXCLUDED</span>
+        <span style="background:#64748b;color:white;font-size:11px;font-weight:600;
+                     padding:2px 8px;border-radius:999px;">MONITOR</span>
+        <span style="font-size:11px;color:#94a3b8;">2026-05-17 06:11:00</span>
+        <span style='margin-left:auto;color:#ea1100;font-weight:700;font-size:12px;'>✕ EXCLUDED BY MST</span>
+      </div>
+      <div style="font-weight:700;color:#1e293b;margin-bottom:2px;">
+        👤 Isaac S &nbsp;·&nbsp; 📦 M2785
+        &nbsp;·&nbsp; 🔖 WO #27771902
+      </div>
+      <div style="color:#334155;font-size:14px;">WO #27771902 — accidental duplicate upload</div>
+      <div style="margin-top:6px;font-style:italic;color:#475569;font-size:13px;">"DUPLICATE - ignore"</div>
+    </div>
+    <div style="border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;
+                margin-bottom:10px;background:white;position:relative;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <span style="background:#64748b;color:white;font-size:11px;font-weight:700;
+                     padding:2px 8px;border-radius:999px;">ID #1</span>
+        <span style="background:#ea580c;color:white;font-size:11px;font-weight:600;
+                     padding:2px 8px;border-radius:999px;">HIGH</span>
+        <span style="font-size:11px;color:#94a3b8;">2026-05-17 06:12:00</span>
+        
+      </div>
+      <div style="font-weight:700;color:#1e293b;margin-bottom:2px;">
+        👤 Isaac S &nbsp;·&nbsp; 📦 M2785
+        &nbsp;·&nbsp; 🔖 WO #27771902
+      </div>
+      <div style="color:#334155;font-size:14px;">WO #27771902 — Motor tripping thermal breaker</div>
+      <div style="margin-top:6px;font-style:italic;color:#475569;font-size:13px;">"Motor tripping thermal breaker on startup. Checked amp draw — reading 28A on phase 2 vs 18A normal."</div>
+    </div>
+    <div style="border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;
+                margin-bottom:10px;background:white;position:relative;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <span style="background:#64748b;color:white;font-size:11px;font-weight:700;
+                     padding:2px 8px;border-radius:999px;">ID #2</span>
+        <span style="background:#ea580c;color:white;font-size:11px;font-weight:600;
+                     padding:2px 8px;border-radius:999px;">HIGH</span>
+        <span style="font-size:11px;color:#94a3b8;">2026-05-17 07:45:00</span>
+        
+      </div>
+      <div style="font-weight:700;color:#1e293b;margin-bottom:2px;">
+        👤 Stanley A &nbsp;·&nbsp; 📦 M2785
+        &nbsp;·&nbsp; 🔖 WO #27771902
+      </div>
+      <div style="color:#334155;font-size:14px;">WO #27771902 — Phase 2 capacitor suspected</div>
+      <div style="margin-top:6px;font-style:italic;color:#475569;font-size:13px;">"Verified Isaac's amp reading. Traced to failing run capacitor on phase 2. Capacitor tested at 18uF vs rated 35uF."</div>
+    </div>
+    <div style="border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;
+                margin-bottom:10px;background:white;position:relative;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <span style="background:#64748b;color:white;font-size:11px;font-weight:700;
+                     padding:2px 8px;border-radius:999px;">ID #4</span>
+        <span style="background:#ea1100;color:white;font-size:11px;font-weight:600;
+                     padding:2px 8px;border-radius:999px;">CRITICAL</span>
+        <span style="font-size:11px;color:#94a3b8;">2026-05-17 08:00:00</span>
+        
+      </div>
+      <div style="font-weight:700;color:#1e293b;margin-bottom:2px;">
+        👤 Isaac S &nbsp;·&nbsp; 📦 BALER-01
+        &nbsp;·&nbsp; 🔖 WO #30045812
+      </div>
+      <div style="color:#334155;font-size:14px;">WO #30045812 — Baler hydraulic leak</div>
+      <div style="margin-top:6px;font-style:italic;color:#475569;font-size:13px;">"Hydraulic leak identified at the cylinder rod seal. Fluid pooling under unit. Tagged OOS."</div>
+    </div>
+    <div style="border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;
+                margin-bottom:10px;background:white;position:relative;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <span style="background:#64748b;color:white;font-size:11px;font-weight:700;
+                     padding:2px 8px;border-radius:999px;">ID #3</span>
+        <span style="background:#64748b;color:white;font-size:11px;font-weight:600;
+                     padding:2px 8px;border-radius:999px;">MONITOR</span>
+        <span style="font-size:11px;color:#94a3b8;">2026-05-17 09:10:00</span>
+        
+      </div>
+      <div style="font-weight:700;color:#1e293b;margin-bottom:2px;">
+        👤 Marcus T &nbsp;·&nbsp; 📦 M2785
+        &nbsp;·&nbsp; 🔖 WO #27771902
+      </div>
+      <div style="color:#334155;font-size:14px;">WO #27771902 — Capacitor replaced, unit RTS</div>
+      <div style="margin-top:6px;font-style:italic;color:#475569;font-size:13px;">"Replaced run capacitor with 35uF/370VAC unit from parts room. Motor tested — amp draw normal at 19A all phases. Unit returned to service."</div>
+    </div>
+    <div style="border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;
+                margin-bottom:10px;background:white;position:relative;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <span style="background:#64748b;color:white;font-size:11px;font-weight:700;
+                     padding:2px 8px;border-radius:999px;">ID #5</span>
+        <span style="background:#ea1100;color:white;font-size:11px;font-weight:600;
+                     padding:2px 8px;border-radius:999px;">CRITICAL</span>
+        <span style="font-size:11px;color:#94a3b8;">2026-05-17 10:30:00</span>
+        
+      </div>
+      <div style="font-weight:700;color:#1e293b;margin-bottom:2px;">
+        👤 Stanley A &nbsp;·&nbsp; 📦 BALER-01
+        &nbsp;·&nbsp; 🔖 WO #30045812
+      </div>
+      <div style="color:#334155;font-size:14px;">WO #30045812 — Seal kit ordered</div>
+      <div style="margin-top:6px;font-style:italic;color:#475569;font-size:13px;">"Seal kit part #HYD-4412 ordered from MaintenanceOne. ETA next shift. Unit remains OOS pending parts."</div>
+    </div>
+    <div style="border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;
+                margin-bottom:10px;background:white;position:relative;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <span style="background:#64748b;color:white;font-size:11px;font-weight:700;
+                     padding:2px 8px;border-radius:999px;">ID #6</span>
+        <span style="background:#64748b;color:white;font-size:11px;font-weight:600;
+                     padding:2px 8px;border-radius:999px;">MONITOR</span>
+        <span style="font-size:11px;color:#94a3b8;">2026-05-17 11:00:00</span>
+        
+      </div>
+      <div style="font-weight:700;color:#1e293b;margin-bottom:2px;">
+        👤 Stanley A &nbsp;·&nbsp; 📦 Vendor
+        
+      </div>
+      <div style="color:#334155;font-size:14px;">Crown lift technician on-site to service WAV-15 battery</div>
+      
+    </div>
+    </div>
+
+    <div style="display:flex;align-items:flex-start;">
+      <div class="arrow">→</div>
+    </div>
+
+    <div class="after">
+      <div class="col-head">✅ AFTER — One consolidated block per WO</div>
+      <p style="font-size:13px;color:#64748b;margin-bottom:14px;">
+        All techs' remarks are merged chronologically, deduplicated, and
+        combined into a single authoritative block. The excluded entry never
+        appears. Raw DB rows are untouched.
+      </p>
+      
+    <div style="border:2px solid #0053e2;border-radius:12px;padding:18px 20px;
+                margin-bottom:14px;background:white;
+                box-shadow:0 4px 16px rgba(0,83,226,0.08);">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+        <span style="background:#0053e2;color:white;font-size:13px;font-weight:800;
+                     padding:4px 12px;border-radius:999px;">WO #27771902</span>
+        <span style="background:#ea580c;color:white;font-size:11px;font-weight:700;
+                     padding:3px 10px;border-radius:999px;">HIGH</span>
+        <span style="background:#f1f5f9;color:#64748b;font-size:11px;padding:3px 10px;border-radius:999px;">
+          3 entries merged
+        </span>
+        <span style="background:#f1f5f9;color:#64748b;font-size:11px;padding:3px 10px;border-radius:999px;">
+          🕐 2026-05-17 06:12:00 → 2026-05-17 09:10:00
+        </span>
+      </div>
+
+      <div style="margin-bottom:10px;">
+        <span style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;
+                     letter-spacing:0.05em;">📦 Asset</span>
+        <span style="font-weight:700;color:#1e293b;margin-left:8px;">M2785</span>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <span style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;
+                     letter-spacing:0.05em;">👥 Techs Involved</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;"><span style="background:#dbeafe;color:#0053e2;font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;">Isaac S</span><span style="background:#dbeafe;color:#0053e2;font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;">Stanley A</span><span style="background:#dbeafe;color:#0053e2;font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;">Marcus T</span></div>
+      </div>
+
+      <div style="margin-bottom:10px;">
+        <span style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;
+                     letter-spacing:0.05em;">📋 Individual Remarks (chronological)</span>
+        <ul style="margin:8px 0 0;padding-left:18px;"><li style="margin-bottom:6px;color:#334155;font-size:13px;">Motor tripping thermal breaker on startup. Checked amp draw — reading 28A on phase 2 vs 18A normal.</li><li style="margin-bottom:6px;color:#334155;font-size:13px;">Verified Isaac's amp reading. Traced to failing run capacitor on phase 2. Capacitor tested at 18uF vs rated 35uF.</li><li style="margin-bottom:6px;color:#334155;font-size:13px;">Replaced run capacitor with 35uF/370VAC unit from parts room. Motor tested — amp draw normal at 19A all phases. Unit returned to service.</li></ul>
+      </div>
+
+      <div style="background:#f8fafc;border-left:4px solid #0053e2;border-radius:0 8px 8px 0;
+                  padding:12px 16px;margin-top:10px;">
+        <span style="font-size:12px;font-weight:700;color:#0053e2;text-transform:uppercase;
+                     letter-spacing:0.05em;">✅ Consolidated Summary (what goes in the report)</span>
+        <p style="margin:8px 0 0;color:#1e293b;font-size:14px;line-height:1.7;">Motor tripping thermal breaker on startup. Checked amp draw — reading 28A on phase 2 vs 18A normal. Verified Isaac's amp reading. Traced to failing run capacitor on phase 2. Capacitor tested at 18uF vs rated 35uF. Replaced run capacitor with 35uF/370VAC unit from parts room. Motor tested — amp draw normal at 19A all phases. Unit returned to service.</p>
+      </div>
+      
+    </div>
+    <div style="border:2px solid #0053e2;border-radius:12px;padding:18px 20px;
+                margin-bottom:14px;background:white;
+                box-shadow:0 4px 16px rgba(0,83,226,0.08);">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+        <span style="background:#0053e2;color:white;font-size:13px;font-weight:800;
+                     padding:4px 12px;border-radius:999px;">WO #30045812</span>
+        <span style="background:#ea1100;color:white;font-size:11px;font-weight:700;
+                     padding:3px 10px;border-radius:999px;">CRITICAL</span>
+        <span style="background:#f1f5f9;color:#64748b;font-size:11px;padding:3px 10px;border-radius:999px;">
+          2 entries merged
+        </span>
+        <span style="background:#f1f5f9;color:#64748b;font-size:11px;padding:3px 10px;border-radius:999px;">
+          🕐 2026-05-17 08:00:00 → 2026-05-17 10:30:00
+        </span>
+      </div>
+
+      <div style="margin-bottom:10px;">
+        <span style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;
+                     letter-spacing:0.05em;">📦 Asset</span>
+        <span style="font-weight:700;color:#1e293b;margin-left:8px;">BALER-01</span>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <span style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;
+                     letter-spacing:0.05em;">👥 Techs Involved</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;"><span style="background:#dbeafe;color:#0053e2;font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;">Isaac S</span><span style="background:#dbeafe;color:#0053e2;font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;">Stanley A</span></div>
+      </div>
+
+      <div style="margin-bottom:10px;">
+        <span style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;
+                     letter-spacing:0.05em;">📋 Individual Remarks (chronological)</span>
+        <ul style="margin:8px 0 0;padding-left:18px;"><li style="margin-bottom:6px;color:#334155;font-size:13px;">Hydraulic leak identified at the cylinder rod seal. Fluid pooling under unit. Tagged OOS.</li><li style="margin-bottom:6px;color:#334155;font-size:13px;">Seal kit part #HYD-4412 ordered from MaintenanceOne. ETA next shift. Unit remains OOS pending parts.</li></ul>
+      </div>
+
+      <div style="background:#f8fafc;border-left:4px solid #0053e2;border-radius:0 8px 8px 0;
+                  padding:12px 16px;margin-top:10px;">
+        <span style="font-size:12px;font-weight:700;color:#0053e2;text-transform:uppercase;
+                     letter-spacing:0.05em;">✅ Consolidated Summary (what goes in the report)</span>
+        <p style="margin:8px 0 0;color:#1e293b;font-size:14px;line-height:1.7;">Hydraulic leak identified at the cylinder rod seal. Fluid pooling under unit. Tagged OOS. Seal kit part #HYD-4412 ordered from MaintenanceOne. ETA next shift. Unit remains OOS pending parts.</p>
+      </div>
+      
+        <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;
+                    padding:8px 12px;margin-top:10px;font-size:13px;color:#92400e;">
+          ⚠️ <strong>Conflicting notes detected</strong> — verify final status with techs
+        </div>
+    </div>
+      <div class="section-label">📌 Passthrough entries (no WO number — unchanged)</div>
+      
+    <div style="border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;
+                margin-bottom:10px;background:white;position:relative;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <span style="background:#64748b;color:white;font-size:11px;font-weight:700;
+                     padding:2px 8px;border-radius:999px;">ID #6</span>
+        <span style="background:#64748b;color:white;font-size:11px;font-weight:600;
+                     padding:2px 8px;border-radius:999px;">MONITOR</span>
+        <span style="font-size:11px;color:#94a3b8;">2026-05-17 11:00:00</span>
+        
+      </div>
+      <div style="font-weight:700;color:#1e293b;margin-bottom:2px;">
+        👤 Stanley A &nbsp;·&nbsp; 📦 Vendor
+        
+      </div>
+      <div style="color:#334155;font-size:14px;">Crown lift technician on-site to service WAV-15 battery</div>
+      
+    </div>
+    </div>
+  </div>
+
+  <div style="margin-top:32px;background:white;border-radius:12px;padding:20px 24px;
+              border:1px solid #e2e8f0;">
+    <div style="font-weight:800;font-size:15px;margin-bottom:12px;color:#0053e2;">
+      📄 Final Passdown Report — Happenings Section
+    </div>
+    <p style="font-size:13px;color:#64748b;margin-bottom:16px;">
+      This is exactly what ends up in the email / PDF passdown:
+    </p>
+    <div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #f1f5f9;"><span style="color:#0053e2;font-weight:700;font-size:18px;flex-shrink:0;">•</span><div><div style="font-weight:700;font-size:14px;">M2785 <span style="font-size:12px;color:#64748b;font-weight:400;">(WO #27771902)</span> <span style="font-size:12px;color:#64748b;font-weight:400;">— by Isaac S, Stanley A, Marcus T</span></div><div style="font-size:13px;color:#334155;line-height:1.7;margin-top:3px;">Motor tripping thermal breaker on startup. Checked amp draw — reading 28A on phase 2 vs 18A normal. Verified Isaac's amp reading. Traced to failing run capacitor on phase 2. Capacitor tested at 18uF vs rated 35uF. Replaced run capacitor with 35uF/370VAC unit from parts room. Motor tested — amp draw normal at 19A all phases. Unit returned to service.</div></div></div><div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #f1f5f9;"><span style="color:#0053e2;font-weight:700;font-size:18px;flex-shrink:0;">•</span><div><div style="font-weight:700;font-size:14px;">BALER-01 <span style="font-size:12px;color:#64748b;font-weight:400;">(WO #30045812)</span> <span style="font-size:12px;color:#64748b;font-weight:400;">— by Isaac S, Stanley A</span></div><div style="font-size:13px;color:#334155;line-height:1.7;margin-top:3px;">Hydraulic leak identified at the cylinder rod seal. Fluid pooling under unit. Tagged OOS. Seal kit part #HYD-4412 ordered from MaintenanceOne. ETA next shift. Unit remains OOS pending parts. [⚠ Conflicting notes — verify status]</div></div></div><div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #f1f5f9;"><span style="color:#0053e2;font-weight:700;font-size:18px;flex-shrink:0;">•</span><div><div style="font-weight:700;font-size:14px;">Vendor <span style="font-size:12px;color:#64748b;font-weight:400;">— by Stanley A</span></div><div style="font-size:13px;color:#334155;line-height:1.7;margin-top:3px;">Crown lift technician on-site to service WAV-15 battery</div></div></div>
+  </div>
+
+</div>
+</body>
+</html>
