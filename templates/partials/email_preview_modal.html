@@ -560,11 +560,15 @@ function composeOutlook(reportId) {
   fd.append('html_body', body);
 
   fetch(`/report/${reportId}/compose-outlook`, { method: 'POST', body: fd })
-    .then(r => r.text())
-    .then(url => {
-      window.open(url.trim(), '_blank');
-      result.innerHTML     = '<span style="color:#2a8703;font-weight:700;">&#9989; Outlook opened!</span>';
-      btn.innerHTML        = '&#10003; Opened';
+    .then(r => r.blob())
+    .then(blob => {
+      const a   = document.createElement('a');
+      a.href    = URL.createObjectURL(blob);
+      a.download = 'passdown.eml';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      result.innerHTML     = '<span style="color:#2a8703;font-weight:700;">&#9989; Downloaded! Double-click the .eml file to open in Outlook.</span>';
+      btn.innerHTML        = '&#10003; Downloaded';
       btn.style.background = '#2a8703';
       btn.style.borderColor= '#1a5c02';
       btn.disabled         = false;
@@ -573,7 +577,7 @@ function composeOutlook(reportId) {
         btn.style.background  = '#0053e2';
         btn.style.borderColor = '#003db5';
         result.innerHTML      = '';
-      }, 6000);
+      }, 8000);
     })
     .catch(err => {
       result.innerHTML  = `<span style="color:#c00;">&#10060; ${err}</span>`;

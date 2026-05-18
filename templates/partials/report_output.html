@@ -90,15 +90,19 @@ function openComposeNow(reportId) {
   status.innerHTML  = '<span class="text-blue-300">Connecting\u2026</span>';
 
   fetch('/report/' + reportId + '/compose-outlook', { method: 'POST', body: new FormData() })
-    .then(r => r.text())
-    .then(url => {
-      // Server returns the URL as plain text — we open it directly.
-      // (innerHTML can't execute <script> tags, so we never inject one)
-      window.open(url.trim(), '_blank');
+    .then(r => r.blob())
+    .then(blob => {
+      // Trigger .eml download — user double-clicks -> Outlook opens in compose
+      const a   = document.createElement('a');
+      a.href    = URL.createObjectURL(blob);
+      a.download = 'passdown.eml';
+      a.click();
+      URL.revokeObjectURL(a.href);
 
-      label.textContent     = '\u2713 Outlook Opened!';
+      label.textContent     = '\u2713 Check your Downloads!';
       btn.style.background  = '#2a8703';
       btn.style.borderColor = '#1a5c02';
+      status.innerHTML      = '<span class="text-green-400 text-xs">Double-click the .eml file to open in Outlook</span>';
 
       setTimeout(() => {
         label.textContent     = 'Open & Compose in Outlook';
@@ -106,7 +110,7 @@ function openComposeNow(reportId) {
         btn.style.borderColor = '';
         btn.disabled          = false;
         status.innerHTML      = '';
-      }, 5000);
+      }, 8000);
     })
     .catch(err => {
       label.textContent = 'Open & Compose in Outlook';

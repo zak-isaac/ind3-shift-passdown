@@ -1931,16 +1931,16 @@ async def report_open_in_outlook(
 # ── Compose in Outlook via OWA or Graph API draft ─────────────────────────────
 
 
-@app.post("/report/{report_id}/compose-outlook", response_class=HTMLResponse)
+@app.post("/report/{report_id}/compose-outlook")
 async def report_compose_outlook(
     request:   Request,
     report_id: int,
     subject:   str = Form(""),
     html_body: str = Form(""),
 ):
-    """Build a mailto: URI and return it as plain text.
-    Client calls window.open(url) — desktop Outlook opens with To + Subject + Body pre-filled.
-    No OAuth, no admin consent, no Microsoft drama.
+    """Return a .eml file (X-Unsent:1) so Outlook opens in compose mode
+    with the full HTML body intact. No OAuth, no admin consent needed.
+    Browser downloads; user double-clicks -> Outlook compose -> Send.
     """
     rec = db.get_report(report_id)
     if not rec:
@@ -1956,33 +1956,50 @@ async def report_compose_outlook(
             f"{data.lead_name} \u2013 {data.date}"
         )
 
-    # ── Body ──
-    # Generate the full HTML email (includes PMs, OOS, LOTO etc.)
-    # then convert to clean plain text.
-    # If the lead edited the body in the modal use that instead.
+    # ── HTML body ──
     if html_body.strip():
-        plain = _html_to_plain(html_body)
+        body_html = html_body
     elif rec.get("report_json"):
-        data = ReportData.model_validate_json(rec["report_json"])
-        loto = db.get_loto(rec["shift_id"])
-        pms  = db.get_pending_pms(rec["shift_id"])
-        full_html = format_email_passdown_html(
+        data      = ReportData.model_validate_json(rec["report_json"])
+        loto      = db.get_loto(rec["shift_id"])
+        pms       = db.get_pending_pms(rec["shift_id"])
+        body_html = format_email_passdown_html(
             data,
             loto_missing=loto.get("loto_missing_keys", ""),
             pending_pms=pms or None,
             loto_verified=bool(loto.get("loto_verified", 0)),
         )
-        plain = _html_to_plain(full_html)
     else:
-        plain = (rec.get("content") or "").strip()
+        body_html = f"<pre>{rec.get('content', '')}</pre>"
 
-    from urllib.parse import quote
-    body_encoded    = quote(plain[:2000], safe="")
-    subject_encoded = quote(subject,      safe="")
-    to_encoded      = quote(to_addrs,     safe="@,;")
+    # ── Build .eml ──
+    # X-Unsent: 1 tells Outlook to open in compose mode, not read mode
+    import base64 as _b64
+    body_b64 = _b64.b64encode(body_html.encode("utf-8")).decode("ascii")
+    body_b64_folded = "\r\n".join(body_b64[i:i+76] for i in range(0, len(body_b64), 76))
 
-    mailto_url = f"mailto:{to_encoded}?subject={subject_encoded}&body={body_encoded}"
-    return Response(content=mailto_url, media_type="text/plain")
+    eml = (
+        f"X-Unsent: 1\r\n"
+        f"To: {to_addrs}\r\n"
+        f"Subject: {subject}\r\n"
+        f"MIME-Version: 1.0\r\n"
+        f'Content-Type: text/html; charset="utf-8"\r\n'
+        f"Content-Transfer-Encoding: base64\r\n"
+        f"\r\n"
+        f"{body_b64_folded}\r\n"
+    )
+
+    shift_label = ""
+    if rec.get("report_json"):
+        d = ReportData.model_validate_json(rec["report_json"])
+        shift_label = f"{d.shift_type}-{d.date}-"
+    filename = f"passdown-{shift_label}{report_id}.eml"
+
+    return Response(
+        content=eml.encode("utf-8"),
+        media_type="message/rfc822",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 def _html_to_plain(html: str) -> str:
