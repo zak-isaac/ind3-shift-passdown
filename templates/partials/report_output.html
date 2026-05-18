@@ -91,10 +91,10 @@ function openComposeNow(reportId) {
 
   fetch('/report/' + reportId + '/compose-outlook', { method: 'POST', body: new FormData() })
     .then(r => r.text())
-    .then(html => {
-      // Inject response — contains <script>window.open(...)</script>
-      const wrap = document.getElementById('compose-status-' + reportId);
-      wrap.innerHTML = html;
+    .then(url => {
+      // Server returns the URL as plain text — we open it directly.
+      // (innerHTML can't execute <script> tags, so we never inject one)
+      window.open(url.trim(), '_blank');
 
       label.textContent     = '\u2713 Outlook Opened!';
       btn.style.background  = '#2a8703';

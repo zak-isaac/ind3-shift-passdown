@@ -561,10 +561,9 @@ function composeOutlook(reportId) {
 
   fetch(`/report/${reportId}/compose-outlook`, { method: 'POST', body: fd })
     .then(r => r.text())
-    .then(html => {
-      // Server returns HTML with an inline <script>window.open(...)</script>
-      // Inject it so the script fires and opens the new tab
-      result.innerHTML     = html;
+    .then(url => {
+      window.open(url.trim(), '_blank');
+      result.innerHTML     = '<span style="color:#2a8703;font-weight:700;">&#9989; Outlook opened!</span>';
       btn.innerHTML        = '&#10003; Opened';
       btn.style.background = '#2a8703';
       btn.style.borderColor= '#1a5c02';

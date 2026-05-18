@@ -1976,29 +1976,15 @@ async def report_compose_outlook(
             subject=subject,
             to_addrs=to_addrs,
         )
-        # Tell the browser (via HTMX response) to open OAuth in a new tab
-        return HTMLResponse(
-            f'<span style="color:#2a8703;font-weight:700;">'
-            f'&#9989; Opening Microsoft login…</span>'
-            f'<script>window.open({json.dumps(auth_url)}, "_blank");</script>'
-        )
+        return Response(content=auth_url, media_type="text/plain")
     else:
         # ── Path B: OWA compose URL — plain text, zero auth needed ──
-        from urllib.parse import urlencode, quote
-        # Strip HTML — OWA body param is plain text only
         import re as _re
-        plain = _re.sub(r"<[^>]+>", "", html_body).strip()
-        params = urlencode({
-            "to":      to_addrs,
-            "subject": subject,
-            "body":    plain[:1800],  # OWA URL limit
-        })
+        from urllib.parse import urlencode
+        plain  = _re.sub(r"<[^>]+>", "", html_body).strip()
+        params = urlencode({"to": to_addrs, "subject": subject, "body": plain[:1800]})
         owa_url = f"https://outlook.office.com/mail/deeplink/compose?{params}"
-        return HTMLResponse(
-            f'<span style="color:#2a8703;font-weight:700;">'
-            f'&#9989; Opening Outlook…</span>'
-            f'<script>window.open({json.dumps(owa_url)}, "_blank");</script>'
-        )
+        return Response(content=owa_url, media_type="text/plain")
 
 
 @app.get("/outlook-draft-callback")
