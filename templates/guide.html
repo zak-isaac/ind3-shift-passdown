@@ -1,356 +1,678 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <title>IND3 Reliability Passdown – User Guide</title>
-  <link rel="stylesheet" href="/static/tailwind.min.css">
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>IND3 Passdown – User Guide</title>
+  <link rel="stylesheet" href="/static/tailwind.min.css" />
   <style>
-    body { font-family: system-ui, sans-serif; background: #f8fafc; color: #1e293b; }
-    .page { max-width: 820px; margin: 0 auto; padding: 2rem 1rem 4rem; }
-    .section { background: white; border-radius: 1rem; padding: 2.25rem 2.5rem; margin-bottom: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
-    h2 { font-size: 1.25rem; font-weight: 900; color: #0053e2; margin-bottom: 1rem; }
-    h3 { font-size: 1rem; font-weight: 800; color: #1e293b; margin: 1.5rem 0 .5rem; }
-    p  { font-size: .9rem; line-height: 1.85; color: #334155; margin-bottom: .9rem; }
-    p:last-child { margin-bottom: 0; }
-    .note { background: #eff6ff; border-left: 4px solid #0053e2; border-radius: .4rem; padding: .75rem 1rem; font-size: .85rem; color: #1e40af; margin: 1rem 0; }
-    .warn { background: #fff7ed; border-left: 4px solid #f97316; border-radius: .4rem; padding: .75rem 1rem; font-size: .85rem; color: #9a3412; margin: 1rem 0; }
-    .code-block { background: #0f172a; color: #86efac; font-family: 'Courier New', monospace; font-size: .82rem; border-radius: .75rem; padding: 1rem 1.25rem; margin: 1rem 0; line-height: 1.8; }
-    .toc { display: grid; grid-template-columns: 1fr 1fr; gap: .1rem 0; }
-    .toc a { display: block; font-size: .875rem; color: #0053e2; padding: .3rem 0; text-decoration: none; font-weight: 600; }
-    .toc a:hover { text-decoration: underline; }
-    .feat-table { width: 100%; border-collapse: collapse; font-size: .85rem; margin: .75rem 0; }
-    .feat-table th { background: #0053e2; color: white; text-align: left; padding: .5rem .85rem; font-weight: 700; }
-    .feat-table td { padding: .5rem .85rem; border-bottom: 1px solid #e2e8f0; vertical-align: top; line-height: 1.6; }
-    .feat-table tr:hover td { background: #f8fafc; }
-    .step { display: flex; gap: 1rem; margin-bottom: .85rem; }
-    .step-num { background: #0053e2; color: white; font-weight: 900; font-size: .8rem; border-radius: 50%; width: 1.6rem; height: 1.6rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: .1rem; }
-    .step-text { font-size: .9rem; line-height: 1.7; color: #334155; }
-    strong { color: #0f172a; }
-    @media print { body { background: white; } .section { box-shadow: none; border: 1px solid #e2e8f0; page-break-inside: avoid; } }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; color: #1e293b; font-size: 16px; }
+    .page { max-width: 860px; margin: 0 auto; padding: 2rem 1rem 5rem; }
+
+    /* Cards */
+    .card  { background: white; border-radius: 1.25rem; padding: 2rem 2.25rem; margin-bottom: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,.07); }
+    .card-sm { background: white; border-radius: 1rem; padding: 1.25rem 1.5rem; margin-bottom: 1rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+
+    /* Section dividers */
+    .section-badge { display:inline-flex; align-items:center; gap:.5rem; background:#0053e2; color:white;
+      font-size:.75rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
+      padding:.35rem 1rem; border-radius:999px; margin-bottom:1rem; }
+    h2 { font-size:1.5rem; font-weight:900; color:#0053e2; margin-bottom:.4rem; line-height:1.2; }
+    h3 { font-size:1.1rem; font-weight:800; color:#1e293b; margin:1.5rem 0 .5rem; }
+    h4 { font-size:.95rem; font-weight:700; color:#334155; margin:.75rem 0 .3rem; }
+    p  { font-size:.95rem; line-height:1.9; color:#334155; margin-bottom:.75rem; }
+    p:last-child { margin-bottom:0; }
+    li { font-size:.95rem; line-height:1.85; color:#334155; }
+
+    /* Steps */
+    .steps { display:flex; flex-direction:column; gap:.75rem; margin:1rem 0; }
+    .step  { display:flex; gap:.9rem; align-items:flex-start; }
+    .step-num { background:#0053e2; color:white; font-weight:900; font-size:.8rem;
+      border-radius:50%; min-width:1.75rem; height:1.75rem;
+      display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:.2rem; }
+    .step-body { flex:1; font-size:.95rem; line-height:1.8; color:#334155; }
+    .step-body strong { color:#0f172a; }
+
+    /* Callouts */
+    .tip  { background:#eff6ff; border-left:4px solid #0053e2; border-radius:.5rem;
+      padding:.85rem 1.1rem; font-size:.9rem; color:#1e40af; margin:1rem 0; line-height:1.75; }
+    .warn { background:#fff7ed; border-left:4px solid #f97316; border-radius:.5rem;
+      padding:.85rem 1.1rem; font-size:.9rem; color:#9a3412; margin:1rem 0; line-height:1.75; }
+    .success { background:#f0fdf4; border-left:4px solid #2a8703; border-radius:.5rem;
+      padding:.85rem 1.1rem; font-size:.9rem; color:#166534; margin:1rem 0; line-height:1.75; }
+
+    /* Feature table */
+    .ftable { width:100%; border-collapse:collapse; font-size:.9rem; margin:.75rem 0; }
+    .ftable th { background:#0053e2; color:white; text-align:left; padding:.6rem 1rem; font-weight:700; }
+    .ftable td { padding:.6rem 1rem; border-bottom:1px solid #e2e8f0; vertical-align:top; line-height:1.7; }
+    .ftable tr:hover td { background:#f8fafc; }
+    .ftable td:first-child { font-weight:700; color:#0f172a; white-space:nowrap; }
+
+    /* TOC */
+    .toc-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:.4rem; }
+    .toc-link { display:block; background:#f8fafc; border:1px solid #e2e8f0; border-radius:.75rem;
+      padding:.6rem 1rem; font-size:.85rem; font-weight:700; color:#0053e2; text-decoration:none; transition:.15s; }
+    .toc-link:hover { background:#eff6ff; border-color:#0053e2; }
+
+    /* Badge */
+    .badge { display:inline-flex; align-items:center; gap:.3rem; font-size:.75rem; font-weight:700;
+      padding:.2rem .6rem; border-radius:999px; }
+    .badge-blue   { background:#dbeafe; color:#1e40af; }
+    .badge-green  { background:#dcfce7; color:#166534; }
+    .badge-yellow { background:#fef3c7; color:#92400e; }
+    .badge-red    { background:#fee2e2; color:#991b1b; }
+
+    /* Priority reference blocks */
+    .prio { display:flex; gap:.75rem; flex-wrap:wrap; margin:.5rem 0 1rem; }
+    .prio-item { flex:1; min-width:120px; border-radius:.75rem; padding:.75rem 1rem;
+      text-align:center; font-size:.8rem; font-weight:700; }
+
+    @media(max-width:640px){
+      .toc-grid { grid-template-columns:1fr; }
+      .card { padding:1.25rem 1rem; }
+    }
+    @media print {
+      body { background:white; font-size:13px; }
+      .card { box-shadow:none; border:1px solid #e2e8f0; break-inside:avoid; }
+      .no-print { display:none; }
+    }
   </style>
 </head>
 <body>
 
-<div style="background:linear-gradient(135deg,#0053e2 0%,#003dab 100%);padding:3rem 2rem;color:white;">
-  <div style="max-width:52rem;margin:0 auto;">
-
-    <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;">
-      <div style="background:rgba(255,255,255,.15);border-radius:.75rem;width:3.5rem;height:3.5rem;display:flex;align-items:center;justify-content:center;font-size:1.75rem;flex-shrink:0;">&#128203;</div>
+<!-- ░░ HERO ░░ -->
+<div style="background:linear-gradient(135deg,#001e50 0%,#0053e2 100%);padding:3rem 1.5rem;">
+  <div style="max-width:860px;margin:0 auto;">
+    <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem;">
+      <div style="background:rgba(255,255,255,.15);border-radius:1rem;width:3.5rem;height:3.5rem;
+        display:flex;align-items:center;justify-content:center;font-size:1.8rem;flex-shrink:0;">📋</div>
       <div>
-        <p style="font-size:.65rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#93c5fd;margin:0 0 .25rem;">IND3 Reliability</p>
-        <h1 style="font-size:1.9rem;font-weight:900;line-height:1.1;margin:0;letter-spacing:-.01em;">Shift Passdown System</h1>
-        <p style="font-size:.95rem;font-weight:700;color:#bfdbfe;margin:.2rem 0 0;">User Guide</p>
+        <p style="font-size:.65rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#93c5fd;margin:0 0 .2rem;">IND3 · eCommerce FC #8972</p>
+        <h1 style="font-size:2rem;font-weight:900;color:white;margin:0;line-height:1.1;">Shift Passdown System</h1>
+        <p style="font-size:.9rem;color:#bfdbfe;margin:.25rem 0 0;font-weight:600;">Complete User Guide — Technicians &amp; MST</p>
       </div>
     </div>
-
-    <p style="font-size:.875rem;color:#dbeafe;line-height:1.75;max-width:38rem;margin:0 0 1.75rem;">
-      Everything you need to know to use the system correctly, whether you are a technician checking in for your shift or an MST preparing the passdown.
+    <p style="font-size:.95rem;color:#dbeafe;line-height:1.8;max-width:38rem;margin:0 0 1.5rem;">
+      This guide covers everything from logging in to sending the passdown email.
+      Read your section — whether you are a technician or an MST — and you will know exactly what to do.
     </p>
-
-    <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
-      <a href="/lead"
-         style="background:#ffc220;color:#1a1a1a;font-weight:900;font-size:.75rem;padding:.55rem 1.1rem;border-radius:.5rem;text-decoration:none;display:inline-flex;align-items:center;gap:.35rem;">
-        &#127968; MST Dashboard
-      </a>
-      <a href="/analytics"
-         style="background:#2a8703;color:#fff;font-weight:900;font-size:.75rem;padding:.55rem 1.1rem;border-radius:.5rem;text-decoration:none;display:inline-flex;align-items:center;gap:.35rem;">
-        &#128200; Analytics
-      </a>
-      <button onclick="window.print()"
-         style="background:#fff;color:#0053e2;border:2px solid #fff;font-weight:900;font-size:.75rem;padding:.55rem 1.1rem;border-radius:.5rem;cursor:pointer;display:inline-flex;align-items:center;gap:.35rem;">
-        &#128438; Print Guide
-      </button>
-      <a href="/guide/download"
-         style="background:#ea1100;color:#fff;font-weight:900;font-size:.75rem;padding:.55rem 1.1rem;border-radius:.5rem;text-decoration:none;display:inline-flex;align-items:center;gap:.35rem;">
-        &#11015; Download Guide
-      </a>
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap;" class="no-print">
+      <a href="/" style="background:#ffc220;color:#1a1a1a;font-weight:900;font-size:.8rem;
+        padding:.6rem 1.2rem;border-radius:.6rem;text-decoration:none;">🏠 Home</a>
+      <a href="/tech" style="background:rgba(255,255,255,.15);color:white;border:1px solid rgba(255,255,255,.3);
+        font-weight:700;font-size:.8rem;padding:.6rem 1.2rem;border-radius:.6rem;text-decoration:none;">👷 Tech Dashboard</a>
+      <a href="/lead" style="background:rgba(255,255,255,.15);color:white;border:1px solid rgba(255,255,255,.3);
+        font-weight:700;font-size:.8rem;padding:.6rem 1.2rem;border-radius:.6rem;text-decoration:none;">🎯 MST Dashboard</a>
+      <button onclick="window.print()" style="background:rgba(255,255,255,.1);color:white;border:1px solid rgba(255,255,255,.3);
+        font-weight:700;font-size:.8rem;padding:.6rem 1.2rem;border-radius:.6rem;cursor:pointer;">🖨️ Print Guide</button>
     </div>
-
   </div>
 </div>
 
+<div style="height:4px;background:#ffc220;"></div>
+
 <div class="page">
 
-  <!-- Contents -->
-  <div class="section">
-    <h2>Contents</h2>
-    <div class="toc">
-      <a href="#overview">1. What This System Does</a>
-      <a href="#roles">2. The Two Roles</a>
-      <a href="#tech">3. Technician Workflow</a>
-      <a href="#cetaris">4. Uploading from Cetaris</a>
-      <a href="#mst-shift">5. Opening a Shift</a>
-      <a href="#live-feed">6. The Live Feed</a>
-      <a href="#controls">7. MST Entry Controls</a>
-      <a href="#report">8. Generating the Report</a>
-      <a href="#format">9. How the Report Is Formatted</a>
-      <a href="#carry-over">10. Carry-Over</a>
-      <a href="#analytics">11. Analytics Dashboard</a>
-      <a href="#admin">12. Admin Settings</a>
-      <a href="#glossary">13. Glossary</a>
+  <!-- TABLE OF CONTENTS -->
+  <div class="card" style="margin-bottom:2rem;">
+    <p style="font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#64748b;margin-bottom:.75rem;">Jump to a section</p>
+    <div class="toc-grid">
+      <a class="toc-link" href="#section-home">🏠 Section 1 — Homepage</a>
+      <a class="toc-link" href="#section-tech">👷 Section 2 — Tech Dashboard</a>
+      <a class="toc-link" href="#section-mst">🎯 Section 3 — MST Dashboard</a>
+      <a class="toc-link" href="#login-mst">🔐 MST Login &amp; PIN</a>
+      <a class="toc-link" href="#cetaris">📄 Cetaris Upload</a>
+      <a class="toc-link" href="#email-workflow">📧 Email Workflow</a>
     </div>
   </div>
 
-  <!-- 1 -->
-  <div class="section" id="overview">
-    <h2>1. What This System Does</h2>
-    <p>
-      The IND3 Reliability Passdown System is the team's digital shift handover tool. Instead of writing passdowns by hand or copying from emails, technicians upload their Cetaris work orders directly and the system formats everything into a clean report that the next shift can read in under a minute.
-    </p>
-    <p>
-      Every entry that comes in gets recorded in real time. The MST sees a live feed of all activity, can review and clean it up, and generates the final report with a single click. The system also keeps a historical record of every shift, which feeds into an analytics dashboard showing which assets get worked on most often, how frequently incidents happen, and who the most active technicians are.
-    </p>
-    <p>
-      The goal is simple: nothing gets lost between shifts, and nobody has to write the same information twice.
-    </p>
-  </div>
 
-  <!-- 2 -->
-  <div class="section" id="roles">
-    <h2>2. The Two Roles</h2>
-    <p>
-      Everyone in the system is either a <strong>Technician</strong> or an <strong>MST</strong>. The login page is the same for everyone, but what you can do after you log in depends entirely on your role.
-    </p>
-    <table class="feat-table">
-      <thead><tr><th>Action</th><th>Technician</th><th>MST</th></tr></thead>
-      <tbody>
-        <tr><td>Upload Cetaris CSV</td><td>Yes</td><td>Yes</td></tr>
-        <tr><td>View your own entries</td><td>Yes</td><td>Yes</td></tr>
-        <tr><td>Edit any entry after submission</td><td>No</td><td>Yes</td></tr>
-        <tr><td>Delete entries</td><td>No</td><td>Yes</td></tr>
-        <tr><td>Exclude entries from the report</td><td>No</td><td>Yes</td></tr>
-        <tr><td>Flag carry-over items</td><td>No</td><td>Yes</td></tr>
-        <tr><td>Generate and send the report</td><td>No</td><td>Yes</td></tr>
-        <tr><td>Access the Analytics dashboard</td><td>No</td><td>Yes</td></tr>
-        <tr><td>Access Shift History</td><td>No</td><td>Yes</td></tr>
-        <tr><td>Access Admin settings</td><td>No</td><td>Yes</td></tr>
-      </tbody>
-    </table>
-    <div class="note">Technicians are intentionally read-only after they submit. If a correction is needed, the tech tells their MST and the MST edits it directly from the live feed.</div>
-  </div>
+  <!-- ═══════════════════════════════════════════════════
+       SECTION 1 — HOMEPAGE
+  ═══════════════════════════════════════════════════ -->
+  <div id="section-home">
+    <div class="section-badge">🏠 Section 1</div>
+    <div class="card">
+      <h2>The Homepage</h2>
+      <p>
+        The homepage is the starting point for everyone. When you open the app, this is the first
+        screen you see. It shows the current date and time, lets MSTs start a new shift, and gives
+        technicians a quick link to their own dashboard.
+      </p>
 
-  <!-- 3 -->
-  <div class="section" id="tech">
-    <h2>3. Technician Workflow</h2>
-    <p>
-      When you arrive for your shift, open the passdown URL on your phone or any computer on the facility network. The home screen shows the currently active shift. Enter your associate number — the six-digit number on your badge — and tap Check In. The system recognizes your number and logs you into your dashboard.
-    </p>
-    <p>
-      Your dashboard shows two things: a list of everything you have already submitted this shift, and the Cetaris upload section. The list is read-only once submitted. If you need something changed, let your MST know and they can edit it from their dashboard.
-    </p>
-    <p>
-      At the top of the dashboard you will also see any carry-over items from the previous shift. These are assets the last shift flagged as needing follow-up. Read through them before you start your shift so you already know what needs attention.
-    </p>
-    <div class="warn">If your associate number is not recognized, your number is not on the roster. Ask your MST to add you in the Admin settings.</div>
-  </div>
+      <h3>🕐 Live Clock &amp; Date</h3>
+      <p>
+        At the top of the page you will see a live clock showing today's date and the current time.
+        This updates automatically — you do not need to refresh the page.
+        If there is already an active shift running, you will also see the shift type and MST name displayed here.
+      </p>
 
-  <!-- 4 -->
-  <div class="section" id="cetaris">
-    <h2>4. Uploading from Cetaris</h2>
-    <p>
-      The upload section is how your work orders get into the passdown. You export a CSV from Cetaris at the end of your shift and drag it into the upload zone on your dashboard. The system reads every work order in the file and creates an entry for each one automatically.
-    </p>
-    <h3>Exporting from Cetaris</h3>
-    <div class="step"><div class="step-num">1</div><div class="step-text">Log in to Cetaris and navigate to your work orders.</div></div>
-    <div class="step"><div class="step-num">2</div><div class="step-text">Filter by your name and the current date so you are only looking at your shift's work.</div></div>
-    <div class="step"><div class="step-num">3</div><div class="step-text">Use the Export option to download a CSV file to your device.</div></div>
-    <div class="step"><div class="step-num">4</div><div class="step-text">Go back to the passdown and drag that file into the upload zone, or tap it to browse.</div></div>
-    <div class="step"><div class="step-num">5</div><div class="step-text">The system shows a summary of how many work orders were imported and how many were PMs.</div></div>
-    <p>
-      Preventive Maintenance work orders (labeled as "Prev Maintenance" in Cetaris) are automatically recognized and counted separately. They do not appear as individual happenings in the passdown report but are tallied and shown as a PM total.
-    </p>
-    <p>
-      If you need to re-upload the same file because you added more WOs to it, that is fine. The system knows which entries belong to you, so re-uploading updates your existing entries instead of creating duplicates. If two technicians both work on the same WO number, the system keeps both entries but only shows one line for that WO in the final report.
-    </p>
-    <div class="note">The Cetaris "Tech Remarks" field is used as the description for each entry. Write your remarks in Cetaris before you export so they carry through automatically.</div>
-  </div>
+      <h3>📋 What Can You Do From the Homepage?</h3>
+      <table class="ftable">
+        <thead><tr><th>If you are a…</th><th>What to do</th></tr></thead>
+        <tbody>
+          <tr><td>👷 Technician</td><td>Click the <strong>"Tech Login"</strong> button to go to your dashboard and log your shift work.</td></tr>
+          <tr><td>🎯 MST / Lead</td><td>Fill in the <strong>Start Shift</strong> form — select shift type, enter your PIN, and click Start. Then head to the MST Dashboard.</td></tr>
+        </tbody>
+      </table>
 
-  <!-- 5 -->
-  <div class="section" id="mst-shift">
-    <h2>5. Opening a Shift</h2>
-    <p>
-      Only the MST can open and close shifts. From the home screen, select MST Login and enter your MST code. Once inside the dashboard, click Open New Shift, choose the correct shift type, enter your name, and the shift goes live. Technicians can check in immediately once the shift is open.
-    </p>
-    <table class="feat-table">
-      <thead><tr><th>Shift</th><th>Hours</th><th>Days</th></tr></thead>
-      <tbody>
-        <tr><td><strong>S1</strong></td><td>5:30 AM to 4:00 PM</td><td>Monday through Thursday</td></tr>
-        <tr><td><strong>S2</strong></td><td>12:00 PM to 10:30 PM</td><td>Monday through Thursday</td></tr>
-        <tr><td><strong>S3</strong></td><td>8:30 PM to 7:00 AM</td><td>Monday through Thursday</td></tr>
-        <tr><td><strong>S4</strong></td><td>5:30 AM to 6:00 PM</td><td>Friday through Sunday</td></tr>
-        <tr><td><strong>S5</strong></td><td>5:30 PM to 6:00 AM</td><td>Friday through Sunday</td></tr>
-      </tbody>
-    </table>
-    <p>
-      Shifts close automatically one hour after their scheduled end time as a safety net in case the MST forgets. You should always generate the report and close the shift manually before that happens.
-    </p>
-  </div>
+      <h3>📅 Starting a Shift (MST Only)</h3>
+      <p>The start shift form on the homepage has two fields:</p>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body"><strong>Shift Type</strong> — Select your shift from the dropdown: S1, S2, S3, S4, or S5. Pick the one that matches your actual shift schedule.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body"><strong>MST PIN</strong> — Enter your personal 4-digit PIN. Each MST has their own PIN. <em>Do not share your PIN with anyone.</em></div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">Click <strong>"Start Shift"</strong>. You will be taken directly to the MST Dashboard where you can monitor the shift in real time.</div>
+        </div>
+      </div>
 
-  <!-- 6 -->
-  <div class="section" id="live-feed">
-    <h2>6. The Live Feed</h2>
-    <p>
-      The MST dashboard has a live feed that shows every entry as it comes in. The page does not need to be refreshed. A WebSocket connection keeps it updated in real time, so the moment a tech uploads their Cetaris file, those entries appear on your screen.
-    </p>
-    <p>
-      Each card in the feed shows the technician's name and initial, the time the entry was submitted, the asset ID, and the issue description. A colored stripe runs down the left side of each card: red means the asset is Down, yellow means Degraded, and green means Monitor. The priority badge on the right side of the card says the same thing in text. The status bar at the top of the feed shows a running count of how many assets are in each state.
-    </p>
-    <p>
-      Entries that the MST has excluded from the report remain visible in the feed but are grayed out with strikethrough text and a red "Excluded from report" label. This way nothing disappears unexpectedly and the exclusion can always be reversed.
-    </p>
-    <div class="note">If the green live dot at the top of the feed disappears, the WebSocket connection dropped. Refresh the page to reconnect. This usually means the network briefly went offline.</div>
-  </div>
+      <div class="tip">
+        💡 <strong>Only one shift can be active at a time.</strong> If you see a message saying a shift is already running, the previous MST needs to close their shift first — or contact the manager to end it.
+      </div>
 
-  <!-- 7 -->
-  <div class="section" id="controls">
-    <h2>7. MST Entry Controls</h2>
-    <p>
-      Every entry card in the live feed has four small icon buttons stacked on the right side. These are only visible and functional for the MST.
-    </p>
-    <table class="feat-table">
-      <thead><tr><th style="width:3rem;">Icon</th><th style="width:6rem;">Action</th><th>What it does</th></tr></thead>
-      <tbody>
-        <tr>
-          <td style="font-size:1.1rem;text-align:center;">✏️</td>
-          <td><strong>Edit</strong></td>
-          <td>Opens an inline edit form inside the card. The current issue text appears in a text box so you can correct it, add detail, or clean up the wording. Saving the change immediately updates the card in the feed and updates what will appear in the report. Cancel returns the card to its original view without saving.</td>
-        </tr>
-        <tr>
-          <td style="font-size:1.1rem;text-align:center;">🚫</td>
-          <td><strong>Exclude</strong></td>
-          <td>Marks the entry so it does not appear in the generated report. The entry stays visible in the feed (grayed out) so you always know it exists. Use this for entries where a tech left notes but the item is not worth reporting. Clicking the button again re-includes the entry.</td>
-        </tr>
-        <tr>
-          <td style="font-size:1.1rem;text-align:center;">📌</td>
-          <td><strong>Carry-Over</strong></td>
-          <td>Flags this asset for the next shift to follow up on. The button turns orange to confirm it is on. Carry-over items appear in a highlighted panel at the top of every technician's dashboard when the next shift opens, and they are listed in a dedicated section of the report.</td>
-        </tr>
-        <tr>
-          <td style="font-size:1.1rem;text-align:center;">🗑️</td>
-          <td><strong>Delete</strong></td>
-          <td>Permanently removes the entry. The system will ask you to confirm before deleting. There is no undo. Only use this for entries that should not exist at all. If you just want to hide something from the report, use Exclude instead.</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- 8 -->
-  <div class="section" id="report">
-    <h2>8. Generating the Report</h2>
-    <p>
-      When the shift is wrapping up, review the live feed one more time. Make sure excluded entries are marked, carry-over flags are set, and any entries with unclear descriptions have been edited. Once everything looks right, click Generate Report.
-    </p>
-    <p>
-      The report is built instantly from the current state of the shift and shown in a preview. From there you can copy it to the clipboard and paste it into Teams or email, or open the print view for a formatted document version. The report is also saved to the system's history so it can be retrieved later.
-    </p>
-    <p>
-      You can generate the report more than once if needed. Each time you generate, the system saves a new snapshot. The most recent generation is the official record. Generating the report does not close the shift, so you can continue making changes and re-generating if late entries come in.
-    </p>
-  </div>
-
-  <!-- 9 -->
-  <div class="section" id="format">
-    <h2>9. How the Report Is Formatted</h2>
-    <p>
-      The report is structured so the next shift can scan through it quickly. At the top is the facility, date, shift type, and who prepared it. Then the sections follow in order.
-    </p>
-    <p>
-      The Shift Happenings section is the most important one. Each entry appears on its own line with the asset ID in bold, followed by the description and the work order number in parentheses if one exists. Here is what a few lines look like in practice:
-    </p>
-    <div class="code-block">
-      PARKING0002: Yard buddy and also assisting with installing the horn and the side light. (WO #27779109).<br>
-      VOIDFILL0101: Inspected the area and noticed the taper was not seated properly causing the blade to have no spring tension. Lifted the bottom taper, reinserted it correctly, cleared fault, set machine to autofill and it ran clean. Monitored. (WO #27798811).<br>
-      CR0005: Unplugged the machine, waited a few minutes then plugged it back up and it is back working.
+      <h3>🔗 Navigation Links</h3>
+      <p>From the homepage you can also access:</p>
+      <ul style="padding-left:1.25rem;margin-bottom:0;">
+        <li><strong>History</strong> — view all past closed shifts and their reports</li>
+        <li><strong>Analytics</strong> — trends and charts across multiple shifts</li>
+        <li><strong>Guide</strong> — this page you are reading right now</li>
+      </ul>
     </div>
-    <p>
-      When two technicians work on the same work order number, the report shows that WO only once. The duplicates are merged so the next shift does not see the same asset listed multiple times for the same job. The PM total is shown as a single summary line rather than listing every individual PM work order.
-    </p>
-    <p>
-      After Shift Happenings, the report includes Reliable Operations for assets that were returned to service, Out of Service for anything still down, and the PM count. Any carry-over items from the previous shift appear in a highlighted section at the top.
-    </p>
   </div>
 
-  <!-- 10 -->
-  <div class="section" id="carry-over">
-    <h2>10. Carry-Over</h2>
-    <p>
-      A carry-over is an asset that was worked on during the current shift but needs the next shift to check on it. The MST sets carry-over flags in the live feed before generating the report.
-    </p>
-    <p>
-      When the next shift opens and any technician logs in, their dashboard shows a carry-over panel at the top with the asset ID, the original issue description, and which shift it came from. This means the incoming technicians know exactly what to look at before they even start walking the floor. The same items are listed in the carry-over section of the generated report.
-    </p>
+
+  <!-- ═══════════════════════════════════════════════════
+       SECTION 2 — TECH DASHBOARD
+  ═══════════════════════════════════════════════════ -->
+  <div id="section-tech" style="margin-top:2.5rem;">
+    <div class="section-badge">👷 Section 2</div>
+    <div class="card">
+      <h2>Technician Dashboard</h2>
+      <p>
+        The Technician Dashboard is where you log everything you worked on during your shift.
+        It is designed to be simple — you only see your own work, and everything you enter shows
+        up on the MST's screen in real time.
+      </p>
+
+      <h3 id="login-tech">🔐 How to Log In (Technicians)</h3>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">From the homepage, click <strong>"Tech Login"</strong> or go to <code style="background:#f1f5f9;padding:.1rem .4rem;border-radius:.3rem;">/tech</code> on the app.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">Start typing your name in the search box. The system will search the associate roster and show matching names. <strong>Click your name</strong> to select it.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">Click <strong>"Sign In"</strong>. You are now logged into the tech dashboard for this shift. Your sign-in time is recorded automatically.</div>
+        </div>
+      </div>
+
+      <div class="tip">
+        💡 You do not need a password. Just find your name and sign in. If your name does not appear, contact your MST — you may need to be added to the roster.
+      </div>
+
+      <h3>📺 What You See After Logging In</h3>
+      <p>Once you are signed in, the header bar at the top shows:</p>
+      <ul style="padding-left:1.25rem;">
+        <li>Your name highlighted in <strong style="color:#ffc220;">yellow/gold</strong></li>
+        <li>The current shift type (S1, S2, etc.) and date</li>
+        <li>Your MST's name</li>
+        <li>The time you signed on</li>
+        <li>Your facility code (US.08972 for IND3)</li>
+      </ul>
+
+      <div class="warn" style="margin-top:.5rem;">
+        🔴 <strong>OOS Banner:</strong> If any equipment is currently Out of Service, you will see a red warning
+        banner at the top listing those units. Do NOT operate any unit shown on this list.
+      </div>
+
+      <h3>✏️ Logging a Manual Entry</h3>
+      <p>
+        Use this when you respond to a call, fix something, or do anything worth noting during your shift.
+        Fill in each field and hit submit.
+      </p>
+      <table class="ftable">
+        <thead><tr><th>Field</th><th>What to enter</th></tr></thead>
+        <tbody>
+          <tr><td>🔍 Asset / Unit</td><td>The asset ID of the equipment you worked on — e.g. <strong>M2785</strong>, <strong>BALER-01</strong>, <strong>TK51</strong>. Start typing and matching assets will appear.</td></tr>
+          <tr><td>📝 Issue</td><td>Describe what was wrong or why you were called. Keep it short and clear — e.g. <em>"Motor tripping thermal breaker"</em>.</td></tr>
+          <tr><td>🔧 Action Taken</td><td>What did you actually do? — e.g. <em>"Replaced run capacitor"</em>.</td></tr>
+          <tr><td>✅ Result</td><td>How did it end? — e.g. <em>"Unit returned to service"</em> or <em>"Parts ordered, unit tagged OOS"</em>.</td></tr>
+          <tr><td>🚦 Priority</td><td>Select the urgency level (see below).</td></tr>
+        </tbody>
+      </table>
+
+      <h4>🚦 Priority Levels — What They Mean</h4>
+      <div class="prio">
+        <div class="prio-item" style="background:#fee2e2;color:#991b1b;">🔴 Critical<br/><span style="font-weight:400;font-size:.75rem;">Immediate safety or production stop</span></div>
+        <div class="prio-item" style="background:#ffedd5;color:#9a3412;">🟠 High<br/><span style="font-weight:400;font-size:.75rem;">Significant issue, needs fast action</span></div>
+        <div class="prio-item" style="background:#fef9c3;color:#854d0e;">🟡 Monitor<br/><span style="font-weight:400;font-size:.75rem;">Watching it, not urgent right now</span></div>
+        <div class="prio-item" style="background:#f0fdf4;color:#166534;">🟢 Low<br/><span style="font-weight:400;font-size:.75rem;">Minor, informational</span></div>
+      </div>
+
+      <h3 id="cetaris-tech">📄 Uploading Your Cetaris Timecard</h3>
+      <p>
+        If you log your work in Cetaris (our CMMS system), you can upload your timecard directly
+        instead of typing each entry by hand. The system reads the file and automatically creates
+        entries from your work orders.
+      </p>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">Export your timecard from Cetaris as a <strong>CSV or Excel file</strong>.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">On the tech dashboard, find the <strong>"Upload Cetaris Timecard"</strong> section.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">Click <strong>"Choose File"</strong>, select your file, then click <strong>"Upload"</strong>.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-body">The system parses your file and creates one entry per work order. You will see a confirmation with how many entries were added.</div>
+        </div>
+      </div>
+      <div class="tip">
+        💡 <strong>Multiple techs can upload timecards for the same work order.</strong> The system is smart enough to automatically merge all their notes into one clean entry in the report — no duplicates.
+      </div>
+
+      <h3>📋 Viewing Your Entries</h3>
+      <p>
+        At the bottom of the tech dashboard, the <strong>"My Entries"</strong> section shows everything
+        you have logged this shift. You can edit or delete your own entries if you made a mistake.
+        Each entry shows the asset ID, issue, and the time it was logged.
+      </p>
+
+      <h3>✅ Signing Off</h3>
+      <p>
+        When you are done for the shift, click the <strong>"Sign Off"</strong> button.
+        This tells the MST that you have finished and checked out. Your entries stay on the system
+        — signing off just marks you as complete for the shift.
+      </p>
+
+      <h3>🌙 Dark Mode</h3>
+      <p>
+        There is a moon icon (🌙) in the top-right corner. Click it to switch between light and dark
+        mode. This is just a display preference and does not affect anything else.
+      </p>
+    </div>
   </div>
 
-  <!-- 11 -->
-  <div class="section" id="analytics">
-    <h2>11. Analytics Dashboard</h2>
-    <p>
-      The Analytics page is accessible from the Analytics link in the MST dashboard navigation. It pulls data across all recorded shifts and presents it in a set of charts and tables.
-    </p>
-    <p>
-      The top row of stat cards shows total shifts logged, total work orders recorded, total PMs completed, and total Down events across all time. Below that, a bar chart shows the fifteen assets with the most work orders, with the top three highlighted in red as chronic problem assets. A doughnut chart breaks down the ratio of Down, Degraded, and Monitor entries across all shifts.
-    </p>
-    <p>
-      The trend charts show work order count and down events per shift for the last thirty completed shifts, and PM count per shift for the same period. These let you see whether workload is increasing, whether down events are clustering around certain dates, and how consistently the team is keeping up with preventive maintenance.
-    </p>
-    <p>
-      The repeat problem assets table lists every asset that has appeared in more than one distinct shift, ranked by how many shifts it has appeared in. An asset that shows up across five different shifts is a signal that there is an unresolved root cause worth investigating. The top technicians chart shows entry count per technician, which reflects who is documenting their work thoroughly.
-    </p>
-    <p>
-      At the bottom of the page, the executive insights strip calls out the single most problematic asset, the most active technician, and the percentage of work orders that were Down events.
-    </p>
+
+  <!-- ═══════════════════════════════════════════════════
+       SECTION 3 — MST DASHBOARD
+  ═══════════════════════════════════════════════════ -->
+  <div id="section-mst" style="margin-top:2.5rem;">
+    <div class="section-badge">🎯 Section 3</div>
+    <div class="card">
+      <h2>MST Dashboard</h2>
+      <p>
+        The MST Dashboard is the command center for the shift lead. From here you can see every
+        tech's entries in real time, manage equipment status, verify LOTO keys, upload reports,
+        and send the end-of-shift passdown email. This section covers every part of it.
+      </p>
+
+      <!-- LOGIN -->
+      <h3 id="login-mst">🔐 How to Log In (MST)</h3>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">Make sure a shift has been started from the <strong>Homepage</strong> first (see Section 1). There must be an active shift for you to access the MST dashboard.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">Go to <strong>/lead</strong> on the app, or click <strong>"MST Dashboard"</strong> from the homepage.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">Enter your <strong>4-digit MST PIN</strong> and click <strong>"Unlock"</strong>. Your session stays open as long as the browser tab is open.</div>
+        </div>
+      </div>
+      <div class="warn">
+        🔒 <strong>PINs are personal.</strong> Every MST has their own PIN. Do not share yours.
+        Manager bypass is available for emergencies — ask your manager directly.
+      </div>
+
+      <!-- STATS BAR -->
+      <h3>📊 The Stats Bar</h3>
+      <p>
+        Pinned just below the header, the stats bar gives you a live snapshot of the shift at a glance:
+      </p>
+      <table class="ftable">
+        <thead><tr><th>Stat</th><th>What it means</th></tr></thead>
+        <tbody>
+          <tr><td>📋 Entries</td><td>Total number of work entries logged this shift across all techs.</td></tr>
+          <tr><td>🔧 PMs Completed</td><td>How many Preventive Maintenance work orders have been marked done this shift.</td></tr>
+          <tr><td>🔴 Down</td><td>Number of assets currently flagged as fully down (Critical priority).</td></tr>
+          <tr><td>🟡 Degraded</td><td>Assets running but with a known issue being monitored.</td></tr>
+          <tr><td>👷 Techs Active</td><td>How many technicians have logged in and submitted at least one entry.</td></tr>
+          <tr><td>✅ Signed Off</td><td>How many techs have clicked their Sign Off button for the shift.</td></tr>
+          <tr><td>⏱ Shift Timer</td><td>A live clock counting up from the moment this shift was started.</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ACTIVITY LOG -->
+      <h3>📡 Activity Log (Live Feed)</h3>
+      <p>
+        The left side of the MST dashboard is the <strong>Activity Log</strong> — a live, auto-refreshing
+        list of every entry submitted by techs this shift. New entries appear automatically every
+        10 seconds without you needing to refresh the page.
+      </p>
+      <p>You can <strong>filter</strong> entries by typing an asset ID or tech name into the search box in the top-right of the feed.</p>
+
+      <h4>Actions You Can Take on Each Entry</h4>
+      <table class="ftable">
+        <thead><tr><th>Button</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>✏️ Edit</td><td>Opens an inline edit form so you can correct the unit, issue, or priority on any entry.</td></tr>
+          <tr><td>🚫 Exclude</td><td>Removes this entry from the passdown report without deleting it. The entry stays in the log for records but is greyed out and not included in the email. Use this for test entries or duplicates.</td></tr>
+          <tr><td>🔁 Carry Over</td><td>Marks this entry to carry over into the next shift's dashboard — for ongoing issues that are not resolved yet.</td></tr>
+        </tbody>
+      </table>
+
+      <!-- CARRY OVERS -->
+      <h3>🔁 Carry-Overs From Previous Shift</h3>
+      <p>
+        At the top of the activity log, you will see any entries that the previous MST flagged as
+        <strong>"carry over."</strong> These are unresolved issues handed to you from the last shift.
+        You can <strong>Adopt</strong> them (add them to your shift) or <strong>Dismiss</strong> them if they have since been resolved.
+      </p>
+
+      <!-- RIGHT SIDEBAR -->
+      <h3>🗂️ Right Sidebar — All the Controls</h3>
+      <p>The right side of the MST dashboard has collapsible panels for every major function. Click any panel header to open it.</p>
+
+      <!-- Problem Assets -->
+      <div class="card-sm" style="border-left:3px solid #ea1100;">
+        <h4 style="margin-top:0;">📈 Problem Assets</h4>
+        <p style="margin-bottom:0;">
+          Auto-refreshes every 30 seconds. Shows which assets have the most activity this shift —
+          ranked by number of entries. Use this to spot repeat offenders that might need escalation.
+        </p>
+      </div>
+
+      <!-- CETARIS -->
+      <div class="card-sm" id="cetaris" style="border-left:3px solid #0053e2;">
+        <h4 style="margin-top:0;">📄 Cetaris CMMS Import (MST Upload)</h4>
+        <p>
+          As the MST, you can also upload a Cetaris export directly — without going through a tech's
+          dashboard. This is useful if a tech forgot to upload or if you are importing shift data
+          from Cetaris yourself.
+        </p>
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-body">Export the relevant work orders from Cetaris as a <strong>CSV or Excel (.xlsx)</strong> file.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-body">Open the <strong>"Cetaris CMMS Import"</strong> panel in the right sidebar.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-body">Click <strong>"Choose File"</strong>, select your export, then click <strong>"Upload"</strong>.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">4</div>
+            <div class="step-body">The system parses every work order row and creates or updates entries automatically. You will see a summary of what was imported.</div>
+          </div>
+        </div>
+        <div class="tip" style="margin-bottom:0;">
+          💡 If the same work order was worked by multiple techs and they each uploaded their own timecard, the system automatically <strong>merges their notes</strong> into one single passdown entry — so the report never has duplicate lines for the same job.
+        </div>
+      </div>
+
+      <!-- PM UPLOAD -->
+      <div class="card-sm" style="border-left:3px solid #6366f1;">
+        <h4 style="margin-top:0;">🔧 PM's Needing Completion</h4>
+        <p>
+          This panel is for uploading the <strong>open PM (Preventive Maintenance) report</strong>
+          from Cetaris. Upload it as a PDF, Excel, or CSV file.
+          The system parses it and displays a list of PMs that are currently open and need to be completed.
+          This helps track which PMs were finished during the shift.
+        </p>
+        <p style="margin-bottom:0;">
+          Previously uploaded PM files are listed below the upload button. You can
+          <strong>download</strong> them again or <strong>delete</strong> them if they are no longer needed.
+        </p>
+      </div>
+
+      <!-- LOTO -->
+      <div class="card-sm" style="border-left:3px solid #ffc220;">
+        <h4 style="margin-top:0;">🔐 LOTO Key Verification</h4>
+        <p>
+          LOTO stands for <strong>Lock Out / Tag Out</strong>. At the start of every shift, you must account
+          for all LOTO keys to make sure no equipment is accidentally energized.
+        </p>
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-body">Open the <strong>"LOTO Key Verification"</strong> panel.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-body">Check the <strong>"All LOTO keys accounted for"</strong> checkbox to confirm all keys are present.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-body">If any keys are <strong>missing</strong>, type the key number/name into the missing keys field and add them. Missing keys are listed and can be removed one by one as they are located.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">4</div>
+            <div class="step-body">Click <strong>"Save LOTO Status"</strong>. The panel badge turns green when verified, amber when pending.</div>
+          </div>
+        </div>
+        <div class="success" style="margin-bottom:0;">
+          ✅ LOTO status is automatically included in the passdown report and email — the receiving MST will see exactly which keys were accounted for.
+        </div>
+      </div>
+
+      <!-- OOS -->
+      <div class="card-sm" style="border-left:3px solid #ea1100;">
+        <h4 style="margin-top:0;">🚫 Out of Service (OOS)</h4>
+        <p>
+          The Out of Service panel tracks which pieces of equipment are currently tagged out and not
+          available for use. <strong>This list is shown to every technician</strong> as a red banner
+          at the top of their dashboard — so the whole team knows what not to operate.
+        </p>
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-body">Open the <strong>"Out of Service"</strong> panel.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-body">Type the <strong>Asset ID</strong> into the input box (e.g. <code style="background:#f1f5f9;padding:.1rem .4rem;border-radius:.3rem;">M2785</code>) and click <strong>"+ Add OOS"</strong>.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-body">The asset immediately appears on every tech's screen in the red warning banner.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">4</div>
+            <div class="step-body">When the unit is repaired and back in service, find it in the OOS list and click <strong>"RTS"</strong> (Return to Service) to remove it.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- HAPPENINGS -->
+      <div class="card-sm" style="border-left:3px solid #2a8703;">
+        <h4 style="margin-top:0;">📁 Happenings File Upload</h4>
+        <p style="margin-bottom:0;">
+          This is an optional panel for uploading any supporting documents you want attached to
+          the shift record — photos, additional reports, etc. These are stored with the shift
+          for future reference but are not included in the passdown email automatically.
+        </p>
+      </div>
+
+      <!-- GENERATE REPORT -->
+      <div class="card-sm" id="email-workflow" style="border-left:3px solid #0053e2;">
+        <h4 style="margin-top:0;">⚡ Generate Report &amp; Send Email</h4>
+        <p>
+          This is the big one — how the passdown email actually works. Read this carefully.
+        </p>
+
+        <h4>Step 1 — Click "Generate Report"</h4>
+        <p>
+          At the bottom of the right sidebar, click the blue <strong>"⚡ Generate Report"</strong> button.
+          The system pulls together every non-excluded entry, the OOS list, LOTO status, PM count,
+          RTS events, and any extra notes you added — and builds a clean, formatted passdown report.
+        </p>
+        <p>
+          The report appears in the main area on the left. You can read through it and make sure
+          everything looks right. If you need to fix something, go back to the activity log,
+          edit or exclude entries, then click Generate Report again — it updates every time.
+        </p>
+
+        <h4>Step 2 — Click "Compose Email"</h4>
+        <p>
+          Once the report looks good, click the <strong>"Compose Email"</strong> button inside the report card.
+          The system does two things at once:
+        </p>
+        <ul style="padding-left:1.25rem;margin-bottom:.75rem;">
+          <li>It builds a fully-formatted HTML email with the passdown report inside.</li>
+          <li>It downloads a file called <strong><code style="background:#f1f5f9;padding:.1rem .4rem;border-radius:.3rem;">passdown-S5-[id].eml</code></strong> to your computer.</li>
+        </ul>
+
+        <div class="tip">
+          💡 An <strong>.eml file</strong> is a ready-made email file. Think of it like a pre-written letter in an envelope — it just needs you to press send.
+        </div>
+
+        <h4>Step 3 — Open the .eml File in Outlook</h4>
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-body">Go to your <strong>Downloads folder</strong> (or wherever your browser saves files).</div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-body"><strong>Double-click</strong> the file named <code style="background:#f1f5f9;padding:.1rem .4rem;border-radius:.3rem;">passdown-S5-....eml</code>. It will open directly in Microsoft Outlook.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-body">Outlook opens a compose window with the passdown already written inside — <strong>To address, subject line ("S5 Passdown"), and full report body are all pre-filled</strong>. Your own Outlook signature is added automatically at the bottom.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">4</div>
+            <div class="step-body">Review the email one final time. If everything looks good, click <strong>"Send"</strong>.</div>
+          </div>
+        </div>
+
+        <div class="success">
+          ✅ <strong>That is it.</strong> The passdown email is sent to the management distribution list automatically.
+          You do not need to type any addresses or copy-paste anything.
+        </div>
+
+        <div class="warn">
+          ⚠️ <strong>Do not close the shift before sending the email.</strong> The "End Shift" button is
+          separate from the email. Always click Compose Email → open → send first, then end the shift.
+        </div>
+
+        <h4>What Is in the Email?</h4>
+        <table class="ftable" style="margin-top:.5rem;">
+          <thead><tr><th>Section</th><th>Contents</th></tr></thead>
+          <tbody>
+            <tr><td>📋 Happenings</td><td>Every work entry from the shift — asset, what happened, what was done. Multiple techs who worked the same job are merged into one clean paragraph.</td></tr>
+            <tr><td>🔐 LOTO Status</td><td>Whether all keys were verified, and any missing keys listed by name.</td></tr>
+            <tr><td>🚫 Out of Service</td><td>Full list of units still tagged out at the end of shift.</td></tr>
+            <tr><td>🔧 PMs Completed</td><td>Count of preventive maintenance work orders completed this shift.</td></tr>
+            <tr><td>✅ RTS Units</td><td>Any equipment that was returned to service during the shift.</td></tr>
+            <tr><td>✍️ Your Signature</td><td>Your Outlook email signature is automatically appended — name, title, contact info, and the Walmart logo.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- END SHIFT -->
+      <div class="card-sm" style="border-left:3px solid #ea1100;">
+        <h4 style="margin-top:0;">🔒 Ending the Shift</h4>
+        <p>
+          After the passdown email has been sent, click the red <strong>"End Shift"</strong> button.
+          This locks the shift — no more entries can be added or edited. The shift moves to the
+          History tab where it is stored permanently.
+        </p>
+        <div class="warn" style="margin-bottom:0;">
+          ⚠️ Ending the shift is <strong>permanent</strong>. Make sure the email is sent and everything
+          is correct before clicking End Shift. If something was missed, check with your manager.
+        </div>
+      </div>
+
+      <!-- HAMBURGER MENU -->
+      <h3>☰ Hamburger Menu</h3>
+      <p>
+        The three-line menu button (☰) in the top-left corner of the MST dashboard opens a
+        navigation menu with quick links to:
+      </p>
+      <ul style="padding-left:1.25rem;margin-bottom:0;">
+        <li><strong>🏠 Home</strong> — back to the main homepage</li>
+        <li><strong>📜 History</strong> — view all past closed shifts and download old reports</li>
+        <li><strong>📊 Analytics</strong> — charts showing reliability trends over time</li>
+        <li><strong>⚙️ Admin</strong> — system settings (email addresses, roster management)</li>
+        <li><strong>📋 Guide</strong> — this user guide</li>
+        <li><strong>🚪 Sign Out</strong> — log out of the MST session</li>
+      </ul>
+
+      <!-- TECH PARTICIPATION -->
+      <h3>👥 Tech Participation Panel</h3>
+      <p>
+        There is also a <strong>Tech Participation</strong> view showing which techs have logged in
+        this shift, how many entries each one has submitted, and who has signed off. This helps
+        you quickly see if anyone is missing or has not checked in yet.
+      </p>
+
+    </div>
   </div>
 
-  <!-- 12 -->
-  <div class="section" id="admin">
-    <h2>12. Admin Settings</h2>
-    <p>
-      The Admin page is accessible from the gear icon in the MST dashboard. It has two sections.
-    </p>
-    <h3>Associate Roster</h3>
-    <p>
-      This section shows every associate who can log into the system. The roster is sourced from the Drax Associates spreadsheet in OneDrive. When someone is added or removed from that spreadsheet, click Re-sync from Drax and the system will pull the latest version, update the database, and refresh the table on screen immediately. The re-sync preserves any MST flags that were set manually so those are never accidentally cleared.
-    </p>
-    <p>
-      You can also add an associate directly in this page without going through the spreadsheet. Fill in their associate number, full name, and shift, check the MST box if they should have lead access, and click Add. The MST toggle on each row lets you grant or remove lead access for any associate without changing the Drax file.
-    </p>
-    <div class="warn">A technician who is not on the roster cannot log in. If someone is having trouble checking in, check that their associate number appears in the roster table and that it matches exactly what is on their badge.</div>
-    <h3>Teams Notifications</h3>
-    <p>
-      Paste an incoming webhook URL from your Teams channel here and save it. Once active, the system will post a card to that Teams channel whenever a technician submits an entry with a Down or Degraded priority. This means the MST gets a notification in Teams the moment something goes down, without needing to keep the dashboard open on screen.
-    </p>
+
+  <!-- ═══════════════════════════════════════════════════
+       QUICK REFERENCE
+  ═══════════════════════════════════════════════════ -->
+  <div style="margin-top:2.5rem;">
+    <div class="section-badge">📌 Quick Reference</div>
+    <div class="card">
+      <h2>Common Questions</h2>
+
+      <h3>What is the tech PIN / password?</h3>
+      <p>Technicians do <strong>not</strong> need a PIN or password. Just search for your name and click Sign In.</p>
+
+      <h3>I can't find my name in the tech login search.</h3>
+      <p>Your name might not be in the associate roster yet. Let your MST know and they can add you through the Admin panel, or reload the roster from there.</p>
+
+      <h3>I uploaded the wrong Cetaris file — what do I do?</h3>
+      <p>Upload the correct file again. The system will update the existing entries for the same work orders rather than creating duplicates. If you need to remove an entry entirely, your MST can exclude it from the activity log.</p>
+
+      <h3>The report shows an entry I don't want included.</h3>
+      <p>The MST can click the <strong>🚫 Exclude</strong> button on any entry in the activity log. Excluded entries are greyed out and not included in the generated report — but they stay in the log for records.</p>
+
+      <h3>The shift timer shows --:-- on the MST dashboard.</h3>
+      <p>Refresh the page. The timer loads automatically when the stats bar appears — if the bar took a moment to load, the timer should catch up within a second.</p>
+
+      <h3>The .eml file won't open in Outlook.</h3>
+      <p>Make sure Microsoft Outlook is installed and set as your default email client. Right-click the .eml file → "Open with" → Microsoft Outlook. If Outlook is not installed, contact IT.</p>
+
+      <h3>Can I generate the report more than once?</h3>
+      <p>Yes! Click Generate Report as many times as you need. Each time it rebuilds from the latest entry data. Only the final version you email is what counts.</p>
+
+      <h3>Where do I see old passdown reports?</h3>
+      <p>Click <strong>History</strong> from the homepage or hamburger menu. Every closed shift is listed there with its full report and the ability to download it.</p>
+    </div>
   </div>
 
-  <!-- 13 -->
-  <div class="section" id="glossary">
-    <h2>13. Glossary</h2>
-    <table class="feat-table">
-      <thead><tr><th style="width:8rem;">Term</th><th>Meaning</th></tr></thead>
-      <tbody>
-        <tr><td><strong>Passdown</strong></td><td>The shift handover document that summarizes everything that happened and passes critical information to the next shift.</td></tr>
-        <tr><td><strong>MST</strong></td><td>The shift lead. MSTs have full access to the system including editing entries, generating reports, and the admin panel.</td></tr>
-        <tr><td><strong>Cetaris</strong></td><td>The CMMS (Computerized Maintenance Management System) used at IND3. Technicians export work orders from Cetaris and upload the CSV to the passdown system.</td></tr>
-        <tr><td><strong>WO</strong></td><td>Work Order. A tracked job in Cetaris tied to a specific asset and technician. WOs have unique numbers used to identify them in the passdown.</td></tr>
-        <tr><td><strong>PM</strong></td><td>Preventive Maintenance. Scheduled routine work. PMs are counted in the report total but not listed individually as happenings.</td></tr>
-        <tr><td><strong>Carry-Over</strong></td><td>An asset flagged by the MST as needing follow-up by the next shift.</td></tr>
-        <tr><td><strong>Excluded</strong></td><td>An entry that has been marked by the MST to not appear in the generated report. It still exists in the system and can be re-included at any time.</td></tr>
-        <tr><td><strong>Live Feed</strong></td><td>The real-time activity stream on the MST dashboard. Updates automatically as technicians upload entries.</td></tr>
-        <tr><td><strong>Down</strong></td><td>The asset is completely out of service and not running.</td></tr>
-        <tr><td><strong>Degraded</strong></td><td>The asset is running but at reduced capacity or with a known problem.</td></tr>
-        <tr><td><strong>Monitor</strong></td><td>The issue was addressed and the asset is running, but it should be watched for signs of recurrence.</td></tr>
-        <tr><td><strong>RTS</strong></td><td>Return to Service. The asset was down and is now fully operational again.</td></tr>
-        <tr><td><strong>OOS</strong></td><td>Out of Service. The asset is still down at shift end and has not been returned to service.</td></tr>
-        <tr><td><strong>Drax</strong></td><td>The shared Associates spreadsheet in OneDrive that the system uses as the source of truth for the associate roster.</td></tr>
-        <tr><td><strong>Associate Number</strong></td><td>The numeric ID on a technician's badge. Used to log into the system. No password is required.</td></tr>
-        <tr><td><strong>Repeat Offender</strong></td><td>An asset that appears across multiple distinct shifts in the analytics. A candidate for root-cause investigation.</td></tr>
-      </tbody>
-    </table>
-  </div>
 
-  <div class="section" style="background:#001e50;text-align:center;padding:1.5rem;">
-    <p style="color:#93c5fd;font-size:.8rem;font-weight:600;margin:0;">
-      IND3 Reliability Passdown System &nbsp;&bull;&nbsp; Walmart 2026 &nbsp;&bull;&nbsp; Questions? Ask your MST lead.
-    </p>
+  <!-- FOOTER -->
+  <div style="text-align:center;margin-top:2rem;padding:1.5rem;color:#94a3b8;font-size:.8rem;">
+    IND3 eCommerce Fulfillment Center #8972 &nbsp;·&nbsp; MST Reliability Team &nbsp;·&nbsp;
+    <a href="/" style="color:#0053e2;font-weight:700;">Back to Homepage</a>
   </div>
 
 </div>
