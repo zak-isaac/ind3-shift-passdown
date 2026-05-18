@@ -1933,10 +1933,11 @@ async def report_open_in_outlook(
 
 @app.get("/report/{report_id}/compose-outlook")
 async def report_compose_outlook_get(request: Request, report_id: int):
-    """GET — one-click button uses a hidden iframe pointing here.
-    Browser receives the .eml and Windows auto-opens it in Outlook compose.
+    """GET — one-click button opens this in a new tab.
+    Redirects to OWA compose with To, Subject, and body pre-filled.
+    OWA automatically injects the user's saved Outlook signature.
     """
-    return await _build_eml_response(report_id, subject="", html_body="")
+    return await _build_owa_redirect(report_id, subject="", html_body="")
 
 
 @app.post("/report/{report_id}/compose-outlook")
@@ -1947,18 +1948,21 @@ async def report_compose_outlook(
     html_body: str = Form(""),
 ):
     """POST — preview modal uses this when the lead has edited the body."""
-    return await _build_eml_response(report_id, subject=subject, html_body=html_body)
+    return await _build_owa_redirect(report_id, subject=subject, html_body=html_body)
 
 
-async def _build_eml_response(report_id: int, subject: str, html_body: str) -> Response:
-    """Build and return a .eml (X-Unsent:1) so Outlook opens in compose mode."""
+async def _build_owa_redirect(report_id: int, subject: str, html_body: str) -> Response:
+    """Build an OWA compose deeplink and redirect to it.
+    OWA automatically appends the user's configured Outlook signature.
+    Body is plain text (OWA does not render HTML in the body param).
+    """
     rec = db.get_report(report_id)
     if not rec:
         return Response("Report not found", status_code=404, media_type="text/plain")
 
     to_addrs = db.get_setting("email_to", "").strip()
 
-    # ── Subject ──
+    # -- Subject --
     if not subject.strip() and rec.get("report_json"):
         data    = ReportData.model_validate_json(rec["report_json"])
         subject = (
@@ -1966,46 +1970,31 @@ async def _build_eml_response(report_id: int, subject: str, html_body: str) -> R
             f"{data.lead_name} \u2013 {data.date}"
         )
 
-    # ── HTML body ──
+    # -- Body: clean plain text --
     if html_body.strip():
-        body_html = html_body
+        plain = _html_to_plain(html_body)
     elif rec.get("report_json"):
         data      = ReportData.model_validate_json(rec["report_json"])
         loto      = db.get_loto(rec["shift_id"])
         pms       = db.get_pending_pms(rec["shift_id"])
-        body_html = format_email_passdown_html(
+        full_html = format_email_passdown_html(
             data,
             loto_missing=loto.get("loto_missing_keys", ""),
             pending_pms=pms or None,
             loto_verified=bool(loto.get("loto_verified", 0)),
         )
+        plain = _html_to_plain(full_html)
     else:
-        body_html = f"<pre>{rec.get('content', '')}</pre>"
+        plain = (rec.get("content") or "").strip()
 
-    # ── Build .eml ──
-    import base64 as _b64
-    body_b64        = _b64.b64encode(body_html.encode("utf-8")).decode("ascii")
-    body_b64_folded = "\r\n".join(body_b64[i:i+76] for i in range(0, len(body_b64), 76))
-    eml = (
-        f"X-Unsent: 1\r\n"
-        f"To: {to_addrs}\r\n"
-        f"Subject: {subject}\r\n"
-        f"MIME-Version: 1.0\r\n"
-        f'Content-Type: text/html; charset="utf-8"\r\n'
-        f"Content-Transfer-Encoding: base64\r\n"
-        f"\r\n"
-        f"{body_b64_folded}\r\n"
+    from urllib.parse import quote
+    owa_url = (
+        "https://outlook.office.com/mail/deeplink/compose?"
+        f"to={quote(to_addrs, safe='@,;')}"
+        f"&subject={quote(subject, safe='')}"
+        f"&body={quote(plain, safe='')}"
     )
-    shift_label = ""
-    if rec.get("report_json"):
-        d = ReportData.model_validate_json(rec["report_json"])
-        shift_label = f"{d.shift_type}-{d.date}-"
-    filename = f"passdown-{shift_label}{report_id}.eml"
-    return Response(
-        content=eml.encode("utf-8"),
-        media_type="message/rfc822",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+    return RedirectResponse(owa_url)
 
 
 def _html_to_plain(html: str) -> str:

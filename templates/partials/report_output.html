@@ -88,24 +88,16 @@ function openComposeNow(reportId) {
   btn.disabled      = true;
   label.textContent = 'Opening Outlook...';
 
-  // Hidden iframe: the browser GETs the .eml endpoint which returns
-  // Content-Type: message/rfc822. Windows sees the file association and
-  // auto-opens it in Outlook compose — no popup blocker, no new tab needed.
-  let iframe = document.getElementById('eml-frame-' + reportId);
-  if (!iframe) {
-    iframe               = document.createElement('iframe');
-    iframe.id            = 'eml-frame-' + reportId;
-    iframe.style.display = 'none';
-    document.body.appendChild(iframe);
-  }
-  iframe.src = '/report/' + reportId + '/compose-outlook';
+  // Server redirects to OWA compose URL with To, Subject, body pre-filled.
+  // OWA auto-injects the user's saved Outlook signature below the body.
+  window.open('/report/' + reportId + '/compose-outlook', '_blank');
 
   setTimeout(() => {
-    label.textContent     = '\u2713 Outlook is opening!';
+    label.textContent     = '\u2713 OWA compose opened!';
     btn.style.background  = '#2a8703';
     btn.style.borderColor = '#1a5c02';
-    status.innerHTML      = '<span class="text-green-400">Check your taskbar \u2014 Outlook compose should appear shortly</span>';
-  }, 900);
+    status.innerHTML      = '<span class="text-green-400">Check the new browser tab \u2014 your signature will appear automatically</span>';
+  }, 600);
 
   setTimeout(() => {
     label.textContent     = 'Open & Compose in Outlook';
