@@ -203,7 +203,7 @@
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════
-       COL A — Activity Log (7 cols, main focus)
+       COL A — Activity Log (7 cols, scrolls with page)
   ══════════════════════════════════════════════════════════════ -->
   <section class="lg:col-span-7 flex flex-col gap-3">
 
@@ -232,9 +232,10 @@
   </section>
 
   <!-- ══════════════════════════════════════════════════════════════
-       COL B — Right sidebar (5 cols)
+       COL B — Right sidebar (5 cols, sticky)
   ══════════════════════════════════════════════════════════════ -->
-  <section class="lg:col-span-5 flex flex-col gap-4">
+  <section class="lg:col-span-5 flex flex-col gap-4 self-start sticky overflow-y-auto"
+    style="top:56px; max-height:calc(100vh - 56px); scrollbar-width:thin; scrollbar-color:#e2e8f0 transparent;">
 
     <!-- ── GROUP 1: Monitoring ─────────────────────────────────── -->
     <p class="section-label">Shift Monitoring</p>
