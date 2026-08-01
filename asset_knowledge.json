@@ -1,0 +1,42 @@
+{
+  "TAPER": {
+    "asset_ids": ["TAPER1101", "TAPER1001"],
+    "description": "BestPack AC Black Tape Head — pressure-sensitive carton sealer. Part of the Ranpak Autofill system. Seals top and bottom of boxes with pressure-sensitive tape.",
+    "components": "- Head: the main tape applicator assembly that applies tape to box seams\n- Closer: mechanism that folds and presses box flaps shut before taping\n- Side Guide: adjustable guide rails that center the box through the machine\n- Blushing: rubber guide strip/bumper on the closure that contacts the box\n- Tension Adjustment Arm (Idler Arm): controls how tight/loose tape feeds; adjust when tape is too tight or too loose\n- Cutter Arm: blade assembly that cuts tape after the box is sealed\n- Applicator Roller: roller that presses tape onto the box surface\n- One-Way Roller: allows tape to feed forward only; if rolling both directions, replace\n- Tape Mandrel: spindle that holds the tape roll\n- Tab (Overlap): how far tape wraps past the box edge; adjustable\n- Tape Path: the route the tape travels from mandrel through rollers to box\n- Calibration: adjusting side guides, closer height, and tape tension to match box size\n- Common issues: tape too tight/loose, tape wrinkling, tab too long/short, misaligned carton, poor cut, tape wrapping around applicator roller"
+  },
+  "VOIDFILL": {
+    "asset_ids": ["VOIDFILL", "VOIDFILL0201", "VOIDFILL0101"],
+    "description": "Ranpak Autofill / Decision Tower — paper void fill cushioning machine. Converts paper rolls into crinkled paper cushioning dispensed into boxes at packing stations.",
+    "components": "- Decision Tower: the main dispenser/controller unit mounted above packing stations\n- Head: the forming head assembly that crinkles and shapes the paper\n- Closer: mechanism that closes/compresses paper into the cushioning shape\n- Side Guide: guides paper through the forming head at correct alignment\n- Blushing: rubber guide strip on the closure that contacts and guides the paper\n- Paper Path: the route paper travels from roll through the forming head to dispense\n- Tension Roller: maintains correct paper tension through the machine\n- Dispense: the action of releasing cushioning material into a box\n- Paper Jam: paper bunching or stopping in the path; clear and re-thread\n- Calibration: adjusting head position, side guide, and closer for correct paper formation\n- Re-thread: feeding new paper through the entire paper path after a jam or roll change\n- Common issues: paper jam, mis-installed blushing (wrong side), misaligned head, closer not seating, side guide out of position"
+  },
+  "TSP": {
+    "asset_ids": ["TSP0005", "TSP####"],
+    "description": "Crown TSP7000 — turret/man-up order selector. Narrow-aisle reach truck. Operator platform and forks elevate together for high-bay picking on wire guidance.",
+    "components": "- Stabilizer Bar: bar that extends at height to stabilize the machine in the aisle; must be adjusted correctly per SOP\n- Wire Guidance: floor-embedded wire the truck follows autonomously in the aisle\n- Platform: the elevated operator compartment\n- Forks: the lifting arms that carry pallets or totes\n- Mast: the vertical rail the platform and forks travel up/down on\n- Drive Motor: propels the truck\n- Hydraulic System: powers fork and platform lift\n- Brake: service brake and plugging brake; plugging = using the motor to decelerate\n- Horn: audible warning device\n- Battery: traction battery; must be fully charged before each shift\n- Wire Guide Antenna: the sensor that follows the floor wire\n- Emergency Lowering: manual valve to lower platform if hydraulics fail\n- Brake Test: required after maintenance — measure braking distance and plugging distance in feet"
+  },
+  "WAV": {
+    "asset_ids": ["WAV####"],
+    "description": "Crown WAV60 — order picker with elevating operator platform for high-bay picking.",
+    "components": "- Platform: operator compartment that elevates with the forks\n- Forks: lifting arms\n- Battery: traction/lift battery\n- Hydraulic System: powers lift\n- Brake: service brake; plugging brake\n- Horn: audible warning device\n- Wire Guidance: floor wire navigation system\n- Event Codes: fault codes displayed on the dash; reference Wave Event Codes manual\n- Mast: vertical rail for lift travel\n- Emergency Lowering: manual lowering valve"
+  },
+  "RC": {
+    "asset_ids": ["RC####"],
+    "description": "Crown reach truck / counterbalance forklift.",
+    "components": "- Forks: lifting arms for pallet handling\n- Mast: vertical rail system (single/double/triple stage)\n- Reach Mechanism: extends forks into racking without moving the whole truck\n- Tilt: tilts the mast forward/back for load stability\n- Side Shift: moves forks left/right for pallet alignment\n- Battery: traction battery; charged via on-board or off-board charger\n- Charger: battery charging unit; check water level and connections\n- Hydraulic System: powers lift, reach, tilt, side shift\n- Brake: service brake\n- Horn: audible warning\n- Drive Motor: propels the truck\n- Common issues: horn inoperative (check fuse), brake out of spec (brake test required), battery not holding charge"
+  },
+  "BALER": {
+    "asset_ids": ["BALER0002", "BALER0003", "BALER0004", "BALER0005"],
+    "description": "American Baler — cardboard/OCC horizontal baler. Compresses cardboard into tied bales.",
+    "components": "- Ram: the hydraulic platen that compresses cardboard\n- Platen: the face of the ram that contacts the material\n- Chamber: the baling chamber where cardboard is loaded\n- Baling Wire: wire used to tie completed bales\n- Tie: the process of threading and knotting wire around a bale\n- Hydraulic System: powers the ram\n- Pressure: hydraulic pressure setting; controls bale density\n- Cycle: one full compress-and-retract motion of the ram\n- Door: the chamber door; must be closed before cycling\n- Safety Bar/Interlock: prevents ram from cycling when door is open\n- Common issues: wire jam, door interlock fault, hydraulic leak, ram not cycling"
+  },
+  "ROBOPAC": {
+    "asset_ids": ["ROBOPAC", "ROBO####"],
+    "description": "Robopac Robot S7 — autonomous mobile stretch wrapper. Wraps pallets with stretch film while driving around them.",
+    "components": "- Turntable: rotating base (N/A on Robot S7 — machine drives around the pallet instead)\n- Film Carriage: the assembly that holds and applies stretch film\n- Pre-stretch: rollers that stretch film before application; percentage setting\n- Roping: gathering film into a rope for the top/bottom wrap\n- Cut and Clamp: automatic film cut and clamp at cycle end\n- Cell Calibration: teaching the robot its route/wrap pattern around a pallet\n- Battery: traction battery for autonomous movement\n- Charging: docking station charging; must return to dock between loads\n- Emergency Stop: large red button; resets after resolving the fault\n- Wrap Cycle: the programmed sequence of wrapping passes\n- Common issues: film break, pre-stretch roller jam, cell calibration drift, battery not docking correctly"
+  },
+  "TENNANT": {
+    "asset_ids": ["T300e", "T500e", "T7", "T12", "M20", "M30", "S10"],
+    "description": "Tennant floor scrubbers (T/M series) and sweepers (S series). Used for floor cleaning throughout the facility.",
+    "components": "- Scrub Head: the brush deck assembly that scrubs the floor\n- Brush: cylindrical or disc brush that agitates floor; replace when worn\n- Squeegee: rear rubber blade that picks up dirty water; adjust or replace when streaking\n- Solution Tank: holds clean water + chemical; fill before each shift\n- Recovery Tank: holds dirty water; empty and rinse after each shift\n- Battery: traction and scrub battery; charge after each use\n- Charger: on-board charger; plug in after shift\n- Filter: debris filter in recovery tank; clean frequently to maintain suction\n- Hopper: debris collection bin on sweeper models (S10, M20, M30)\n- Vacuum: suction system that pulls dirty water into recovery tank\n- Squeegee Adjustment: raise/lower rear squeegee to contact floor evenly\n- Common issues: streaking (squeegee worn/misaligned), poor scrub (brush worn), no suction (filter clogged), battery not charging"
+  }
+}

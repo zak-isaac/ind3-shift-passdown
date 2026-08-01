@@ -11,9 +11,11 @@ rewrite_batch(inputs: list[str]) -> list[str]
 """
 from __future__ import annotations
 
+import json
 import logging
 import re
 import time
+from pathlib import Path
 from typing import Optional
 
 import httpx
@@ -27,6 +29,38 @@ _TEMPERATURE      = 0.1
 _TOKENS_PER_ENTRY = 200  # 200k was requested but let's not melt the GPU lmao
 
 log = logging.getLogger(__name__)
+
+# -- Asset knowledge base (loaded once at import) ------------------------------
+_KNOWLEDGE_FILE = Path(__file__).parent / "asset_knowledge.json"
+_ASSET_KNOWLEDGE: dict = {}
+
+def _load_knowledge() -> None:
+    global _ASSET_KNOWLEDGE
+    if not _KNOWLEDGE_FILE.exists():
+        log.info("[ai_rewriter] No asset_knowledge.json found -- running without glossary")
+        return
+    try:
+        _ASSET_KNOWLEDGE = json.loads(_KNOWLEDGE_FILE.read_text(encoding="utf-8"))
+        log.info("[ai_rewriter] Loaded asset knowledge for: %s", list(_ASSET_KNOWLEDGE.keys()))
+    except Exception as e:
+        log.warning("[ai_rewriter] Failed to load asset_knowledge.json: %s", e)
+
+def _get_asset_context(asset_id: str) -> str:
+    """Return the component glossary for the given asset ID, or empty string."""
+    asset_id_upper = asset_id.upper().strip()
+    for atype, info in _ASSET_KNOWLEDGE.items():
+        # Match by exact asset_id OR by prefix (e.g. 'TSP0005' matches 'TSP')
+        ids = [i.upper() for i in info.get("asset_ids", [])]
+        if asset_id_upper in ids or any(
+            asset_id_upper.startswith(i.replace("####", "")) for i in ids if "####" in i
+        ) or atype.upper() in asset_id_upper:
+            components = info.get("components", "")
+            desc       = info.get("description", "")
+            if components:
+                return f"Equipment context: {desc}\nKey components:\n{components}"
+    return ""
+
+_load_knowledge()
 
 _SYSTEM_PROMPT = (
     "You are a maintenance technician writing concise Work Order notes for a "
@@ -58,8 +92,9 @@ _SINGLE_TEMPLATE = (
     "  Entry: Head was crashing against boxes; recalibrated and unit returned to service.\n"
     "  Note: VOIDFILL / blushing on right closure installed on wrong side. repositioned blushing. recalibrated head, side guide, closers. asset operational\n"
     "  Entry: Right-closure blushing found mis-installed; repositioned and head, side guide, and closers recalibrated; unit returned to service.\n"
-    "  Note: RC0042 / horn not working replaced fuse rts | checked wiring all good\n"
-    "  Entry: Horn found inoperative; fuse replaced, wiring verified, unit returned to service.\n\n"
+    "  Note: RC0042 / horn not working replaced fuse rts | wiring checked all good unit rts\n"
+    "  Entry: Horn found inoperative; fuse replaced, wiring verified, unit returned to service.\n"
+    "{context_block}\n\n"
     "Now write the entry. Output ONLY the sentence, no asset ID, nothing else:\n"
     "  Note: {text}\n"
     "  Entry:"
@@ -76,10 +111,11 @@ _BATCH_TEMPLATE = (
     "  2. TSP0005 / platform not fully lowered by operator. lowered platform. drove to shop. brake test: 7ft braking, 10ft plugging\n"
     "  2. Platform found not fully lowered; lowered and unit driven to shop for brake test. Braking distance: 7ft, plugging distance: 10ft.\n"
     "  3. RC0042 / horn dead replaced fuse | wiring checked all good unit rts\n"
-    "  3. Horn found inoperative; fuse replaced, wiring verified, unit returned to service.\n\n"
+    "  3. Horn found inoperative; fuse replaced, wiring verified, unit returned to service.\n"
+    "{context_block}\n\n"
     "Notes to rewrite:\n"
     "{numbered_notes}\n\n"
-    "Rewritten entries:\n"
+    "Rewritten entries (STOP after the last numbered entry):\n"
     "1."
 )
 
@@ -191,11 +227,12 @@ def rewrite(text: str) -> str:
     if not text or not text.strip():
         return text
 
-    # Extract asset ID for post-processing strip
     asset_id = text.split("/")[0].strip() if "/" in text else ""
+    context  = _get_asset_context(asset_id)
+    context_block = f"\n\nAsset reference:\n{context}" if context else ""
 
     result = _call_ollama(
-        _SINGLE_TEMPLATE.format(text=text),
+        _SINGLE_TEMPLATE.format(text=text, context_block=context_block),
         timeout=_TIMEOUT_SINGLE,
         num_predict=150,
     )
@@ -216,11 +253,21 @@ def rewrite_batch(inputs: list[str]) -> list[str]:
     if len(inputs) == 1:
         return [rewrite(inputs[0])]
 
-    # Extract asset IDs for post-processing
+    # Extract asset IDs for post-processing and context lookup
     asset_ids = [t.split("/")[0].strip() if "/" in t else "" for t in inputs]
 
+    # Build per-asset context block (deduplicated)
+    seen_contexts: set[str] = set()
+    context_lines: list[str] = []
+    for aid in asset_ids:
+        ctx = _get_asset_context(aid)
+        if ctx and ctx not in seen_contexts:
+            seen_contexts.add(ctx)
+            context_lines.append(ctx)
+    context_block = ("\n\nAsset reference:\n" + "\n\n".join(context_lines)) if context_lines else ""
+
     numbered = "\n".join(f"  {i+1}. {t}" for i, t in enumerate(inputs))
-    prompt   = _BATCH_TEMPLATE.format(numbered_notes=numbered)
+    prompt   = _BATCH_TEMPLATE.format(numbered_notes=numbered, context_block=context_block)
     budget   = _TOKENS_PER_ENTRY * len(inputs)
 
     t0  = time.perf_counter()
