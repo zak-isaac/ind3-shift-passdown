@@ -2748,35 +2748,40 @@ async def lead_generate(
 
     # Optional: upgrade merged summaries via Element LLM if key is configured
     from summarizer import summarize_remarks as _summarize, _ELEMENT_API_KEY as _EL_KEY
-    happenings: list[RewrittenHappening] = []
+
+    # Build AI inputs for every happening.
+    # Multi-tech WOs: all_remarks are joined with ' | ' so the AI synthesizes them.
+    # build_input() produces "ASSET / remark1 | remark2" format.
+    ai_inputs: list[str] = []
     for h in co_happenings:
         title       = h["title"]
         raw_remarks = h.get("all_remarks") or []
-        fallback_para = h["paragraph"]  # _smart_concat output, only used if AI skips
-
-        # Feed raw remarks directly to AI — skip _smart_concat entirely.
-        # Join multiple remarks with a space so multi-tech WOs are preserved.
+        fallback    = h["paragraph"]
         if raw_remarks:
-            ai_input = f"{title} / " + " ".join(raw_remarks)
+            ai_input = ai_rewriter.build_input(title, raw_remarks)
         else:
-            ai_input = f"{title} / {fallback_para}"
-
-        if _EL_KEY and h["wo_number"] and len(co_result.consolidated) > 0:
-            # Find the matching ConsolidatedWO and upgrade its summary async
+            ai_input = ai_rewriter.build_input(title, [fallback])
+        # Element LLM upgrade (only when key is set)
+        if _EL_KEY and h["wo_number"]:
             for cwo in co_result.consolidated:
                 if cwo.wo_number == h["wo_number"] and len(cwo.all_remarks) > 1:
                     try:
                         para = await _summarize(cwo.all_remarks)
                         if h["conflicting"]:
                             para += " [\u26a0 Conflicting notes \u2014 verify status]"
-                        ai_input = f"{title} / {para}"
+                        ai_input = ai_rewriter.build_input(title, [para])
                     except Exception:
                         pass
                     break
+        ai_inputs.append(ai_input)
 
-        para = await asyncio.to_thread(ai_rewriter.rewrite, ai_input)
+    # ONE batch AI call for all happenings -- much faster than sequential
+    rewritten_paras = await asyncio.to_thread(ai_rewriter.rewrite_batch, ai_inputs)
+
+    happenings: list[RewrittenHappening] = []
+    for h, para in zip(co_happenings, rewritten_paras):
         happenings.append(RewrittenHappening(
-            title=title,
+            title=h["title"],
             paragraph=para,
             wo_number=h["wo_number"],
             tech_name=h["tech_name"],
