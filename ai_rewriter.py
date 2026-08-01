@@ -24,7 +24,7 @@ _MODEL            = "phi4-mini"
 _TIMEOUT_SINGLE   = 60.0
 _TIMEOUT_BATCH    = 120.0
 _TEMPERATURE      = 0.1
-_TOKENS_PER_ENTRY = 90
+_TOKENS_PER_ENTRY = 200  # 200k was requested but let's not melt the GPU lmao
 
 log = logging.getLogger(__name__)
 

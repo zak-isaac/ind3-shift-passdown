@@ -22,7 +22,7 @@ def _fmt_date(iso: str) -> str:
 # ── HTML preview ─────────────────────────────────────────────────────────────────────
 
 def _none(msg: str = "No activity recorded this shift.") -> str:
-    return f'<p style="color:#444;font-style:italic;font-size:15px;">{msg}</p>'
+    return f'<p style="color:#444;font-style:italic;font-size:12px;">{msg}</p>'
 
 
 def _sec(icon: str, title: str, body: str) -> str:
@@ -30,9 +30,9 @@ def _sec(icon: str, title: str, body: str) -> str:
         '<div style="margin-bottom:2rem;">'
         f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">'
         f'<span style="font-size:1rem;">{icon}</span>'
-        f'<h3 style="font-size:13px;font-weight:900;text-transform:uppercase;'
+        f'<h3 style="font-size:14px;font-weight:900;text-transform:uppercase;'
         f'letter-spacing:0.08em;color:#000;margin:0;">{title}</h3></div>'
-        f'<div style="padding-left:4px;font-size:15px;line-height:1.75;color:#000;">{body}</div>'
+        f'<div style="padding-left:4px;font-size:12px;line-height:1.75;color:#000;">{body}</div>'
         '</div>'
     )
 
@@ -59,14 +59,14 @@ def format_html_preview(data: ReportData) -> str:
     if data.pm_count:
         label = f"{data.pm_count} PM{'s' if data.pm_count != 1 else ''} completed this shift"
         happening_lines.append(
-            f'<li style="padding:8px 0;border-bottom:1px solid #eee;font-size:14px;color:#111;line-height:1.7;">'
+            f'<li style="padding:8px 0;border-bottom:1px solid #eee;font-size:12px;color:#111;line-height:1.7;">'
             f'<strong style="color:#000;">PM:</strong> {label}</li>'
         )
 
     for h in data.happenings:
-        wo_ref = f" <span style='color:#555;font-size:13px;'>(WO #{h.wo_number})</span>" if h.wo_number else ""
+        wo_ref = f" <span style='color:#555;font-size:12px;'>(WO #{h.wo_number})</span>" if h.wo_number else ""
         happening_lines.append(
-            f'<li style="padding:8px 0;border-bottom:1px solid #eee;font-size:14px;color:#111;line-height:1.7;">'
+            f'<li style="padding:8px 0;border-bottom:1px solid #eee;font-size:12px;color:#111;line-height:1.7;">'
             f'<strong style="color:#000;">{h.title}:</strong> {h.paragraph}.{wo_ref}</li>'
         )
 
@@ -174,8 +174,8 @@ def format_email_passdown(data: ReportData) -> str:
             h_items.append(h.paragraph)
     lines += ["Shift Happenings", _bullets(h_items), ""]
 
-    # ── PM's Needing to be Completed (Reliable Operations) ──
-    lines += ["PM's Needing to be Completed", _bullets(list(data.ro)), ""]
+    # ── Reliable Operations ──
+    lines += ["Reliable Operations", _bullets(list(data.ro)), ""]
 
     # ── Out of Service — RTS ──
     lines += ["Out of Service \u2014 Returned to Service (RTS)", _bullets(list(data.rts)), ""]
@@ -253,13 +253,18 @@ def format_email_passdown_html(
                 f"<td style='{td_s}color:#666;'>{r.get('wo_date','')}</td>"
                 f"</tr>"
             )
+        pm_count_label = f"PM\u2019s Needing to be Completed ({len(pending_pms)})"
         pm_html = (
-            f"<p style='margin:16px 0 4px;'><strong style='font-size:14px;'>PM\u2019s Needing to be Completed</strong></p>"
+            f"<p style='margin:16px 0 2px;'><strong style='font-size:14px;'>PM\u2019s Needing to be Completed</strong></p>"
+            f"<p style='margin:0 0 6px;font-size:12px;font-weight:bold;color:#dc2626;'>{len(pending_pms)} PM{'s' if len(pending_pms) != 1 else ''} pending this shift</p>"
             f"<table style='width:100%;border-collapse:collapse;margin-top:4px;'>"
             f"<thead>{hdr}</thead><tbody>{body_rows}</tbody></table>"
         )
     else:
-        pm_html = _bullet_sec("PM\u2019s Needing to be Completed", list(data.ro) if data.ro else [])
+        pm_html = (
+            f"<p style='margin:16px 0 2px;'><strong style='font-size:14px;'>PM\u2019s Needing to be Completed</strong></p>"
+            f"<p style='margin:0 0 6px;font-size:12px;color:#6b7280;font-style:italic;'>No PMs pending this shift.</p>"
+        )
 
     # LOTO — only show verified if actually verified
     if loto_verified:
@@ -273,11 +278,12 @@ def format_email_passdown_html(
     # below the compose body. Putting a name here would create a duplicate.
 
     return (
-        "<html><body style='font-family:Calibri,Arial,sans-serif;font-size:14px;"
+        "<html><body style='font-family:Calibri,Arial,sans-serif;font-size:12px;"
         "color:#111;max-width:700px;line-height:1.6;'>"
-        f"<p style='margin:0 0 18px;font-size:16px;'><strong>{data.shift_type} End of Shift Passdown</strong></p>"
+        f"<p style='margin:0 0 18px;font-size:14px;'><strong>{data.shift_type} End of Shift Passdown</strong></p>"
         + _bullet_sec("Vendors", list(data.vendors))
         + _bullet_sec("Shift Happenings", h_items)
+        + _bullet_sec("Reliable Operations", list(data.ro))
         + pm_html
         + _bullet_sec("Out of Service \u2014 Returned to Service (RTS)", list(data.rts))
         + _bullet_sec("Current Out of Service", [o.unit for o in data.oos])
