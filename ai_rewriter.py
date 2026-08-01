@@ -76,10 +76,13 @@ _SYSTEM_PROMPT = (
     "combine without repeating, resolve the final status from the latest remark.\n"
     "5. Correct obvious typos (doubled/transposed letters) only when unambiguous. "
     "Example: 'craahing' -> 'crashing'.\n"
-    "6. DO NOT add any detail not in the original remarks.\n"
-    "7. DO NOT start your output with the asset ID -- it is already shown in the report. "
+    "6. Preserve ALL directional and positional references exactly as written: "
+    "left, right, top, bottom, front, rear, inner, outer, upper, lower. "
+    "Example: 'blushing on right closure' must remain 'right-closure blushing', never just 'blushing'.\n"
+    "7. DO NOT add any detail not in the original remarks.\n"
+    "8. DO NOT start your output with the asset ID -- it is already shown in the report. "
     "Start directly with the action or finding.\n"
-    "8. Output ONLY the rewritten sentence. No labels, no explanations."
+    "9. Output ONLY the rewritten sentence. No labels, no explanations."
 )
 
 _SINGLE_TEMPLATE = (
@@ -94,6 +97,8 @@ _SINGLE_TEMPLATE = (
     "  Entry: Right-closure blushing found mis-installed; repositioned and head, side guide, and closers recalibrated; unit returned to service.\n"
     "  Note: RC0042 / horn not working replaced fuse rts | wiring checked all good unit rts\n"
     "  Entry: Horn found inoperative; fuse replaced, wiring verified, unit returned to service.\n"
+    "  Note: VOIDFILL / blushing on right closure installed on wrong side. repositioned. recalibrated head, side guide, closers\n"
+    "  Entry: Right-closure blushing found mis-installed; repositioned and head, side guide, and closers recalibrated; unit returned to service.\n"
     "{context_block}\n\n"
     "Now write the entry. Output ONLY the sentence, no asset ID, nothing else:\n"
     "  Note: {text}\n"
