@@ -201,14 +201,18 @@ def format_email_passdown_html(
     from datetime import date as _date
 
     def _li(items: list[str]) -> str:
+        """Outlook needs explicit font-size on every element -- body inheritance is ignored."""
+        s = "font-size:14px;font-family:Calibri,Arial,sans-serif;margin:4px 0;"
         if not items:
-            return "<li style='margin:2px 0;color:#555;'>None</li>"
-        return "".join(f"<li style='margin:4px 0;'>{i}</li>" for i in items)
+            return f"<li style='{s}color:#555;'>None</li>"
+        return "".join(f"<li style='{s}'>{i}</li>" for i in items)
 
     def _bullet_sec(title: str, items: list[str]) -> str:
         return (
-            f"<p style='margin:16px 0 4px;'><strong style='font-size:16px;'>{title}</strong></p>"
-            f"<ul style='margin:0 0 4px;padding-left:20px;line-height:1.8;'>{_li(items)}</ul>"
+            f"<p style='margin:16px 0 4px;font-family:Calibri,Arial,sans-serif;'>"
+            f"<strong style='font-size:16px;'>{title}</strong></p>"
+            f"<ul style='margin:0 0 4px;padding-left:20px;line-height:1.8;"
+            f"font-size:14px;font-family:Calibri,Arial,sans-serif;'>{_li(items)}</ul>"
         )
 
     # Shift Happenings
@@ -229,8 +233,8 @@ def format_email_passdown_html(
     # PM section: proper bordered table or bullet fallback
     today  = _date.today().strftime("%m/%d/%Y")
     border = "border:1px solid #d1d5db;"
-    th_s   = f"padding:8px 12px;text-align:left;font-size:12px;font-weight:bold;background:#1a56db;color:#fff;{border}"
-    td_s   = f"padding:7px 12px;font-size:12px;{border}"
+    th_s   = f"padding:8px 12px;text-align:left;font-size:14px;font-weight:bold;background:#1a56db;color:#fff;font-family:Calibri,Arial,sans-serif;{border}"
+    td_s   = f"padding:7px 12px;font-size:14px;font-family:Calibri,Arial,sans-serif;{border}"
 
     if pending_pms:
         hdr = (
@@ -266,13 +270,14 @@ def format_email_passdown_html(
             f"<p style='margin:0 0 6px;font-size:14px;color:#6b7280;font-style:italic;'>No PMs pending this shift.</p>"
         )
 
-    # LOTO — only show verified if actually verified
+    # LOTO -- only show verified if actually verified
+    _loto_s = "font-size:14px;font-family:Calibri,Arial,sans-serif;margin-top:18px;"
     if loto_verified:
-        loto_html = "<p style='margin-top:18px;'><strong style='color:#2a8703;'>&#10003; All LOTO Keys Verified</strong></p>"
+        loto_html = f"<p style='{_loto_s}'><strong style='color:#2a8703;'>&#10003; All LOTO Keys Verified</strong></p>"
     else:
-        loto_html = "<p style='margin-top:18px;'><strong style='color:#b45309;'>&#9888; LOTO Verification Pending</strong></p>"
+        loto_html = f"<p style='{_loto_s}'><strong style='color:#b45309;'>&#9888; LOTO Verification Pending</strong></p>"
     if loto_missing:
-        loto_html += f"<p style='color:#c00;margin:2px 0;'><strong>Missing keys:</strong> {loto_missing}</p>"
+        loto_html += f"<p style='color:#c00;margin:2px 0;font-size:14px;font-family:Calibri,Arial,sans-serif;'><strong>Missing keys:</strong> {loto_missing}</p>"
 
     # No sign-off block — Outlook appends the user's own signature automatically
     # below the compose body. Putting a name here would create a duplicate.
