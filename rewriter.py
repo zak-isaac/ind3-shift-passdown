@@ -1,10 +1,14 @@
-"""Shift happening rewriter – pure template-based, zero dependencies.
+"""Shift happening rewriter.
 
-Classifies each raw note (repair / informational / general) and wraps it
-in a polished professional paragraph. No LLM, no API keys, no network.
+Primary path : local Phi-4 Mini via ai_rewriter (Ollama).
+Fallback path: template-based classification (zero dependencies).
+
+The AI step is completely transparent to callers — this module's
+public API is unchanged.
 """
 from __future__ import annotations
 from report_models import HappeningInput, RewrittenHappening
+import ai_rewriter
 
 _REPAIR_KW = frozenset({
     "fixed", "repaired", "replaced", "adjusted", "reset", "cleared",
@@ -29,10 +33,20 @@ def _classify(note: str) -> str:
 
 
 def rewrite_happening(item: HappeningInput) -> RewrittenHappening:
-    """Transform a raw note into a polished paragraph."""
-    note = item.raw_note.strip().rstrip(".")
-    kind = _classify(note)
+    """Transform a raw note into a polished paragraph.
 
+    Tries the local AI model first. Falls back to template-based
+    rewriting when Ollama is unavailable or the request fails.
+    """
+    note = item.raw_note.strip().rstrip(".")
+
+    # ── Primary: AI rewrite ───────────────────────────────────────────────
+    ai_para = ai_rewriter.rewrite(f"{item.title} {note}")
+    if ai_para and ai_para.strip() != f"{item.title} {note}".strip():
+        return RewrittenHappening(title=item.title, paragraph=ai_para)
+
+    # ── Fallback: template-based classification ───────────────────────────
+    kind = _classify(note)
     if kind == "repair":
         para = (
             f"A reliability condition was identified involving {item.title}. "
