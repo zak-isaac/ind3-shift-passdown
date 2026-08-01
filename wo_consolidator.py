@@ -227,6 +227,7 @@ def consolidated_to_happenings(
         out.append({
             "title":      wo.asset_id or f"WO #{wo.wo_number}",
             "paragraph":  wo.summary + conflict_note,
+            "all_remarks": wo.all_remarks,          # raw remarks for direct AI input
             "wo_number":  wo.wo_number,
             "tech_name":  tech_str,
             "conflicting": wo.conflicting,

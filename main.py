@@ -34,6 +34,7 @@ def _outlook_ready() -> bool:
 from report_models import OosUnit, ReportData, RewrittenHappening, HappeningInput
 from formatter import format_html_preview, format_email, format_email_passdown, format_email_passdown_html
 from rewriter import rewrite_all
+import ai_rewriter
 from cetaris_parser import parse_cetaris, ParseResult
 from summarizer import summarize_remarks
 from exporters import export_docx, export_pdf
@@ -294,6 +295,10 @@ async def lifespan(_: FastAPI):
             await asyncio.sleep(60)
 
     asyncio.create_task(_shift_reaper())
+
+    # 8. Verify local AI rewriter (Ollama + phi4-mini) — advisory only
+    ai_rewriter.check_ollama()
+
     yield
 
 
@@ -2745,7 +2750,17 @@ async def lead_generate(
     from summarizer import summarize_remarks as _summarize, _ELEMENT_API_KEY as _EL_KEY
     happenings: list[RewrittenHappening] = []
     for h in co_happenings:
-        para = h["paragraph"]
+        title       = h["title"]
+        raw_remarks = h.get("all_remarks") or []
+        fallback_para = h["paragraph"]  # _smart_concat output, only used if AI skips
+
+        # Feed raw remarks directly to AI — skip _smart_concat entirely.
+        # Join multiple remarks with a space so multi-tech WOs are preserved.
+        if raw_remarks:
+            ai_input = f"{title} / " + " ".join(raw_remarks)
+        else:
+            ai_input = f"{title} / {fallback_para}"
+
         if _EL_KEY and h["wo_number"] and len(co_result.consolidated) > 0:
             # Find the matching ConsolidatedWO and upgrade its summary async
             for cwo in co_result.consolidated:
@@ -2753,12 +2768,15 @@ async def lead_generate(
                     try:
                         para = await _summarize(cwo.all_remarks)
                         if h["conflicting"]:
-                            para += " [⚠ Conflicting notes — verify status]"
+                            para += " [\u26a0 Conflicting notes \u2014 verify status]"
+                        ai_input = f"{title} / {para}"
                     except Exception:
-                        pass  # fall back to _smart_concat result already in h
+                        pass
                     break
+
+        para = await asyncio.to_thread(ai_rewriter.rewrite, ai_input)
         happenings.append(RewrittenHappening(
-            title=h["title"],
+            title=title,
             paragraph=para,
             wo_number=h["wo_number"],
             tech_name=h["tech_name"],

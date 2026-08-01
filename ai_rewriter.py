@@ -1,4 +1,4 @@
-"""Local AI remark rewriter — Ollama + Phi-4 Mini.
+"""Local AI remark rewriter -- Ollama + Phi-4 Mini.
 
 Public API
 ----------
@@ -8,6 +8,7 @@ check_ollama() -> bool
 
 rewrite(text: str) -> str
     Rewrite technician remarks into professional maintenance language.
+    Input should be: "ASSET_ID / raw remark text"
     Returns the AI-rewritten text on success.
     Returns the ORIGINAL text unchanged on any failure.
     Report generation is NEVER blocked by this function.
@@ -16,7 +17,7 @@ Design constraints
 ------------------
 - Communicates ONLY with http://localhost:11434 (never the internet).
 - Reuses a single httpx.Client across all calls (connection pooling).
-- Hard 20-second timeout per request.
+- Hard 60-second timeout per request.
 - Does NOT log remark content unless DEBUG level is active.
 - Does NOT modify report formatting, sections, or parser output.
 """
@@ -28,12 +29,12 @@ from typing import Optional
 
 import httpx
 
-# ── Configuration ─────────────────────────────────────────────────────────────
+# -- Configuration -------------------------------------------------------------
 _OLLAMA_BASE  = "http://localhost:11434"
 _MODEL        = "phi4-mini"
 _TIMEOUT_SEC  = 60.0
 _TEMPERATURE  = 0.1
-_MAX_TOKENS   = 512
+_MAX_TOKENS   = 200
 
 log = logging.getLogger(__name__)
 
@@ -43,33 +44,34 @@ _SYSTEM_PROMPT = (
     "void fill machines, chargers, dock doors, conveyors, forklifts, and reach trucks.\n"
     "Rewrite the raw technician remark as 1-2 professional WO-style sentences.\n"
     "Rules you MUST follow:\n"
-    "1. Write in professional third-person: 'Calibration performed', 'Component repositioned'.\n"
+    "1. Write in professional third-person passive voice: 'Calibration performed', 'Component repositioned'.\n"
     "2. Preserve asset IDs, WO numbers, part names, and measurements EXACTLY as written.\n"
-    "3. Keep ALL facts: the symptom found, every action taken, and the final status.\n"
-    "4. Fix obvious typos ONLY when the meaning is 100%% clear from context. Do NOT guess.\n"
-    "5. DO NOT add ANY detail not in the original text. No interpretation. No diagnosis.\n"
-    "6. DO NOT use first person (I, we) or blame language ('associate failed to').\n"
-    "7. Output ONLY the rewritten sentence. No explanations, no labels."
+    "3. Keep ALL facts: every symptom, every action taken, and the final status.\n"
+    "4. Correct obvious typos such as doubled or transposed letters when the correct word "
+    "is unambiguous from context. Example: 'craahing' -> 'crashing', 'recalibreted' -> 'recalibrated'.\n"
+    "5. DO NOT add ANY detail not in the original text. Do not interpret or diagnose.\n"
+    "6. Use the technician's exact words for the symptom and action, just make them grammatical.\n"
+    "7. Output ONLY the rewritten sentence. No explanations, no labels, no WO number prefix."
 )
 
 _PROMPT_TEMPLATE = (
-    "Examples — raw note to WO-style passdown entry:\n"
+    "Examples of raw note to WO-style passdown entry:\n"
     "  Note: TAPER1001 / recalibrated the closer. asset is fully operational\n"
     "  Entry: TAPER1001 closer recalibration performed; unit returned to service.\n"
     "  Note: VOIDFILL0201 / top and bottom tape was threaded incorrectly, rethreaded correctly, asset fully operational\n"
     "  Entry: VOIDFILL0201 tape threading error corrected; unit returned to full operational status.\n"
+    "  Note: TAPER1101 / the head was craahing hard on the boxes. did calibration on the head. asset back into operation\n"
+    "  Entry: TAPER1101 head was crashing against boxes; head recalibrated and unit returned to service.\n"
     "  Note: VOIDFILL / blushing on right closure installed on wrong side. repositioned blushing. recalibrated head, side guide, closers. asset operational\n"
-    "  Entry: VOIDFILL right-closure blushing found mis-installed; repositioned to correct orientation. Head, side guide, and closers recalibrated; unit returned to service.\n"
+    "  Entry: VOIDFILL right-closure blushing found mis-installed; repositioned and head, side guide, and closers recalibrated; unit returned to service.\n"
     "  Note: RC0042 / horn not working replaced fuse rts\n"
-    "  Entry: RC0042 horn found inoperative; fuse replaced and unit returned to service.\n"
-    "  Note: dock door 14 / spring broke waiting on parts\n"
-    "  Entry: Dock Door 14 spring failure identified; unit out of service pending parts.\n\n"
+    "  Entry: RC0042 horn found inoperative; fuse replaced and unit returned to service.\n\n"
     "Now write the entry for this note. Output ONLY the entry sentence, nothing else:\n"
     "  Note: {text}\n"
     "  Entry:"
 )
 
-# ── Singleton HTTP client (initialized once, reused for every call) ───────────
+# -- Singleton HTTP client (initialized once, reused for every call) -----------
 _client: Optional[httpx.Client] = None
 
 
@@ -83,14 +85,14 @@ def _get_client() -> httpx.Client:
     return _client
 
 
-# ── Startup check ─────────────────────────────────────────────────────────────
+# -- Startup check -------------------------------------------------------------
 
 def check_ollama() -> bool:
     """Verify Ollama is running and phi4-mini is installed.
 
     Prints administrator-facing messages when something is wrong.
     Returns True only when the full AI pipeline is ready.
-    Call once during application startup — not on every request.
+    Call once during application startup -- not on every request.
     """
     _sep = "=" * 68
 
@@ -132,7 +134,7 @@ def check_ollama() -> bool:
         log.warning("[ai_rewriter] phi4-mini not found. Installed models: %s", models)
         return False
 
-    # 3. Warm up the model — first inference loads weights into memory (~30s).
+    # 3. Warm up the model -- first inference loads weights into memory (~30s).
     #    Doing it at startup means the first real report isn't slow.
     print(f"[ai_rewriter] Warming up '{_MODEL}' (first load may take ~30s)...", flush=True)
     try:
@@ -140,11 +142,11 @@ def check_ollama() -> bool:
     except Exception:
         pass  # warmup failure is non-fatal
 
-    print(f"[ai_rewriter] Ready — Ollama running, model '{_MODEL}' available.", flush=True)
+    print(f"[ai_rewriter] Ready -- Ollama running, model '{_MODEL}' available.", flush=True)
     return True
 
 
-# ── Core rewrite ──────────────────────────────────────────────────────────────
+# -- Core rewrite --------------------------------------------------------------
 
 def _call_ollama(text: str) -> Optional[str]:
     """Send text to Ollama generate API. Returns rewritten string or None on any failure."""
@@ -161,7 +163,7 @@ def _call_ollama(text: str) -> Optional[str]:
                 "stream": False,
                 "options": {
                     "temperature": _TEMPERATURE,
-                    "num_predict": 200,
+                    "num_predict": _MAX_TOKENS,
                     "stop": ["\n\n", "Note:", "Example:", "<Your", "<your", "Note ", "Examples"],
                 },
             },
@@ -171,26 +173,27 @@ def _call_ollama(text: str) -> Optional[str]:
         elapsed = time.perf_counter() - t0
 
         if not result:
-            log.warning("[ai_rewriter] Empty response — falling back to original")
+            log.warning("[ai_rewriter] Empty response -- falling back to original")
             return None
 
         log.info("[ai_rewriter] Completed in %.2fs", elapsed)
         return result
 
     except httpx.TimeoutException:
-        log.warning("[ai_rewriter] Timed out after %.0fs — using original remarks", _TIMEOUT_SEC)
+        log.warning("[ai_rewriter] Timed out after %.0fs -- using original remarks", _TIMEOUT_SEC)
         return None
     except httpx.ConnectError:
-        log.warning("[ai_rewriter] Ollama not reachable — using original remarks")
+        log.warning("[ai_rewriter] Ollama not reachable -- using original remarks")
         return None
     except Exception as exc:
-        log.warning("[ai_rewriter] Unexpected error — using original remarks: %s", exc)
+        log.warning("[ai_rewriter] Unexpected error -- using original remarks: %s", exc)
         return None
 
 
 def rewrite(text: str) -> str:
     """Rewrite technician remarks using the local Phi-4 Mini model.
 
+    Input format: "ASSET_ID / raw remark text"
     Always returns a string. On any failure (timeout, Ollama down,
     model missing, empty response) returns the original text unchanged.
     Report generation is never blocked by this function.
@@ -201,13 +204,13 @@ def rewrite(text: str) -> str:
     result = _call_ollama(text)
 
     if result is None:
-        log.info("[ai_rewriter] Fallback active — returning original remarks")
+        log.info("[ai_rewriter] Fallback active -- returning original remarks")
         return text
 
     # Reject template filler the model sometimes outputs
     _garbage = ("<", "your answer", "your response", "[insert", "[your", "n/a")
     if len(result) < 10 or any(g in result.lower() for g in _garbage):
-        log.info("[ai_rewriter] Rejected template output — using original")
+        log.info("[ai_rewriter] Rejected template output -- using original")
         return text
 
     return result
