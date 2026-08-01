@@ -32,28 +32,41 @@ import httpx
 _OLLAMA_BASE  = "http://localhost:11434"
 _MODEL        = "phi4-mini"
 _TIMEOUT_SEC  = 60.0
-_TEMPERATURE  = 0.2
+_TEMPERATURE  = 0.1
 _MAX_TOKENS   = 512
 
 log = logging.getLogger(__name__)
 
 _SYSTEM_PROMPT = (
-    "You are writing a professional industrial maintenance shift passdown report. "
-    "Complete the 'Passdown entry' field with one or two professional sentences. "
-    "Rules: preserve every asset ID exactly, keep it factual, no markdown, no questions, no bullet points."
+    "You are a maintenance technician writing concise Work Order notes for a "
+    "warehouse fulfillment center (IND3). Equipment includes tappers, closers, "
+    "void fill machines, chargers, dock doors, conveyors, forklifts, and reach trucks.\n"
+    "Rewrite the raw technician remark as 1-2 professional WO-style sentences.\n"
+    "Rules you MUST follow:\n"
+    "1. Write in professional third-person: 'Calibration performed', 'Component repositioned'.\n"
+    "2. Preserve asset IDs, WO numbers, part names, and measurements EXACTLY as written.\n"
+    "3. Keep ALL facts: the symptom found, every action taken, and the final status.\n"
+    "4. Fix obvious typos ONLY when the meaning is 100%% clear from context. Do NOT guess.\n"
+    "5. DO NOT add ANY detail not in the original text. No interpretation. No diagnosis.\n"
+    "6. DO NOT use first person (I, we) or blame language ('associate failed to').\n"
+    "7. Output ONLY the rewritten sentence. No explanations, no labels."
 )
 
 _PROMPT_TEMPLATE = (
-    "Examples of good passdown entries:\n"
+    "Examples — raw note to WO-style passdown entry:\n"
+    "  Note: TAPER1001 / recalibrated the closer. asset is fully operational\n"
+    "  Entry: TAPER1001 closer recalibration performed; unit returned to service.\n"
+    "  Note: VOIDFILL0201 / top and bottom tape was threaded incorrectly, rethreaded correctly, asset fully operational\n"
+    "  Entry: VOIDFILL0201 tape threading error corrected; unit returned to full operational status.\n"
+    "  Note: VOIDFILL / blushing on right closure installed on wrong side. repositioned blushing. recalibrated head, side guide, closers. asset operational\n"
+    "  Entry: VOIDFILL right-closure blushing found mis-installed; repositioned to correct orientation. Head, side guide, and closers recalibrated; unit returned to service.\n"
     "  Note: RC0042 / horn not working replaced fuse rts\n"
-    "  Passdown entry: RC0042 horn was found inoperative; fuse replaced and unit returned to service.\n"
+    "  Entry: RC0042 horn found inoperative; fuse replaced and unit returned to service.\n"
     "  Note: dock door 14 / spring broke waiting on parts\n"
-    "  Passdown entry: Dock Door 14 spring failed; unit is out of service pending parts arrival.\n"
-    "  Note: charger bay 7 / fault code E04 reset breaker unit back online\n"
-    "  Passdown entry: Charger Bay 7 displayed fault code E04; breaker reset and unit returned to service.\n\n"
-    "Now complete this one:\n"
+    "  Entry: Dock Door 14 spring failure identified; unit out of service pending parts.\n\n"
+    "Now write the entry for this note. Output ONLY the entry sentence, nothing else:\n"
     "  Note: {text}\n"
-    "  Passdown entry:"
+    "  Entry:"
 )
 
 # ── Singleton HTTP client (initialized once, reused for every call) ───────────
@@ -148,8 +161,8 @@ def _call_ollama(text: str) -> Optional[str]:
                 "stream": False,
                 "options": {
                     "temperature": _TEMPERATURE,
-                    "num_predict": 150,
-                    "stop": ["\n\n", "Note:", "Example", "<Your", "<your"],
+                    "num_predict": 200,
+                    "stop": ["\n\n", "Note:", "Example:", "<Your", "<your", "Note ", "Examples"],
                 },
             },
         )
