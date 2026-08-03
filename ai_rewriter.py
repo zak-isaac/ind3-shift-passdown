@@ -207,6 +207,25 @@ def _clean_output(text: str) -> str:
     return text.strip()
 
 
+# Phrases that indicate no actual maintenance work was done.
+# Entries matching these are excluded from the passdown report entirely.
+_NON_TECHNICAL_PATTERNS: list[re.Pattern] = [
+    re.compile(r"\bno\s+(?:damage|damages|damaged)\b", re.IGNORECASE),
+    re.compile(r"\bno\s+action\s+(?:needed|required|taken)\b", re.IGNORECASE),
+    re.compile(r"\baccident\s+assessment\b", re.IGNORECASE),
+    re.compile(r"\bno\s+(?:issues?|problems?|faults?)\s+(?:found|detected|observed)\s*\.?\s*$", re.IGNORECASE),
+    re.compile(r"^\s*(?:n/?a|none|nothing\s+to\s+report)\s*\.?\s*$", re.IGNORECASE),
+]
+
+
+def is_non_technical(remark: str) -> bool:
+    """Return True if the remark describes no actual maintenance work done."""
+    text = remark.strip()
+    if not text:
+        return True
+    return any(p.search(text) for p in _NON_TECHNICAL_PATTERNS)
+
+
 def _is_garbage(text: str) -> bool:
     low = text.lower()
     return len(text) < 10 or any(g in low for g in (

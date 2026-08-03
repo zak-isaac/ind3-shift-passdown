@@ -2766,17 +2766,24 @@ async def lead_generate(
                 break
 
         if cwo_match and len(cwo_match.tech_remarks) > 1:
-            # Multi-tech: queue one AI call per tech remark
+            # Multi-tech: queue one AI call per tech remark (skip non-technical)
             for t_name, remark in cwo_match.tech_remarks:
+                if ai_rewriter.is_non_technical(remark):
+                    continue
                 ai_inputs.append(ai_rewriter.build_input(title, [remark]))
                 input_meta.append((h_idx, t_name))
         else:
-            # Single-tech (or no WO match): one AI call for all remarks
+            # Single-tech: skip entirely if non-technical
             raw = []
             if cwo_match:
-                raw = [r for r in cwo_match.all_remarks if r and r.strip()]
+                raw = [r for r in cwo_match.all_remarks if r and r.strip()
+                       and not ai_rewriter.is_non_technical(r)]
             if not raw:
                 raw = [fallback]
+            if ai_rewriter.is_non_technical(" ".join(raw)):
+                input_meta.append((h_idx, "__SKIP__"))
+                ai_inputs.append("")
+                continue
             ai_inputs.append(ai_rewriter.build_input(title, raw))
             input_meta.append((h_idx, h.get("tech_name", "")))
 
@@ -2792,14 +2799,20 @@ async def lead_generate(
     happenings: list[RewrittenHappening] = []
     for h_idx, h in enumerate(co_happenings):
         pts = groups[h_idx]
+        # Skip entries flagged as non-technical
+        if any(t == "__SKIP__" for t, _ in pts) or not pts:
+            continue
         if len(pts) > 1:
-            # Multi-tech: first tech's note as paragraph, rest as sub_points
+            # Multi-tech: sub-bullets, filter any remaining non-technical sub-points
+            clean_pts = [(t, p) for t, p in pts if t != "__SKIP__" and p.strip()]
+            if not clean_pts:
+                continue
             happenings.append(RewrittenHappening(
                 title=h["title"],
-                paragraph=pts[0][1],
+                paragraph=clean_pts[0][1],
                 wo_number=h["wo_number"],
-                tech_name=pts[0][0],
-                sub_points=pts,   # all techs including first
+                tech_name=clean_pts[0][0],
+                sub_points=clean_pts,
             ))
         else:
             happenings.append(RewrittenHappening(
