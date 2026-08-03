@@ -65,10 +65,23 @@ def format_html_preview(data: ReportData) -> str:
 
     for h in data.happenings:
         wo_ref = f" <span style='color:#555;font-size:13px;'>(WO #{h.wo_number})</span>" if h.wo_number else ""
-        happening_lines.append(
-            f'<li style="padding:8px 0;border-bottom:1px solid #eee;font-size:14px;color:#111;line-height:1.7;">'
-            f'<strong style="color:#000;">{h.title}:</strong> {h.paragraph}.{wo_ref}</li>'
-        )
+        if h.sub_points:
+            # Multi-tech: show each tech's remark as an indented sub-bullet
+            sub_html = "".join(
+                f'<li style="padding:3px 0 3px 16px;font-size:13px;color:#333;line-height:1.6;">'
+                f'<span style="color:#555;font-weight:bold;">{tname}:</span> {remark}</li>'
+                for tname, remark in h.sub_points
+            )
+            happening_lines.append(
+                f'<li style="padding:8px 0;border-bottom:1px solid #eee;font-size:14px;color:#111;line-height:1.7;">'
+                f'<strong style="color:#000;">{h.title}</strong>{wo_ref}'
+                f'<ul style="list-style:disc;margin:4px 0 0 16px;padding:0;">{sub_html}</ul></li>'
+            )
+        else:
+            happening_lines.append(
+                f'<li style="padding:8px 0;border-bottom:1px solid #eee;font-size:14px;color:#111;line-height:1.7;">'
+                f'<strong style="color:#000;">{h.title}:</strong> {h.paragraph}{wo_ref}</li>'
+            )
 
     if happening_lines:
         body = f'<ul style="list-style:none;margin:0;padding:0;">{"".join(happening_lines)}</ul>'
@@ -225,7 +238,19 @@ def format_email_passdown_html(
             f" <span style='color:#6b7280;font-size:12px;'>(WO# {h.wo_number})</span>"
             if getattr(h, "wo_number", "") else ""
         )
-        if prefix and " " not in prefix and "," not in prefix:
+        if getattr(h, "sub_points", []):
+            # Multi-tech: build a nested sub-list inside this bullet
+            sub_s = "font-size:13px;font-family:Calibri,Arial,sans-serif;margin:2px 0;"
+            sub_items = "".join(
+                f"<li style='{sub_s}'><strong>{tname}:</strong> {remark}</li>"
+                for tname, remark in h.sub_points
+            )
+            entry = (
+                f"<strong>{prefix}</strong>{wo_tag}"
+                f"<ul style='margin:4px 0 0 0;padding-left:20px;'>{sub_items}</ul>"
+            )
+            h_items.append(entry)
+        elif prefix and " " not in prefix and "," not in prefix:
             h_items.append(f"<strong>{prefix}:</strong> {h.paragraph}{wo_tag}")
         else:
             h_items.append(f"{h.paragraph}{wo_tag}")

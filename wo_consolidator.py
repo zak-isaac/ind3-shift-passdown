@@ -52,6 +52,7 @@ class ConsolidatedWO:
     asset_id: str           # unit field from the FIRST entry (most authoritative)
     techs: list[str]        # unique tech names, first-seen order
     all_remarks: list[str]  # deduped union of all raw_remarks across entries
+    tech_remarks: list[tuple[str, str]]  # [(tech_name, remark), ...] in chrono order
     summary: str            # _smart_concat(all_remarks) or LLM summary
     priority: str           # highest priority across the group
     first_logged: str       # earliest created_at (ISO string)
@@ -139,9 +140,19 @@ def _build_wo(wo_number: str, group: list[dict]) -> ConsolidatedWO:
             techs.append(name)
 
     # Collect all remarks across every entry, then dedup
+    # Also keep per-tech pairing for sub-point display
     all_raw: list[str] = []
+    tech_remarks: list[tuple[str, str]] = []
+    seen_tr: set[str] = set()
     for e in group:
-        all_raw.extend(_collect_remarks(e))
+        t_name   = (e.get("tech_name") or "Unknown").strip()
+        remarks  = _collect_remarks(e)
+        all_raw.extend(remarks)
+        for r in remarks:
+            key = r.strip().lower()
+            if key and key not in seen_tr:
+                seen_tr.add(key)
+                tech_remarks.append((t_name, r.strip()))
     all_remarks = _dedup_remarks(all_raw)
 
     # Summary: smart-concat the deduped remarks; guarantee non-empty string
@@ -153,9 +164,10 @@ def _build_wo(wo_number: str, group: list[dict]) -> ConsolidatedWO:
 
     return ConsolidatedWO(
         wo_number    = wo_number,
-        asset_id     = (first.get("unit") or "").strip(),   # first entry = most authoritative
+        asset_id     = (first.get("unit") or "").strip(),
         techs        = techs,
         all_remarks  = all_remarks,
+        tech_remarks = tech_remarks,
         summary      = summary,
         priority     = _highest_priority([e.get("priority", "monitor") for e in group]),
         first_logged = first.get("created_at", ""),

@@ -16,9 +16,12 @@ class OosUnit(BaseModel):
 
 class RewrittenHappening(BaseModel):
     title: str        # asset ID
-    paragraph: str    # technician's summary note (no WO prefix)
+    paragraph: str    # single-tech summary (used when sub_points is empty)
     wo_number: str = ""  # WO number for the report line, empty for manual entries
-    tech_name: str = ""  # who logged it
+    tech_name: str = ""  # who logged it (single-tech)
+    # Multi-tech WOs: each tech's remark as its own sub-point
+    # List of (tech_name, rewritten_remark) -- empty for single-tech WOs
+    sub_points: list[tuple[str, str]] = Field(default_factory=list)
 
 
 class ReportData(BaseModel):

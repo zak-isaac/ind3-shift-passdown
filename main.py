@@ -2741,7 +2741,7 @@ async def lead_generate(
     # ── Pull FRESH entries and consolidate duplicate WOs ──────────────────
     # Same WO from multiple techs → one merged block with all remarks + tech list.
     # Raw rows are never deleted; consolidation is view-only.
-    from wo_consolidator import consolidate_entries, consolidated_to_happenings
+    from wo_consolidator import consolidate_entries, consolidated_to_happenings, ConsolidatedWO
     db_entries  = db.get_entries(shift_id)
     co_result   = consolidate_entries(db_entries)   # handles excluded filter internally
     co_happenings = consolidated_to_happenings(co_result, wo_prefix_re=_WO_PREFIX_RE)
@@ -2751,31 +2751,64 @@ async def lead_generate(
 
     # Build passdown notes using the rule-based cleaner (deterministic, instant,
     # zero hallucinations). AI rewriting was removed -- phi4-mini was too small
-    # Build AI inputs -- multi-tech WOs: all remarks joined with ' | ' so the AI
-    # sees each tech's contribution and synthesizes them into one entry.
-    ai_inputs: list[str] = []
-    for h in co_happenings:
+    # Build AI inputs and track per-tech remarks for multi-tech WOs
+    ai_inputs: list[str] = []          # flat list: one entry per remark
+    # (happening_idx, tech_name, is_sub) so we can reconstruct sub_points
+    input_meta: list[tuple[int, str]] = []
+
+    for h_idx, h in enumerate(co_happenings):
         title    = h["title"]
         fallback = h.get("paragraph") or h.get("raw_remark") or title
-        raw_remarks: list[str] = []
+        cwo_match: ConsolidatedWO | None = None
         for cwo in co_result.consolidated:
             if cwo.wo_number == h["wo_number"]:
-                raw_remarks = [r for r in (cwo.all_remarks or []) if r and r.strip()]
+                cwo_match = cwo
                 break
-        if not raw_remarks:
-            raw_remarks = [fallback]
-        ai_inputs.append(ai_rewriter.build_input(title, raw_remarks))
 
-    rewritten_paras = await asyncio.to_thread(ai_rewriter.rewrite_batch, ai_inputs)
+        if cwo_match and len(cwo_match.tech_remarks) > 1:
+            # Multi-tech: queue one AI call per tech remark
+            for t_name, remark in cwo_match.tech_remarks:
+                ai_inputs.append(ai_rewriter.build_input(title, [remark]))
+                input_meta.append((h_idx, t_name))
+        else:
+            # Single-tech (or no WO match): one AI call for all remarks
+            raw = []
+            if cwo_match:
+                raw = [r for r in cwo_match.all_remarks if r and r.strip()]
+            if not raw:
+                raw = [fallback]
+            ai_inputs.append(ai_rewriter.build_input(title, raw))
+            input_meta.append((h_idx, h.get("tech_name", "")))
+
+    rewritten_flat = await asyncio.to_thread(ai_rewriter.rewrite_batch, ai_inputs)
+
+    # Reconstruct per-happening with sub_points for multi-tech
+    # Group rewritten lines back by happening index
+    from collections import defaultdict
+    groups: dict[int, list[tuple[str, str]]] = defaultdict(list)
+    for (h_idx, t_name), para in zip(input_meta, rewritten_flat):
+        groups[h_idx].append((t_name, para))
 
     happenings: list[RewrittenHappening] = []
-    for h, para in zip(co_happenings, rewritten_paras):
-        happenings.append(RewrittenHappening(
-            title=h["title"],
-            paragraph=para,
-            wo_number=h["wo_number"],
-            tech_name=h["tech_name"],
-        ))
+    for h_idx, h in enumerate(co_happenings):
+        pts = groups[h_idx]
+        if len(pts) > 1:
+            # Multi-tech: first tech's note as paragraph, rest as sub_points
+            happenings.append(RewrittenHappening(
+                title=h["title"],
+                paragraph=pts[0][1],
+                wo_number=h["wo_number"],
+                tech_name=pts[0][0],
+                sub_points=pts,   # all techs including first
+            ))
+        else:
+            happenings.append(RewrittenHappening(
+                title=h["title"],
+                paragraph=pts[0][1] if pts else "",
+                wo_number=h["wo_number"],
+                tech_name=h.get("tech_name", ""),
+                sub_points=[],
+            ))
 
     # Append any MST-authored extra happenings from the form
     for t, n in zip(extra_title, extra_note):
