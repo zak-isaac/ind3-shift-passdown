@@ -77,6 +77,15 @@ Technician Language
    Assisting with calibration of the Fill Head -> Fill Head calibrated.
    Assisted with deinstalling the old light -> Old flickering light deinstalled.
    Assisted with replacing the motor -> Motor replaced.
+7a. VOID RULE: If the entire remark is only a vague participation phrase with no specific
+    asset, component, action, finding, or technical detail whatsoever, output only a dash: -
+    Examples of remarks that must be voided:
+      "Assisting with the repair."
+      "Assisted with the fix."
+      "Helped with maintenance."
+      "Supported the team."
+      "Assisted with the work."
+    These contain no technical content to preserve. Output only: -
 8. Remove conversational filler: anyways, just, basically, had to, went ahead and, no worries.
 
 Technical Terminology
@@ -242,6 +251,17 @@ def _strip_leading_asset_id(text: str, asset_id: str) -> str:
 def _clean_output(text: str) -> str:
     """Strip informal phrases and fix formatting the model sometimes adds."""
     import re as _re
+    # Void bare participation phrases with no technical content.
+    # Anchored to full string -- specific detail after the noun keeps it alive.
+    _VOID_PHRASES = _re.compile(
+        r"^(?:assist(?:ed|ing)?|help(?:ed|ing)?|support(?:ed|ing)?|participat(?:ed|ing)?|perform(?:ed|ing)?)"
+        r"\s+(?:with\s+)?(?:the\s+)?"
+        r"(?:repair|fix|work|maintenance|task|job|effort|project|team)"
+        r"\.?$",
+        _re.IGNORECASE,
+    )
+    if _VOID_PHRASES.match(text.strip()):
+        return "-"
     # Fix ALL CAPS output -- convert to sentence case
     if text == text.upper() and len(text) > 20:
         text = text.capitalize()
