@@ -64,9 +64,10 @@ def format_html_preview(data: ReportData) -> str:
         )
 
     for h in data.happenings:
-        wo_ref = f" <span style='color:#555;font-size:13px;'>(WO #{h.wo_number})</span>" if h.wo_number else ""
+        # WO tag inline before the final period, not appended after
+        wo_tag = f" <span style='color:#555;font-size:13px;'>(WO #{h.wo_number})</span>" if h.wo_number else ""
         if h.sub_points:
-            # Multi-tech: show each tech's remark as an indented sub-bullet (no names)
+            # Multi-tech: sub-bullets, asset name + WO tag on the header line
             sub_html = "".join(
                 f'<li style="padding:3px 0 3px 16px;font-size:13px;color:#333;line-height:1.6;">'
                 f'{remark}</li>'
@@ -74,13 +75,15 @@ def format_html_preview(data: ReportData) -> str:
             )
             happening_lines.append(
                 f'<li style="padding:8px 0;border-bottom:1px solid #eee;font-size:14px;color:#111;line-height:1.7;">'
-                f'<strong style="color:#000;">{h.title}</strong>{wo_ref}'
+                f'<strong style="color:#000;">{h.title}</strong>{wo_tag}'
                 f'<ul style="list-style:disc;margin:4px 0 0 16px;padding:0;">{sub_html}</ul></li>'
             )
         else:
+            # Single-tech or combined-asset: paragraph with WO tag before trailing period
+            para = h.paragraph.rstrip(".")
             happening_lines.append(
                 f'<li style="padding:8px 0;border-bottom:1px solid #eee;font-size:14px;color:#111;line-height:1.7;">'
-                f'<strong style="color:#000;">{h.title}:</strong> {h.paragraph}{wo_ref}</li>'
+                f'<strong style="color:#000;">{h.title}:</strong> {para}{wo_tag}.</li>'
             )
 
     if happening_lines:

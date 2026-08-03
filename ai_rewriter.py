@@ -240,12 +240,15 @@ _INFORMAL = [
     (r"(?i)\ball systems(?:\s+are)?\s+go\b", ""),
     (r"as usual\.?",                  ""),
     (r"no worries\.?",                ""),
-    # 'Assisted with X' -> 'X performed' equivalent -- strip the filler prefix
-    (r"(?i)\bAssisted with adjusting\b",  "Adjusted"),
-    (r"(?i)\bAssisted with replacing\b",  "Replaced"),
-    (r"(?i)\bAssisted with installing\b", "Installed"),
-    (r"(?i)\bAssisted with calibrating\b","Calibrated"),
-    (r"(?i)\bAssisted with\b",            "Performed"),
+    # 'Assisted/Assisting with X' -> direct action verb
+    (r"(?i)\bAssist(?:ed|ing) with adjusting\b",   "Adjusted"),
+    (r"(?i)\bAssist(?:ed|ing) with replacing\b",   "Replaced"),
+    (r"(?i)\bAssist(?:ed|ing) with installing\b",  "Installed"),
+    (r"(?i)\bAssist(?:ed|ing) with calibrating\b", "Calibrated"),
+    (r"(?i)\bAssist(?:ed|ing) with deinstalling\b","Deinstalled"),
+    (r"(?i)\bAssist(?:ed|ing) with reinstalling\b","Reinstalled"),
+    (r"(?i)\bAssist(?:ed|ing) with\b",             "Performed"),
+    (r"(?i)\bAssisting\b",                          "Performing"),
     # AI-invented filler when no outcome was stated -- strip entirely
     (r"no further details? are available[^.]*\.",           ""),
     (r"the (?:current |operational )?status (?:of the (?:unit|asset) )?(?:remains?|is) (?:unknown|unclear|not specified|unavailable)[^.]*\.", ""),
@@ -284,8 +287,10 @@ def build_input(asset_id: str, remarks: list[str]) -> str:
     reliable than depending on the model to catch them every time.
     Format: "ASSET_ID / remark1 | remark2 | ..."
     """
-    fixed   = [_fix_typos(r.strip()) for r in remarks if r.strip()]
-    body    = " | ".join(fixed)
+    fixed = [_fix_typos(r.strip()) for r in remarks if r.strip()]
+    body  = " | ".join(fixed)
+    if not asset_id:
+        return body  # sub-bullet inputs: no prefix, just the remark
     return f"{asset_id} / {body}"
 
 
@@ -295,7 +300,10 @@ def rewrite(text: str) -> str:
     if not text or not text.strip():
         return text
 
-    asset_id = text.split("/")[0].strip() if "/" in text else ""
+    # asset_id is only present when the input starts with "ASSETID / "
+    asset_id = ""
+    if " / " in text:
+        asset_id = text.split(" / ", 1)[0].strip()
 
     # Give longer inputs more room -- rough heuristic: 1 token ≈ 4 chars.
     # Cap at 400 so we never blow up on garbage input.
