@@ -311,10 +311,15 @@ def rewrite(text: str) -> str:
 
     asset_id = text.split("/")[0].strip() if "/" in text else ""
 
+    # Give longer inputs more room -- rough heuristic: 1 token ≈ 4 chars.
+    # Cap at 400 so we never blow up on garbage input.
+    input_words = len(text.split())
+    num_predict  = max(180, min(400, input_words * 2))
+
     result = _call_ollama(
         _SINGLE_TEMPLATE.format(text=text, context_block=""),
         timeout=_TIMEOUT_SINGLE,
-        num_predict=180,
+        num_predict=num_predict,
         stop=["---", "\nOriginal:", "\nNote:", "\nExample", "\n\n"],
     )
     if not result or _is_garbage(result):
