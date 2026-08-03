@@ -66,11 +66,11 @@ def format_html_preview(data: ReportData) -> str:
     for h in data.happenings:
         wo_ref = f" <span style='color:#555;font-size:13px;'>(WO #{h.wo_number})</span>" if h.wo_number else ""
         if h.sub_points:
-            # Multi-tech: show each tech's remark as an indented sub-bullet
+            # Multi-tech: show each tech's remark as an indented sub-bullet (no names)
             sub_html = "".join(
                 f'<li style="padding:3px 0 3px 16px;font-size:13px;color:#333;line-height:1.6;">'
-                f'<span style="color:#555;font-weight:bold;">{tname}:</span> {remark}</li>'
-                for tname, remark in h.sub_points
+                f'{remark}</li>'
+                for _, remark in h.sub_points
             )
             happening_lines.append(
                 f'<li style="padding:8px 0;border-bottom:1px solid #eee;font-size:14px;color:#111;line-height:1.7;">'
@@ -242,8 +242,8 @@ def format_email_passdown_html(
             # Multi-tech: build a nested sub-list inside this bullet
             sub_s = "font-size:13px;font-family:Calibri,Arial,sans-serif;margin:2px 0;"
             sub_items = "".join(
-                f"<li style='{sub_s}'><strong>{tname}:</strong> {remark}</li>"
-                for tname, remark in h.sub_points
+                f"<li style='{sub_s}'>{remark}</li>"
+                for _, remark in h.sub_points
             )
             entry = (
                 f"<strong>{prefix}</strong>{wo_tag}"
