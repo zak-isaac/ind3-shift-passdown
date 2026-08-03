@@ -24,71 +24,60 @@ _MODEL            = "phi4-mini"
 _TIMEOUT_SINGLE   = 60.0
 _TIMEOUT_BATCH    = 120.0
 _TEMPERATURE      = 0.1
-_TOKENS_PER_ENTRY = 200  # 200k was requested but let's not melt the GPU lmao
+
 
 log = logging.getLogger(__name__)
 
 
 
 _SYSTEM_PROMPT = (
-    "You are a maintenance technician writing concise Work Order notes for a "
-    "warehouse fulfillment center (IND3). Equipment includes tappers, closers, "
-    "void fill machines, chargers, dock doors, conveyors, forklifts, and reach trucks.\n"
-    "You will receive a note in the format: ASSET_ID / remark (or multiple remarks separated by ' | ').\n"
-    "Rewrite as 1-2 professional WO-style sentences.\n"
-    "Rules:\n"
-    "1. Write in professional third-person passive voice: 'Calibration performed', 'Component repositioned'.\n"
-    "2. Preserve part names, measurements, and WO numbers EXACTLY as written.\n"
-    "3. Keep ALL facts: every symptom, every action, and the final status.\n"
-    "4. If multiple remarks are given (separated by ' | '), synthesize them into ONE coherent entry -- "
-    "combine without repeating, resolve the final status from the latest remark.\n"
-    "5. Correct obvious typos (doubled/transposed letters) only when unambiguous. "
-    "Example: 'craahing' -> 'crashing'.\n"
-    "6. Preserve ALL directional and positional references exactly as written: "
-    "left, right, top, bottom, front, rear, inner, outer, upper, lower. "
-    "Example: 'blushing on right closure' must remain 'right-closure blushing', never just 'blushing'.\n"
-    "7. DO NOT add any detail not in the original remarks.\n"
-    "8. DO NOT start your output with the asset ID -- it is already shown in the report. "
-    "Start directly with the action or finding.\n"
-    "9. Output ONLY the rewritten sentence. No labels, no explanations."
+    "You rewrite warehouse maintenance notes into professional shift passdown entries. "
+    "Rules: use passive voice, keep every detail the tech wrote, keep all part names exactly "
+    "(head, closer, side guide, blushing, taper, closers -- do not change these), keep all "
+    "directions (left/right/top/bottom), fix obvious typos, do not add anything new. "
+    "Output only the rewritten note, nothing else."
 )
 
 _SINGLE_TEMPLATE = (
-    "Examples (asset ID is context only -- do NOT repeat it in output):\n"
-    "  Note: TAPER1001 / recalibrated the closer. asset is fully operational\n"
-    "  Entry: Closer recalibration performed; unit returned to service.\n"
-    "  Note: VOIDFILL0201 / top and bottom tape was threaded incorrectly, rethreaded correctly, asset fully operational\n"
-    "  Entry: Tape threading error corrected; unit returned to full operational status.\n"
-    "  Note: TAPER1101 / the head was craahing hard on the boxes. did calibration on the head. asset back into operation\n"
-    "  Entry: Head was crashing against boxes; recalibrated and unit returned to service.\n"
-    "  Note: VOIDFILL / blushing on right closure installed on wrong side. repositioned blushing. recalibrated head, side guide, closers. asset operational\n"
-    "  Entry: Right-closure blushing found mis-installed; repositioned and head, side guide, and closers recalibrated; unit returned to service.\n"
-    "  Note: RC0042 / horn not working replaced fuse rts | wiring checked all good unit rts\n"
-    "  Entry: Horn found inoperative; fuse replaced, wiring verified, unit returned to service.\n"
-    "  Note: VOIDFILL / blushing on right closure installed on wrong side. repositioned. recalibrated head, side guide, closers\n"
-    "  Entry: Right-closure blushing found mis-installed; repositioned and head, side guide, and closers recalibrated; unit returned to service.\n"
-    "{context_block}\n\n"
-    "Now write the entry. Output ONLY the sentence, no asset ID, nothing else:\n"
-    "  Note: {text}\n"
-    "  Entry:"
+    "Rewrite as a professional passdown note. Keep all details. Keep all part names."
+    " Do not add anything not in the original.\n"
+    "---\n"
+    "Original: TAPER1101 / head was craahing hard on boxes. did calibration on head. back in service\n"
+    "Passdown: Head found crashing hard against boxes; head calibration performed and unit returned to service.\n"
+    "---\n"
+    "Original: VOIDFILL / blushing on right closure installed on wrong side. repositioned blushing. recalibrated head, side guide, closers. asset operational\n"
+    "Passdown: Right-closure blushing found mis-installed on wrong side; blushing repositioned and head, side guide, and closers recalibrated; unit returned to service.\n"
+    "---\n"
+    "Original: VOIDFILL0201 / top and bottom tape threaded incorrectly by associate. rethreaded top and bottom correctly. asset fully operational\n"
+    "Passdown: Top and bottom tape found threaded incorrectly by associate; both rethreaded correctly and unit returned to full operational status.\n"
+    "---\n"
+    "Original: TSP0005 / platform not fully lowered by operator, prevented getting off wire guide. lowered platform. drove to shop. brake test 7ft braking 10ft plugging passed | confirmed no other issues on inspection. rts\n"
+    "Passdown: Platform found not fully lowered by operator, preventing exit from wire guide; platform lowered and unit driven to shop for brake test. Braking: 7ft, plugging: 10ft -- passed. No additional issues found on inspection; unit returned to service.\n"
+    "---\n"
+    "Original: {text}\n"
+    "Passdown:"
 )
 
 _BATCH_TEMPLATE = (
-    "Rewrite each numbered maintenance note as a WO-style passdown entry.\n"
-    "Asset ID is for context only -- do NOT include it in your output.\n"
-    "If a note has multiple remarks separated by ' | ', synthesize them into one entry.\n"
-    "Output a numbered list ONLY -- one line per entry. No blank lines. No extra text.\n\n"
+    "Rewrite each numbered maintenance note as a complete shift passdown entry.\n"
+    "The next shift reads these -- they need EVERY detail without pulling work orders.\n"
+    "Asset ID is shown in the report header -- do NOT include it in your output.\n"
+    "Keep all part names exactly as written (head, closer, side guide, blushing, taper, etc.).\n"
+    "Keep all directional refs (left/right/top/bottom/front/rear) and all qualifiers (hard, repeatedly, etc.).\n"
+    "For ' | ' separated remarks: present all actions in order -- do not collapse or drop any.\n"
+    "Output a numbered list -- one entry per line. No blank lines between entries.\n\n"
     "Examples:\n"
-    "  1. TAPER1101 / head was craahing on boxes. calibration done. back in service\n"
-    "  1. Head was crashing against boxes; recalibrated and unit returned to service.\n"
-    "  2. TSP0005 / platform not fully lowered by operator. lowered platform. drove to shop. brake test: 7ft braking, 10ft plugging\n"
-    "  2. Platform found not fully lowered; lowered and unit driven to shop for brake test. Braking distance: 7ft, plugging distance: 10ft.\n"
-    "  3. RC0042 / horn dead replaced fuse | wiring checked all good unit rts\n"
-    "  3. Horn found inoperative; fuse replaced, wiring verified, unit returned to service.\n"
-    "{context_block}\n\n"
+    "  1. TAPER1101 / head was craahing hard on boxes. calibration done. back in service\n"
+    "  1. Head found crashing hard against boxes; head calibration performed and unit returned to service.\n"
+    "  2. VOIDFILL / blushing on right closure wrong side. repositioned. recalibrated head, side guide, closers. operational\n"
+    "  2. Right-closure blushing found mis-installed on wrong side; blushing repositioned and head, side guide, and closers recalibrated; unit returned to service.\n"
+    "  3. TSP0005 / platform not lowered, couldnt get off wire. lowered platform. brake test 7ft braking 10ft plugging passed | no other issues found\n"
+    "  3. Platform found not fully lowered, preventing exit from wire guide; platform lowered and brake test performed -- braking: 7ft, plugging: 10ft, passed. No additional issues found; unit returned to service.\n"
+    "  4. RC0042 / horn dead replaced fuse | wiring checked all good unit rts\n"
+    "  4. Horn found inoperative; fuse replaced. Wiring inspected, all connections found good; unit returned to service.\n\n"
     "Notes to rewrite:\n"
     "{numbered_notes}\n\n"
-    "Rewritten entries (STOP after the last numbered entry):\n"
+    "Rewritten entries (STOP after the last numbered entry -- no extra text):\n"
     "1."
 )
 
@@ -174,6 +163,25 @@ def _strip_leading_asset_id(text: str, asset_id: str) -> str:
     return re.sub(pattern, "", text, flags=re.IGNORECASE).strip()
 
 
+def _clean_output(text: str) -> str:
+    """Strip informal phrases and fix formatting the model sometimes adds."""
+    import re as _re
+    # Fix ALL CAPS output -- convert to sentence case
+    if text == text.upper() and len(text) > 20:
+        text = text.capitalize()
+    for pattern, replacement in _INFORMAL:
+        text = _re.sub(pattern, replacement, text, flags=_re.IGNORECASE)
+    text = _re.sub(r"\.\s*\.", ".", text)      # double periods
+    text = _re.sub(r"  +", " ", text)           # double spaces
+    text = _re.sub(r"\s*--\s*$", ".", text)    # trailing --
+    text = _re.sub(r" @ ", " at ", text)        # @ -> at
+    text = _re.sub(r"\s*\|\s*", "; ", text)    # | in output -> ;
+    # Ensure sentence ends with period
+    if text and text[-1] not in ".!?":
+        text += "."
+    return text.strip()
+
+
 def _is_garbage(text: str) -> bool:
     low = text.lower()
     return len(text) < 10 or any(g in low for g in (
@@ -181,16 +189,52 @@ def _is_garbage(text: str) -> bool:
     ))
 
 
+# Common informal/casual phrases the model slips in -- replace with nothing
+_INFORMAL = [
+    (r"all systems go!?",              ""),
+    (r"back in business\.?",           "unit returned to service."),
+    (r"good to go!?",                  "unit returned to service."),
+    (r"ready to roll!?",               "unit returned to service."),
+    (r"up and running",                "returned to service"),
+    (r"making it functional again\.?", "unit returned to service."),
+    (r"(?i)\ball systems(?:\s+are)?\s+go\b", ""),
+    (r"as usual\.?",                  ""),
+    (r"no worries\.?",                ""),
+]
+
+# Warehouse-specific typo map -- applied BEFORE sending to AI.
+# Pattern -> replacement (case-insensitive word boundary match)
+_TYPOS: list[tuple[str, str]] = [
+    (r"\bcraahing\b",       "crashing"),
+    (r"\bcraashing\b",      "crashing"),
+    (r"\brecalibreted\b",   "recalibrated"),
+    (r"\brecalibrated\b",   "recalibrated"),   # already correct, no-op
+    (r"\boperationl\b",    "operational"),
+    (r"\boperatinal\b",    "operational"),
+    (r"\bcloser(?!s)\b",   "closer"),          # no-op placeholder for future
+    (r"\bblushings?\b",    "blushing"),         # normalize plural
+]
+
+
+def _fix_typos(text: str) -> str:
+    """Fix known warehouse-specific typos before sending to the AI."""
+    import re as _re
+    for pattern, replacement in _TYPOS:
+        text = _re.sub(pattern, replacement, text, flags=_re.IGNORECASE)
+    return text
+
+
 # -- Public API ----------------------------------------------------------------
 
 def build_input(asset_id: str, remarks: list[str]) -> str:
     """Build the canonical input string for rewrite / rewrite_batch.
 
+    Applies Python-level typo fixes before sending to the AI -- more
+    reliable than depending on the model to catch them every time.
     Format: "ASSET_ID / remark1 | remark2 | ..."
-    Multiple remarks (multi-tech WOs) are joined with ' | ' so the AI
-    knows to synthesize them rather than just clean up one remark.
     """
-    body = " | ".join(r.strip() for r in remarks if r.strip())
+    fixed   = [_fix_typos(r.strip()) for r in remarks if r.strip()]
+    body    = " | ".join(fixed)
     return f"{asset_id} / {body}"
 
 
@@ -205,61 +249,18 @@ def rewrite(text: str) -> str:
     result = _call_ollama(
         _SINGLE_TEMPLATE.format(text=text, context_block=""),
         timeout=_TIMEOUT_SINGLE,
-        num_predict=150,
+        num_predict=180,
+        stop=["---", "\nOriginal:", "\nNote:", "\nExample", "\n\n"],
     )
     if not result or _is_garbage(result):
         return text
-    return _strip_leading_asset_id(result, asset_id)
+    return _clean_output(_strip_leading_asset_id(result, asset_id))
 
 
 def rewrite_batch(inputs: list[str]) -> list[str]:
-    """Rewrite all inputs in ONE Ollama call -- far faster than N x rewrite().
+    """Rewrite all inputs, one at a time for best quality.
 
-    inputs: list of strings from build_input().
-    Returns list of same length; failed items fall back to original input.
-    Output strings have the asset ID stripped (report header already shows it).
+    phi4-mini handles one focused entry better than a long batch prompt.
+    Ollama queues requests anyway so total time is similar to batching.
     """
-    if not inputs:
-        return []
-    if len(inputs) == 1:
-        return [rewrite(inputs[0])]
-
-    # Extract asset IDs for post-processing
-    asset_ids = [t.split("/")[0].strip() if "/" in t else "" for t in inputs]
-
-    numbered = "\n".join(f"  {i+1}. {t}" for i, t in enumerate(inputs))
-    prompt   = _BATCH_TEMPLATE.format(numbered_notes=numbered, context_block="")
-    budget   = _TOKENS_PER_ENTRY * len(inputs)
-
-    t0  = time.perf_counter()
-    raw = _call_ollama(
-        prompt,
-        timeout=_TIMEOUT_BATCH,
-        num_predict=budget,
-        stop=[f"\n{len(inputs)+1}.", "Note:", "Examples",
-              "Question:", "\nQ:", "\nA)", "What ", "---"],
-    )
-    log.info("[ai_rewriter] batch(%d) %.2fs", len(inputs), time.perf_counter() - t0)
-
-    if not raw:
-        log.warning("[ai_rewriter] Batch failed -- falling back to originals")
-        return inputs[:]
-
-    full = "1." + raw  # restore the "1." used as prompt suffix
-
-    results: list[str] = []
-    for i in range(len(inputs)):
-        n      = i + 1
-        n_next = i + 2
-        m = re.search(rf"{n}\.\s*(.+?)(?=\n\s*{n_next}\.|$)", full, re.DOTALL)
-        if m:
-            parsed = m.group(1).strip()
-            if not _is_garbage(parsed):
-                results.append(_strip_leading_asset_id(parsed, asset_ids[i]))
-            else:
-                results.append(inputs[i])
-        else:
-            log.warning("[ai_rewriter] Could not parse item %d -- using original", n)
-            results.append(inputs[i])
-
-    return results
+    return [rewrite(t) for t in inputs]
