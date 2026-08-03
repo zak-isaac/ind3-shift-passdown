@@ -73,21 +73,14 @@ for h_idx, h in enumerate(co_happenings):
     cwo_match = next((c for c in co_result.consolidated if c.wo_number == h["wo_number"]), None)
     if cwo_match and len(cwo_match.tech_remarks) > 1:
         for t_name, remark in cwo_match.tech_remarks:
-            if ai_rewriter.is_non_technical(remark):
-                continue
             ai_inputs.append(ai_rewriter.build_input(h["title"], [remark]))
             input_meta.append((h_idx, t_name))
     else:
         raw = []
         if cwo_match:
-            raw = [r for r in cwo_match.all_remarks if r and r.strip()
-                   and not ai_rewriter.is_non_technical(r)]
+            raw = [r for r in cwo_match.all_remarks if r and r.strip()]
         if not raw:
             raw = [h.get("paragraph") or h.get("raw_remark") or h["title"]]
-        if ai_rewriter.is_non_technical(" ".join(raw)):
-            input_meta.append((h_idx, "__SKIP__"))
-            ai_inputs.append("")
-            continue
         ai_inputs.append(ai_rewriter.build_input(h["title"], raw))
         input_meta.append((h_idx, h.get("tech_name", "")))
 
@@ -101,7 +94,7 @@ for (h_idx, t_name), para in zip(input_meta, rewritten_flat):
 happenings = []
 for h_idx, h in enumerate(co_happenings):
     pts = groups[h_idx]
-    if not pts or all(t == "__SKIP__" or not p.strip() for t, p in pts):
+    if not pts:
         continue
     if len(pts) > 1:
         clean_pts = [(t, p) for t, p in pts if t != "__SKIP__" and p.strip()]

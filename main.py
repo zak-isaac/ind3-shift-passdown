@@ -2766,24 +2766,17 @@ async def lead_generate(
                 break
 
         if cwo_match and len(cwo_match.tech_remarks) > 1:
-            # Multi-tech: queue one AI call per tech remark (skip non-technical)
+            # Multi-tech: queue one AI call per tech remark
             for t_name, remark in cwo_match.tech_remarks:
-                if ai_rewriter.is_non_technical(remark):
-                    continue
                 ai_inputs.append(ai_rewriter.build_input(title, [remark]))
                 input_meta.append((h_idx, t_name))
         else:
-            # Single-tech: skip entirely if non-technical
+            # Single-tech: one AI call for all remarks
             raw = []
             if cwo_match:
-                raw = [r for r in cwo_match.all_remarks if r and r.strip()
-                       and not ai_rewriter.is_non_technical(r)]
+                raw = [r for r in cwo_match.all_remarks if r and r.strip()]
             if not raw:
                 raw = [fallback]
-            if ai_rewriter.is_non_technical(" ".join(raw)):
-                input_meta.append((h_idx, "__SKIP__"))
-                ai_inputs.append("")
-                continue
             ai_inputs.append(ai_rewriter.build_input(title, raw))
             input_meta.append((h_idx, h.get("tech_name", "")))
 
@@ -2799,8 +2792,8 @@ async def lead_generate(
     happenings: list[RewrittenHappening] = []
     for h_idx, h in enumerate(co_happenings):
         pts = groups[h_idx]
-        # Skip entries flagged as non-technical or where AI returned empty string
-        if not pts or all(t == "__SKIP__" or not p.strip() for t, p in pts):
+        # Skip if AI returned empty for everything
+        if not pts or not any(p.strip() for _, p in pts):
             continue
         if len(pts) > 1:
             # Multi-tech: sub-bullets, filter any remaining non-technical sub-points
