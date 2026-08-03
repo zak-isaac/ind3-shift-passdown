@@ -92,26 +92,35 @@ groups: dict = defaultdict(list)
 for (h_idx, t_name), para in zip(input_meta, rewritten_flat):
     groups[h_idx].append((t_name, para))
 
-# Build per-WO happenings first
+# Build per-WO happenings -- preserve each tech's remark separately (rules 28-31)
 raw_happenings: list[RewrittenHappening] = []
 for h_idx, h in enumerate(co_happenings):
-    pts = groups[h_idx]
+    pts = groups[h_idx]  # list of (tech_name, rewritten_para)
     if not pts:
         continue
-    # Always merge all tech remarks into one paragraph -- no sub-bullets
-    clean = [p for _, p in pts if p.strip() and p.strip() not in ("-", "--")]
+    clean = [(t, p) for t, p in pts if p.strip() and p.strip() not in ("-", "--")]
     if not clean:
         continue
-    merged = " ".join(p.rstrip(".") + "." for p in clean)
-    raw_happenings.append(RewrittenHappening(
-        title=h["title"],
-        paragraph=merged,
-        wo_number=h["wo_number"],
-        tech_name=h.get("tech_name", ""),
-        sub_points=[],
-    ))
+    if len(clean) == 1:
+        # Single tech, single remark -- flat entry
+        raw_happenings.append(RewrittenHappening(
+            title=h["title"],
+            paragraph=clean[0][1],
+            wo_number=h["wo_number"],
+            tech_name=clean[0][0],
+            sub_points=[],
+        ))
+    else:
+        # Multiple tech remarks under same WO -- keep separate as sub-points (rule 30)
+        raw_happenings.append(RewrittenHappening(
+            title=h["title"],
+            paragraph="",
+            wo_number=h["wo_number"],
+            tech_name="",
+            sub_points=clean,  # (tech_name, remark) preserved separately
+        ))
 
-# Group by asset -- combine multiple WOs on the same asset into one entry
+# Group by asset (rule 28) -- each asset appears only once
 from collections import OrderedDict
 asset_groups: OrderedDict = OrderedDict()
 for rh in raw_happenings:
@@ -122,23 +131,22 @@ for asset_id, group in asset_groups.items():
     if len(group) == 1:
         happenings.append(group[0])
     else:
-        # Flatten all WO remarks into one paragraph, each sentence tagged (WO #X)
-        sentences: list[str] = []
+        # Multiple WOs for same asset (rule 29) -- each WO becomes a sub-bullet
+        # sub_points stores (wo_number, remark) for multi-WO assets
+        sub_pts: list[tuple[str, str]] = []
         for rh in group:
             if rh.sub_points:
-                for _, sp in rh.sub_points:
-                    if sp.strip() and sp.strip() not in ("-", "--"):
-                        wo_tag = f" (WO #{rh.wo_number})" if rh.wo_number else ""
-                        sentences.append(sp.rstrip(".") + wo_tag + ".")
+                # This WO had multiple techs -- each is its own sub-bullet
+                for _, remark in rh.sub_points:
+                    sub_pts.append((rh.wo_number, remark))
             else:
-                wo_tag = f" (WO #{rh.wo_number})" if rh.wo_number else ""
-                sentences.append(rh.paragraph.rstrip(".") + wo_tag + ".")
+                sub_pts.append((rh.wo_number, rh.paragraph))
         happenings.append(RewrittenHappening(
             title=asset_id,
-            paragraph=" ".join(sentences),
-            wo_number="",  # multiple WOs -- shown inline per sentence
+            paragraph="",
+            wo_number="",
             tech_name="",
-            sub_points=[],
+            sub_points=sub_pts,
         ))
 
 oos = [OosUnit(unit=r["unit"]) for r in oos_rows]

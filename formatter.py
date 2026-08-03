@@ -64,22 +64,25 @@ def format_html_preview(data: ReportData) -> str:
         )
 
     for h in data.happenings:
-        # WO tag inline before the final period, not appended after
         wo_tag = f" <span style='color:#555;font-size:13px;'>(WO #{h.wo_number})</span>" if h.wo_number else ""
         if h.sub_points:
-            # Multi-tech: sub-bullets, asset name + WO tag on the header line
+            # Sub-points: either (wo_number, remark) for multi-WO asset
+            # or (tech_name, remark) for multi-tech single WO
+            # Detect multi-WO by checking if first element looks like a WO number
+            is_multi_wo = h.sub_points and h.sub_points[0][0].isdigit()
             sub_html = "".join(
-                f'<li style="padding:3px 0 3px 16px;font-size:13px;color:#333;line-height:1.6;">'
-                f'{remark}</li>'
-                for _, remark in h.sub_points
+                f'<li style="padding:4px 0 4px 16px;font-size:13px;color:#222;line-height:1.75;list-style:disc;">'
+                f'{remark}'
+                + (f' <span style="color:#666;font-size:12px;">(WO #{wo_or_tech})</span>' if is_multi_wo and wo_or_tech else '')
+                + '</li>'
+                for wo_or_tech, remark in h.sub_points
             )
             happening_lines.append(
                 f'<li style="padding:8px 0;border-bottom:1px solid #eee;font-size:14px;color:#111;line-height:1.7;">'
-                f'<strong style="color:#000;">{h.title}</strong>{wo_tag}'
-                f'<ul style="list-style:disc;margin:4px 0 0 16px;padding:0;">{sub_html}</ul></li>'
+                f'<strong style="color:#000;">{h.title}</strong>'
+                f'<ul style="list-style:none;margin:4px 0 0 8px;padding:0;">{sub_html}</ul></li>'
             )
         else:
-            # Single-tech or combined-asset: paragraph with WO tag before trailing period
             para = h.paragraph.rstrip(".")
             happening_lines.append(
                 f'<li style="padding:8px 0;border-bottom:1px solid #eee;font-size:14px;color:#111;line-height:1.7;">'

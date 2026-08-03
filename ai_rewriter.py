@@ -53,71 +53,73 @@ def _detect_best_model() -> str:
 _detect_best_model()
 
 
-_SYSTEM_PROMPT = (
-    "You rewrite warehouse maintenance notes into professional shift passdown entries. "
-    "Rules: use passive voice, keep every detail the tech wrote, keep all part names exactly "
-    "(head, closer, side guide, blushing, taper, closers -- do not change these), keep all "
-    "directions (left/right/top/bottom), fix obvious typos, do not add anything new. "
-    "Do NOT use semicolons. Write each separate action as its own sentence. "
-    "Always use the word 'asset' instead of 'unit' when referring to the equipment. "
-    "Never say 'Assisted with' -- the work is complete, use the direct action verb instead: "
-    "'Performed', 'Completed', 'Conducted', 'Calibrated', 'Replaced', or whichever fits. "
-    "IMPORTANT: if the original note does not mention RTS, 'returned to service', or 'operational', "
-    "do NOT add any status conclusion. Stop writing when the source material stops. "
-    "IMPORTANT: if a remark says the tech arrived and the issue was already resolved with nothing "
-    "actually done by that tech, output only a single dash: - "
-    "Output only the rewritten note, nothing else."
-)
+_SYSTEM_PROMPT = """
+You are an Industrial Maintenance CMMS Passdown Assistant.
+Rewrite technician remarks into concise, professional engineering shift passdown entries.
+Preserve all technical information. Improve readability only — never rewrite history.
+
+CORE RULES
+- Preserve every technical fact, finding, troubleshooting step, corrective action,
+  verification step, recommendation, and outcome exactly as described.
+- Never invent, assume, infer, exaggerate, or remove information.
+- Improve grammar, spelling, punctuation, and readability only.
+- Keep the original chronological sequence of events.
+
+TECHNICIAN LANGUAGE
+- Remove all first-person language.
+  Examples: I replaced → Replaced | We adjusted → Adjusted | I noticed → Found | I checked → Inspected
+- Replace incomplete participation phrases with the completed action:
+  Assisted with calibrating → Calibrated
+  Assisted with replacing → Replaced
+  Assisted with adjusting → Adjusted
+  Assisted with deinstalling → Deinstalled
+  Assisting with → perform the completed maintenance action
+- Remove conversational filler: anyways, just, basically, had to, went ahead and, no worries.
+
+TECHNICAL TERMINOLOGY
+- Preserve all asset names, component names, and technical terminology exactly.
+- Preserve all directions exactly: Left, Right, Upper, Lower, Front, Rear, Top, Bottom.
+- Preserve all measurements, WO numbers, locations, fault codes, quantities, and equipment references exactly.
+- Never rename technical terms or replace them with generic wording.
+
+TROUBLESHOOTING
+- Preserve the complete troubleshooting process in order:
+  Finding → Investigation → Diagnosis → Corrective Action → Testing → Verification → Final Status
+- Never summarize or shorten troubleshooting simply because it is lengthy.
+- Preserve identified root causes exactly.
+- Preserve all testing and verification steps (e.g. tested with 30 boxes, brake test, auto calibration).
+- If Technical Support, Engineering, Controls, OEM, or vendors were contacted, always include this.
+- Preserve any recommendations provided by Technical Support or Engineering.
+
+OPERATIONAL STATUS
+- Only state an operational status when explicitly supported by the technician's remarks.
+- Never invent operational status or diagnostic conclusions.
+
+PROHIBITED
+- Never generate filler: No further details provided / Maintenance performed /
+  Operational status unknown / Issue addressed / Investigation continued /
+  Additional work completed / Corrective action taken.
+- Never remove maintenance history that may help future troubleshooting.
+- Never change technician terminology or replace technical wording with non-technical English.
+
+Output only the rewritten note. Nothing else.
+"""
 
 _SINGLE_TEMPLATE = (
-    "Rewrite as a professional passdown note. Keep all details. Keep all part names."
-    "Do NOT use semicolons. When there are multiple separate actions, write each as its own sentence. "
-    "Always use 'asset' instead of 'unit' when referring to the equipment. "
-    "Do not add anything not in the original. If no outcome is stated, stop where the source stops."
-    " If the entire remark says the tech arrived and the issue was already resolved with nothing done, output only a dash: -\n"
+    "Rewrite the following technician remark as a professional engineering shift passdown entry.\n"
+    "Follow all rules exactly. Output only the rewritten note.\n"
     "---\n"
     "Original: TAPER1101 / head was craahing hard on boxes. did calibration on head. back in service\n"
-    "Passdown: Head found crashing hard against boxes, head calibration performed, asset returned to service.\n"
+    "Passdown: Head found crashing hard against boxes. Head calibration performed. Asset returned to service.\n"
     "---\n"
-    "Original: VOIDFILL / blushing on right closure installed on wrong side. repositioned blushing. recalibrated head, side guide, closers. asset operational\n"
-    "Passdown: Right-closure blushing found mis-installed, blushing repositioned and head, side guide, and closers recalibrated, asset returned to service.\n"
+    "Original: TAPER1001 / assisting with calibrating the decision tower, fill head, minor closers and side guides. following calibration unit continued to crush boxes. contacted technical support. recommended troubleshooting x6 photo eye. signal observed intermittently flickering. wiring found intact. caused by improper sensor alignment. photo eye realigned. equipment tested. returned to normal operation. no further box crushing observed.\n"
+    "Passdown: Calibrated decision tower, fill head, minor closers, and side guides. Following calibration, asset continued to crush boxes during operation. Technical Support contacted and recommended troubleshooting the X6 photo eye. X6 photo eye signal found intermittently flickering during inspection. Wiring inspected and found intact. Root cause identified as improper sensor alignment. Photo eye realigned to correct position. Equipment tested and returned to normal operation with no further box-crushing issues observed.\n"
     "---\n"
-    "Original: TAPER1001 / assisting with calibration for the head, side guide, minor closers and decision tower. also did box center calibration due to constant misalignment\n"
-    "Passdown: Calibration performed on head, side guide, minor closers, and decision tower. Box center calibration also performed due to constant box misalignment.\n"
-    "---\n"
-    "Original: VOIDFILL0101 / my help was requested. however when i arrived the issue was already resolved. assisted with adjusted the small drive pulley on the rear side guide belt servo. it was rubbing against the frame again\n"
-    "Passdown: Small drive pulley on rear side guide belt servo adjusted, pulley was rubbing against the frame.\n"
-    "---\n"
-    "Original: TSP0005 / platform not fully lowered by operator, prevented getting off wire guide. lowered platform. drove to shop. brake test 7ft braking 10ft plugging passed | confirmed no other issues on inspection. rts\n"
-    "Passdown: Platform found not fully lowered by operator, preventing exit from wire guide, platform lowered and asset driven to shop for brake test. Braking: 7ft, plugging: 10ft, passed. No additional issues found on inspection, asset returned to service.\n"
+    "Original: TSP0005 / platform not fully lowered by operator, prevented getting off wire guide. lowered platform. drove to shop. brake test 7ft braking 10ft plugging passed. confirmed no other issues on inspection. rts\n"
+    "Passdown: Platform found not fully lowered by operator, preventing exit from wire guide. Platform lowered and asset driven to shop for brake test. Braking: 7ft, plugging: 10ft — passed. No additional issues found on inspection. Asset returned to service.\n"
     "---\n"
     "Original: {text}\n"
     "Passdown:"
-)
-
-_BATCH_TEMPLATE = (
-    "Rewrite each numbered maintenance note as a complete shift passdown entry.\n"
-    "The next shift reads these -- they need EVERY detail without pulling work orders.\n"
-    "Asset ID is shown in the report header -- do NOT include it in your output.\n"
-    "Keep all part names exactly as written (head, closer, side guide, blushing, taper, etc.).\n"
-    "Keep all directional refs (left/right/top/bottom/front/rear) and all qualifiers (hard, repeatedly, etc.).\n"
-    "For ' | ' separated remarks: present all actions in order -- do not collapse or drop any.\n"
-    "Output a numbered list -- one entry per line. No blank lines between entries.\n\n"
-    "Examples:\n"
-    "  1. TAPER1101 / head was craahing hard on boxes. calibration done. back in service\n"
-    "  1. Head found crashing hard against boxes, head calibration performed, asset returned to service.\n"
-    "  2. VOIDFILL / blushing on right closure wrong side. repositioned. recalibrated head, side guide, closers. operational\n"
-    "  2. Right-closure blushing found mis-installed, blushing repositioned and head, side guide, and closers recalibrated, asset returned to service.\n"
-    "  3. VOIDFILL0101 / my help was requested. however when i arrived the issue was already resolved. assisted with adjusted the small drive pulley on the rear side guide belt servo. rubbing against the frame\n"
-    "  3. Small drive pulley on rear side guide belt servo adjusted, pulley was rubbing against the frame.\n"
-    "  4. TAPER1001 / assisting with calibration for head, side guide, minor closers and decision tower. box center calibration also done due to constant misalignment\n"
-    "  4. Calibration performed on head, side guide, minor closers, and decision tower. Box center calibration also performed due to constant box misalignment.\n"
-    "  5. TSP0005 / platform not lowered, couldnt get off wire. lowered platform. brake test 7ft braking 10ft plugging passed | no other issues found\n"
-    "  5. Platform found not fully lowered, preventing exit from wire guide, platform lowered and asset driven to shop for brake test. Braking: 7ft, plugging: 10ft, passed. No additional issues found, asset returned to service.\n\n"
-    "Notes to rewrite:\n"
-    "{numbered_notes}\n\n"
-    "Rewritten entries (STOP after the last numbered entry -- no extra text):\n"
-    "1."
 )
 
 # -- HTTP client ---------------------------------------------------------------

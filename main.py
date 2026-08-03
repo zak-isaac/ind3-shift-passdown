@@ -2793,18 +2793,40 @@ async def lead_generate(
         pts = groups[h_idx]
         if not pts or not any(p.strip() for _, p in pts):
             continue
-        # Always merge all tech remarks into one paragraph -- no sub-bullets
-        clean = [p for _, p in pts if p.strip() and p.strip() not in ("-", "--")]
+        clean = [(t, p) for t, p in pts if p.strip() and p.strip() not in ("-", "--")]
         if not clean:
             continue
-        merged = " ".join(p.rstrip(".") + "." for p in clean)
-        raw_happenings.append(RewrittenHappening(
-            title=h["title"],
-            paragraph=merged,
-            wo_number=h["wo_number"],
-            tech_name=h.get("tech_name", ""),
-            sub_points=[],
-        ))
+        if len(clean) == 1:
+            raw_happenings.append(RewrittenHappening(
+                title=h["title"], paragraph=clean[0][1],
+                wo_number=h["wo_number"], tech_name=clean[0][0], sub_points=[],
+            ))
+        else:
+            raw_happenings.append(RewrittenHappening(
+                title=h["title"], paragraph="",
+                wo_number=h["wo_number"], tech_name="", sub_points=clean,
+            ))
+
+    from collections import OrderedDict
+    asset_groups: OrderedDict = OrderedDict()
+    for rh in raw_happenings:
+        asset_groups.setdefault(rh.title, []).append(rh)
+
+    happenings: list[RewrittenHappening] = []
+    for asset_id, group in asset_groups.items():
+        if len(group) == 1:
+            happenings.append(group[0])
+        else:
+            sub_pts: list[tuple[str, str]] = []
+            for rh in group:
+                if rh.sub_points:
+                    for _, remark in rh.sub_points:
+                        sub_pts.append((rh.wo_number, remark))
+                else:
+                    sub_pts.append((rh.wo_number, rh.paragraph))
+            happenings.append(RewrittenHappening(
+                title=asset_id, paragraph="", wo_number="", tech_name="", sub_points=sub_pts,
+            ))
 
     # Group by asset -- combine multiple WOs on the same asset into one entry
     asset_groups: OrderedDict = OrderedDict()
