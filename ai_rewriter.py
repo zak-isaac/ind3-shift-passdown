@@ -60,6 +60,8 @@ _SYSTEM_PROMPT = (
     "directions (left/right/top/bottom), fix obvious typos, do not add anything new. "
     "Do NOT use semicolons. Write each separate action as its own sentence. "
     "Always use the word 'asset' instead of 'unit' when referring to the equipment. "
+    "Never say 'Assisted with' -- the work is complete, use the direct action verb instead: "
+    "'Performed', 'Completed', 'Conducted', 'Calibrated', 'Replaced', or whichever fits. "
     "IMPORTANT: if the original note does not mention RTS, 'returned to service', or 'operational', "
     "do NOT add any status conclusion. Stop writing when the source material stops. "
     "IMPORTANT: if a remark says the tech arrived and the issue was already resolved with nothing "
@@ -238,6 +240,12 @@ _INFORMAL = [
     (r"(?i)\ball systems(?:\s+are)?\s+go\b", ""),
     (r"as usual\.?",                  ""),
     (r"no worries\.?",                ""),
+    # 'Assisted with X' -> 'X performed' equivalent -- strip the filler prefix
+    (r"(?i)\bAssisted with adjusting\b",  "Adjusted"),
+    (r"(?i)\bAssisted with replacing\b",  "Replaced"),
+    (r"(?i)\bAssisted with installing\b", "Installed"),
+    (r"(?i)\bAssisted with calibrating\b","Calibrated"),
+    (r"(?i)\bAssisted with\b",            "Performed"),
     # AI-invented filler when no outcome was stated -- strip entirely
     (r"no further details? are available[^.]*\.",           ""),
     (r"the (?:current |operational )?status (?:of the (?:unit|asset) )?(?:remains?|is) (?:unknown|unclear|not specified|unavailable)[^.]*\.", ""),

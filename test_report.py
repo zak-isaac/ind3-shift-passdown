@@ -73,7 +73,8 @@ for h_idx, h in enumerate(co_happenings):
     cwo_match = next((c for c in co_result.consolidated if c.wo_number == h["wo_number"]), None)
     if cwo_match and len(cwo_match.tech_remarks) > 1:
         for t_name, remark in cwo_match.tech_remarks:
-            ai_inputs.append(ai_rewriter.build_input(h["title"], [remark]))
+            # No asset ID in sub-bullet inputs -- it's already on the parent header
+            ai_inputs.append(ai_rewriter.build_input("", [remark]))
             input_meta.append((h_idx, t_name))
     else:
         raw = []
@@ -91,26 +92,60 @@ groups: dict = defaultdict(list)
 for (h_idx, t_name), para in zip(input_meta, rewritten_flat):
     groups[h_idx].append((t_name, para))
 
-happenings = []
+# Build per-WO happenings first
+raw_happenings: list[RewrittenHappening] = []
 for h_idx, h in enumerate(co_happenings):
     pts = groups[h_idx]
     if not pts:
         continue
     if len(pts) > 1:
-        clean_pts = [(t, p) for t, p in pts if t != "__SKIP__" and p.strip()]
+        clean_pts = [(t, p) for t, p in pts if p.strip() and p.strip() not in ("-", "--")]
         if not clean_pts:
             continue
-        happenings.append(RewrittenHappening(
+        raw_happenings.append(RewrittenHappening(
             title=h["title"], paragraph=clean_pts[0][1],
             wo_number=h["wo_number"], tech_name=clean_pts[0][0],
             sub_points=clean_pts,
         ))
     else:
-        happenings.append(RewrittenHappening(
+        para = pts[0][1] if pts else h.get("paragraph", "")
+        if not para.strip() or para.strip() in ("-", "--"):
+            continue
+        raw_happenings.append(RewrittenHappening(
             title=h["title"],
-            paragraph=pts[0][1] if pts else h.get("paragraph",""),
+            paragraph=para,
             wo_number=h["wo_number"],
-            tech_name=h.get("tech_name",""),
+            tech_name=h.get("tech_name", ""),
+            sub_points=[],
+        ))
+
+# Group by asset -- combine multiple WOs on the same asset into one entry
+from collections import OrderedDict
+asset_groups: OrderedDict = OrderedDict()
+for rh in raw_happenings:
+    asset_groups.setdefault(rh.title, []).append(rh)
+
+happenings: list[RewrittenHappening] = []
+for asset_id, group in asset_groups.items():
+    if len(group) == 1:
+        happenings.append(group[0])
+    else:
+        # Flatten all WO remarks into one paragraph, each sentence tagged (WO #X)
+        sentences: list[str] = []
+        for rh in group:
+            if rh.sub_points:
+                for _, sp in rh.sub_points:
+                    if sp.strip() and sp.strip() not in ("-", "--"):
+                        wo_tag = f" (WO #{rh.wo_number})" if rh.wo_number else ""
+                        sentences.append(sp.rstrip(".") + wo_tag + ".")
+            else:
+                wo_tag = f" (WO #{rh.wo_number})" if rh.wo_number else ""
+                sentences.append(rh.paragraph.rstrip(".") + wo_tag + ".")
+        happenings.append(RewrittenHappening(
+            title=asset_id,
+            paragraph=" ".join(sentences),
+            wo_number="",  # multiple WOs -- shown inline per sentence
+            tech_name="",
             sub_points=[],
         ))
 
