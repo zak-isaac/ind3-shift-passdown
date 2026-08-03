@@ -60,12 +60,17 @@ _SYSTEM_PROMPT = (
     "directions (left/right/top/bottom), fix obvious typos, do not add anything new. "
     "IMPORTANT: if the original note does not mention RTS, 'returned to service', or 'operational', "
     "do NOT add any status conclusion. Stop writing when the source material stops. "
+    "IMPORTANT: if a remark says the tech arrived and the issue was already resolved, or that no "
+    "action was taken, OMIT that part entirely. Only include what was actually worked on or repaired. "
+    "If the entire remark is just 'issue already resolved' with nothing done, output only a single "
+    "dash: -"
     "Output only the rewritten note, nothing else."
 )
 
 _SINGLE_TEMPLATE = (
     "Rewrite as a professional passdown note. Keep all details. Keep all part names."
-    " Do not add anything not in the original. If no outcome is stated, do not invent one -- stop where the source stops.\n"
+    " Do not add anything not in the original. If no outcome is stated, do not invent one -- stop where the source stops."
+    " If part of the remark says the tech arrived and the issue was already resolved or no action was taken, omit that part -- only keep what was actually worked on.\n"
     "---\n"
     "Original: TAPER1101 / head was craahing hard on boxes. did calibration on head. back in service\n"
     "Passdown: Head found crashing hard against boxes; head calibration performed and unit returned to service.\n"
@@ -75,6 +80,9 @@ _SINGLE_TEMPLATE = (
     "---\n"
     "Original: TAPER1001 / assisting with calibration for the head, side guide, minor closers and decision tower. also did box center calibration due to constant misalignment\n"
     "Passdown: Assisted with calibration of head, side guide, minor closers, and decision tower; box center calibration also performed due to constant box misalignment.\n"
+    "---\n"
+    "Original: VOIDFILL0101 / my help was requested. however when i arrived the issue was already resolved. assisted with adjusted the small drive pulley on the rear side guide belt servo. it was rubbing against the frame again\n"
+    "Passdown: Small drive pulley on rear side guide belt servo adjusted; pulley was rubbing against the frame.\n"
     "---\n"
     "Original: TSP0005 / platform not fully lowered by operator, prevented getting off wire guide. lowered platform. drove to shop. brake test 7ft braking 10ft plugging passed | confirmed no other issues on inspection. rts\n"
     "Passdown: Platform found not fully lowered by operator, preventing exit from wire guide; platform lowered and unit driven to shop for brake test. Braking: 7ft, plugging: 10ft -- passed. No additional issues found on inspection; unit returned to service.\n"
@@ -96,10 +104,12 @@ _BATCH_TEMPLATE = (
     "  1. Head found crashing hard against boxes; head calibration performed and unit returned to service.\n"
     "  2. VOIDFILL / blushing on right closure wrong side. repositioned. recalibrated head, side guide, closers. operational\n"
     "  2. Right-closure blushing found mis-installed on wrong side; blushing repositioned and head, side guide, and closers recalibrated; unit returned to service.\n"
-    "  3. TAPER1001 / assisting with calibration for head, side guide, minor closers and decision tower. box center calibration also done due to constant misalignment\n"
-    "  3. Assisted with calibration of head, side guide, minor closers, and decision tower; box center calibration performed due to constant box misalignment.\n"
-    "  4. TSP0005 / platform not lowered, couldnt get off wire. lowered platform. brake test 7ft braking 10ft plugging passed | no other issues found\n"
-    "  4. Platform found not fully lowered, preventing exit from wire guide; platform lowered and brake test performed -- braking: 7ft, plugging: 10ft, passed. No additional issues found; unit returned to service.\n\n"
+    "  3. VOIDFILL0101 / my help was requested. however when i arrived the issue was already resolved. assisted with adjusted the small drive pulley on the rear side guide belt servo. rubbing against the frame\n"
+    "  3. Small drive pulley on rear side guide belt servo adjusted; pulley was rubbing against the frame.\n"
+    "  4. TAPER1001 / assisting with calibration for head, side guide, minor closers and decision tower. box center calibration also done due to constant misalignment\n"
+    "  4. Assisted with calibration of head, side guide, minor closers, and decision tower; box center calibration performed due to constant box misalignment.\n"
+    "  5. TSP0005 / platform not lowered, couldnt get off wire. lowered platform. brake test 7ft braking 10ft plugging passed | no other issues found\n"
+    "  5. Platform found not fully lowered, preventing exit from wire guide; platform lowered and brake test performed -- braking: 7ft, plugging: 10ft, passed. No additional issues found; unit returned to service.\n\n"
     "Notes to rewrite:\n"
     "{numbered_notes}\n\n"
     "Rewritten entries (STOP after the last numbered entry -- no extra text):\n"
@@ -303,7 +313,11 @@ def rewrite(text: str) -> str:
     )
     if not result or _is_garbage(result):
         return text
-    return _clean_output(_strip_leading_asset_id(result, asset_id))
+    cleaned = _clean_output(_strip_leading_asset_id(result, asset_id))
+    # AI signals "nothing worth reporting" with a bare dash
+    if cleaned.strip() in ("-", "--", ""):
+        return ""
+    return cleaned
 
 
 def rewrite_batch(inputs: list[str]) -> list[str]:

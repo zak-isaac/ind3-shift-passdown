@@ -101,7 +101,7 @@ for (h_idx, t_name), para in zip(input_meta, rewritten_flat):
 happenings = []
 for h_idx, h in enumerate(co_happenings):
     pts = groups[h_idx]
-    if any(t == "__SKIP__" for t, _ in pts) or not pts:
+    if not pts or all(t == "__SKIP__" or not p.strip() for t, p in pts):
         continue
     if len(pts) > 1:
         clean_pts = [(t, p) for t, p in pts if t != "__SKIP__" and p.strip()]

@@ -2799,8 +2799,8 @@ async def lead_generate(
     happenings: list[RewrittenHappening] = []
     for h_idx, h in enumerate(co_happenings):
         pts = groups[h_idx]
-        # Skip entries flagged as non-technical
-        if any(t == "__SKIP__" for t, _ in pts) or not pts:
+        # Skip entries flagged as non-technical or where AI returned empty string
+        if not pts or all(t == "__SKIP__" or not p.strip() for t, p in pts):
             continue
         if len(pts) > 1:
             # Multi-tech: sub-bullets, filter any remaining non-technical sub-points
