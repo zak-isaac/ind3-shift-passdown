@@ -58,12 +58,14 @@ _SYSTEM_PROMPT = (
     "Rules: use passive voice, keep every detail the tech wrote, keep all part names exactly "
     "(head, closer, side guide, blushing, taper, closers -- do not change these), keep all "
     "directions (left/right/top/bottom), fix obvious typos, do not add anything new. "
+    "IMPORTANT: if the original note does not mention RTS, 'returned to service', or 'operational', "
+    "do NOT add any status conclusion. Stop writing when the source material stops. "
     "Output only the rewritten note, nothing else."
 )
 
 _SINGLE_TEMPLATE = (
     "Rewrite as a professional passdown note. Keep all details. Keep all part names."
-    " Do not add anything not in the original.\n"
+    " Do not add anything not in the original. If no outcome is stated, do not invent one -- stop where the source stops.\n"
     "---\n"
     "Original: TAPER1101 / head was craahing hard on boxes. did calibration on head. back in service\n"
     "Passdown: Head found crashing hard against boxes; head calibration performed and unit returned to service.\n"
@@ -71,8 +73,8 @@ _SINGLE_TEMPLATE = (
     "Original: VOIDFILL / blushing on right closure installed on wrong side. repositioned blushing. recalibrated head, side guide, closers. asset operational\n"
     "Passdown: Right-closure blushing found mis-installed on wrong side; blushing repositioned and head, side guide, and closers recalibrated; unit returned to service.\n"
     "---\n"
-    "Original: VOIDFILL0201 / top and bottom tape threaded incorrectly by associate. rethreaded top and bottom correctly. asset fully operational\n"
-    "Passdown: Top and bottom tape found threaded incorrectly by associate; both rethreaded correctly and unit returned to full operational status.\n"
+    "Original: TAPER1001 / assisting with calibration for the head, side guide, minor closers and decision tower. also did box center calibration due to constant misalignment\n"
+    "Passdown: Assisted with calibration of head, side guide, minor closers, and decision tower; box center calibration also performed due to constant box misalignment.\n"
     "---\n"
     "Original: TSP0005 / platform not fully lowered by operator, prevented getting off wire guide. lowered platform. drove to shop. brake test 7ft braking 10ft plugging passed | confirmed no other issues on inspection. rts\n"
     "Passdown: Platform found not fully lowered by operator, preventing exit from wire guide; platform lowered and unit driven to shop for brake test. Braking: 7ft, plugging: 10ft -- passed. No additional issues found on inspection; unit returned to service.\n"
@@ -94,10 +96,10 @@ _BATCH_TEMPLATE = (
     "  1. Head found crashing hard against boxes; head calibration performed and unit returned to service.\n"
     "  2. VOIDFILL / blushing on right closure wrong side. repositioned. recalibrated head, side guide, closers. operational\n"
     "  2. Right-closure blushing found mis-installed on wrong side; blushing repositioned and head, side guide, and closers recalibrated; unit returned to service.\n"
-    "  3. TSP0005 / platform not lowered, couldnt get off wire. lowered platform. brake test 7ft braking 10ft plugging passed | no other issues found\n"
-    "  3. Platform found not fully lowered, preventing exit from wire guide; platform lowered and brake test performed -- braking: 7ft, plugging: 10ft, passed. No additional issues found; unit returned to service.\n"
-    "  4. RC0042 / horn dead replaced fuse | wiring checked all good unit rts\n"
-    "  4. Horn found inoperative; fuse replaced. Wiring inspected, all connections found good; unit returned to service.\n\n"
+    "  3. TAPER1001 / assisting with calibration for head, side guide, minor closers and decision tower. box center calibration also done due to constant misalignment\n"
+    "  3. Assisted with calibration of head, side guide, minor closers, and decision tower; box center calibration performed due to constant box misalignment.\n"
+    "  4. TSP0005 / platform not lowered, couldnt get off wire. lowered platform. brake test 7ft braking 10ft plugging passed | no other issues found\n"
+    "  4. Platform found not fully lowered, preventing exit from wire guide; platform lowered and brake test performed -- braking: 7ft, plugging: 10ft, passed. No additional issues found; unit returned to service.\n\n"
     "Notes to rewrite:\n"
     "{numbered_notes}\n\n"
     "Rewritten entries (STOP after the last numbered entry -- no extra text):\n"
@@ -223,6 +225,11 @@ _INFORMAL = [
     (r"(?i)\ball systems(?:\s+are)?\s+go\b", ""),
     (r"as usual\.?",                  ""),
     (r"no worries\.?",                ""),
+    # AI-invented filler when no outcome was stated -- strip entirely
+    (r"no further details? are available[^.]*\.",           ""),
+    (r"the (?:current |operational )?status (?:of the unit )?(?:remains?|is) (?:unknown|unclear|not specified|unavailable)[^.]*\.", ""),
+    (r"(?:regarding |concerning )?(?:its |the )?(?:unit.s |asset.s )?(?:current )?operational (?:status|functionality)[^.]*\.", ""),
+    (r"further (?:details?|information) (?:regarding|about|on)[^.]*(?:status|condition|functionality)[^.]*\.", ""),
 ]
 
 # Warehouse-specific typo map -- applied BEFORE sending to AI.
