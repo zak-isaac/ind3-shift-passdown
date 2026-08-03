@@ -296,8 +296,9 @@ async def lifespan(_: FastAPI):
 
     asyncio.create_task(_shift_reaper())
 
-    # 8. Verify local AI rewriter (Ollama + phi4-mini) — advisory only
-    ai_rewriter.check_ollama()
+    # 8. Verify local AI rewriter (Ollama + model) — run in background so server starts immediately
+    import threading
+    threading.Thread(target=ai_rewriter.check_ollama, daemon=True).start()
 
     yield
 
