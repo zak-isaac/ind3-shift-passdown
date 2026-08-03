@@ -28,6 +28,8 @@ _TEMPERATURE    = 0.1
 _MODEL_PRIORITY = ["phi4:14b", "llama3.1:8b", "phi4-mini"]
 _MODEL          = "phi4-mini"  # updated at startup by _detect_best_model()
 
+log = logging.getLogger(__name__)
+
 
 def _detect_best_model() -> str:
     """Pick the best available Ollama model from priority list."""
@@ -49,10 +51,6 @@ def _detect_best_model() -> str:
     return _MODEL
 
 _detect_best_model()
-
-
-log = logging.getLogger(__name__)
-
 
 
 _SYSTEM_PROMPT = (
