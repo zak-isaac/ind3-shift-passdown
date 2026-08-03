@@ -2749,36 +2749,39 @@ async def lead_generate(
     # Optional: upgrade merged summaries via Element LLM if key is configured
     from summarizer import summarize_remarks as _summarize, _ELEMENT_API_KEY as _EL_KEY
 
-    # Build AI inputs for every happening.
-    # Multi-tech WOs: all_remarks are joined with ' | ' so the AI synthesizes them.
-    # build_input() produces "ASSET / remark1 | remark2" format.
-    ai_inputs: list[str] = []
+    # Build passdown notes using the rule-based cleaner (deterministic, instant,
+    # zero hallucinations). AI rewriting was removed -- phi4-mini was too small
+    # to reliably preserve all details and part names.
+    from remark_cleaner import clean as _clean_remarks
+
+    # Build inputs for each happening
+    ai_inputs: list[tuple[str, list[str]]] = []  # (asset_id, raw_remarks)
     for h in co_happenings:
-        title       = h["title"]
-        raw_remarks = h.get("all_remarks") or []
-        fallback    = h["paragraph"]
-        if raw_remarks:
-            ai_input = ai_rewriter.build_input(title, raw_remarks)
-        else:
-            ai_input = ai_rewriter.build_input(title, [fallback])
-        # Element LLM upgrade (only when key is set)
-        if _EL_KEY and h["wo_number"]:
-            for cwo in co_result.consolidated:
-                if cwo.wo_number == h["wo_number"] and len(cwo.all_remarks) > 1:
-                    try:
-                        para = await _summarize(cwo.all_remarks)
-                        if h["conflicting"]:
-                            para += " [\u26a0 Conflicting notes \u2014 verify status]"
-                        ai_input = ai_rewriter.build_input(title, [para])
-                    except Exception:
-                        pass
-                    break
-        ai_inputs.append(ai_input)
+        title    = h["title"]
+        fallback = h.get("paragraph") or h.get("raw_remark") or title
+        # Gather raw remarks for this WO (multi-tech = multiple entries)
+        raw_remarks: list[str] = []
+        for cwo in co_result.consolidated:
+            if cwo.wo_number == h["wo_number"]:
+                raw_remarks = [r for r in (cwo.all_remarks or []) if r and r.strip()]
+                break
+        if not raw_remarks:
+            raw_remarks = [fallback]
+        ai_inputs.append((title, raw_remarks))
 
-    # ONE batch AI call for all happenings -- much faster than sequential
-    rewritten_paras = await asyncio.to_thread(ai_rewriter.rewrite_batch, ai_inputs)
+    # Run all entries through the rule-based cleaner (no async needed -- it's instant)
+    rewritten_paras = [_clean_remarks(asset_id, remarks) or " | ".join(remarks)
+                       for asset_id, remarks in ai_inputs]
 
-    happenings: list[RewrittenHappening] = []
+
+    for h, para in zip(co_happenings, rewritten_paras):
+        happenings.append(RewrittenHappening(
+            title=h["title"],
+            paragraph=para,
+            wo_number=h["wo_number"],
+            tech_name=h["tech_name"],
+        ))
+
     for h, para in zip(co_happenings, rewritten_paras):
         happenings.append(RewrittenHappening(
             title=h["title"],
