@@ -19,11 +19,36 @@ from typing import Optional
 import httpx
 
 # -- Configuration -------------------------------------------------------------
-_OLLAMA_BASE      = "http://localhost:11434"
-_MODEL            = "phi4-mini"
-_TIMEOUT_SINGLE   = 60.0
-_TIMEOUT_BATCH    = 120.0
-_TEMPERATURE      = 0.1
+_OLLAMA_BASE    = "http://localhost:11434"
+_TIMEOUT_SINGLE = 90.0
+_TIMEOUT_BATCH  = 90.0
+_TEMPERATURE    = 0.1
+
+# Model priority list -- first available one wins
+_MODEL_PRIORITY = ["phi4:14b", "llama3.1:8b", "phi4-mini"]
+_MODEL          = "phi4-mini"  # updated at startup by _detect_best_model()
+
+
+def _detect_best_model() -> str:
+    """Pick the best available Ollama model from priority list."""
+    global _MODEL
+    try:
+        import httpx as _httpx
+        r = _httpx.get(f"{_OLLAMA_BASE}/api/tags", timeout=5)
+        available = {m["name"].split(":")[0] + ":" + m["name"].split(":")[1]
+                     if ":" in m["name"] else m["name"]
+                     for m in r.json().get("models", [])}
+        for candidate in _MODEL_PRIORITY:
+            if candidate in available:
+                _MODEL = candidate
+                log.info("[ai_rewriter] Selected model: %s", _MODEL)
+                return _MODEL
+    except Exception:
+        pass
+    log.info("[ai_rewriter] Using default model: %s", _MODEL)
+    return _MODEL
+
+_detect_best_model()
 
 
 log = logging.getLogger(__name__)
