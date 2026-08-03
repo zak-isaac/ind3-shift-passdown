@@ -98,26 +98,18 @@ for h_idx, h in enumerate(co_happenings):
     pts = groups[h_idx]
     if not pts:
         continue
-    if len(pts) > 1:
-        clean_pts = [(t, p) for t, p in pts if p.strip() and p.strip() not in ("-", "--")]
-        if not clean_pts:
-            continue
-        raw_happenings.append(RewrittenHappening(
-            title=h["title"], paragraph=clean_pts[0][1],
-            wo_number=h["wo_number"], tech_name=clean_pts[0][0],
-            sub_points=clean_pts,
-        ))
-    else:
-        para = pts[0][1] if pts else h.get("paragraph", "")
-        if not para.strip() or para.strip() in ("-", "--"):
-            continue
-        raw_happenings.append(RewrittenHappening(
-            title=h["title"],
-            paragraph=para,
-            wo_number=h["wo_number"],
-            tech_name=h.get("tech_name", ""),
-            sub_points=[],
-        ))
+    # Always merge all tech remarks into one paragraph -- no sub-bullets
+    clean = [p for _, p in pts if p.strip() and p.strip() not in ("-", "--")]
+    if not clean:
+        continue
+    merged = " ".join(p.rstrip(".") + "." for p in clean)
+    raw_happenings.append(RewrittenHappening(
+        title=h["title"],
+        paragraph=merged,
+        wo_number=h["wo_number"],
+        tech_name=h.get("tech_name", ""),
+        sub_points=[],
+    ))
 
 # Group by asset -- combine multiple WOs on the same asset into one entry
 from collections import OrderedDict
