@@ -67,23 +67,45 @@ Register-ScheduledTask `
     -Xml      $Xml.OuterXml `
     -Force | Out-Null
 
+# Open port 8765 in Windows Firewall so other laptops on the LAN can reach the tool
+$FwRuleName = "IND3 Passdown Server (8765)"
+if (-not (Get-NetFirewallRule -DisplayName $FwRuleName -ErrorAction SilentlyContinue)) {
+    New-NetFirewallRule `
+        -DisplayName $FwRuleName `
+        -Direction   Inbound `
+        -Protocol    TCP `
+        -LocalPort   8765 `
+        -Action      Allow `
+        -Profile     Any `
+        -Description "LAN access to IND3 Reliability Passdown on port 8765" | Out-Null
+    Write-Host "  Firewall rule created for port 8765" -ForegroundColor Yellow
+} else {
+    Write-Host "  Firewall rule already exists for port 8765" -ForegroundColor Gray
+}
+
 # Start it immediately
 Start-ScheduledTask -TaskName $TaskName
 Start-Sleep -Seconds 3
 
 $State = (Get-ScheduledTask -TaskName $TaskName).State
+$MyIP  = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.*' } | Select-Object -First 1).IPAddress
+
 Write-Host ""
 Write-Host "==================================================" -ForegroundColor Green
 Write-Host "  IND3 Passdown Server installed as a service!" -ForegroundColor Green
 Write-Host "==================================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "  Task name : $TaskName"
-Write-Host "  Runs as   : NT AUTHORITY\SYSTEM"
-Write-Host "  Triggers  : Boot, hibernate resume, session connect"
-Write-Host "  Restarts  : every 1 min on crash (up to 99x)"
-Write-Host "  Port      : 8765"
-Write-Host "  Log       : $ProjectDir\server.log"
-Write-Host "  State now : $State" -ForegroundColor Cyan
+Write-Host "  Task name  : $TaskName"
+Write-Host "  Runs as    : NT AUTHORITY\SYSTEM"
+Write-Host "  Triggers   : Boot, hibernate resume, session connect"
+Write-Host "  Restarts   : every 1 min on crash (up to 99x)"
+Write-Host "  State now  : $State" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "  Access URLs:" -ForegroundColor White
+Write-Host "    This PC   : http://localhost:8765" -ForegroundColor Cyan
+Write-Host "    Other PCs : http://${MyIP}:8765" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "  Log file   : $ProjectDir\server.log"
 Write-Host ""
 Write-Host "To remove:" -ForegroundColor Gray
 Write-Host "  Unregister-ScheduledTask -TaskName IND3PassdownServer -Confirm:`$false" -ForegroundColor Gray
