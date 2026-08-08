@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>IND3 Passdown System — Screenshot Walkthrough</title>
+  <style>
+    :root { --wm-blue:#0053e2; --wm-dark:#001e50; --wm-spark:#ffc220; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; color: #1e293b; margin: 0; }
+    header { background: linear-gradient(135deg,#001e50 0%,#0053e2 100%); padding: 2.5rem 1.5rem 2rem; text-align: center; }
+    header .badge { display:inline-block; background: var(--wm-spark); color:#1e293b; font-size:.7rem; font-weight:900;
+      letter-spacing:.14em; text-transform:uppercase; padding:.35rem 1rem; border-radius:999px; margin-bottom:.75rem; }
+    header h1 { color:white; font-size:2.1rem; font-weight:900; margin:0 0 .5rem; }
+    header p { color:#bfdbfe; font-size:1rem; max-width:640px; margin:0 auto; line-height:1.6; }
+    .bar { height:5px; background: var(--wm-spark); }
+
+    .page { max-width: 1000px; margin: 0 auto; padding: 2.5rem 1.25rem 5rem; }
+
+    .toc { background:white; border-radius:1rem; padding:1.25rem 1.5rem; box-shadow:0 1px 4px rgba(0,0,0,.06); margin-bottom:2.5rem; }
+    .toc p.label { font-size:.7rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#64748b; margin:0 0 .6rem; }
+    .toc ol { margin:0; padding-left:1.1rem; columns:2; gap:1.5rem; }
+    .toc li { font-size:.85rem; margin-bottom:.35rem; }
+    .toc a { color: var(--wm-blue); text-decoration:none; font-weight:600; }
+    .toc a:hover { text-decoration:underline; }
+
+    .step { background:white; border-radius:1.25rem; overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,.07); margin-bottom:2.5rem; }
+    .step-head { display:flex; align-items:center; gap:1rem; padding:1.5rem 1.75rem 1rem; }
+    .step-num { flex-shrink:0; width:2.75rem; height:2.75rem; border-radius:50%; background: var(--wm-blue); color:white;
+      display:flex; align-items:center; justify-content:center; font-weight:900; font-size:1.15rem; }
+    .step-head h2 { margin:0; font-size:1.3rem; font-weight:800; color:#0f172a; }
+    .step-head p { margin:.15rem 0 0; font-size:.85rem; color:#64748b; }
+    .step-body { padding: 0 1.75rem 1.75rem; }
+    .step-body p.caption { font-size:.95rem; line-height:1.8; color:#334155; margin: 0 0 1rem; }
+    .step-body img { width:100%; display:block; border-radius:.75rem; border:1px solid #e2e8f0; }
+    .step-body .callout { background:#eff6ff; border-left:4px solid var(--wm-blue); border-radius:.5rem;
+      padding:.75rem 1rem; font-size:.85rem; color:#1e40af; margin-top:1rem; line-height:1.65; }
+
+    .foot { text-align:center; padding:2rem; color:#94a3b8; font-size:.8rem; }
+    .foot a { color: var(--wm-blue); font-weight:700; text-decoration:none; }
+
+    @media(max-width:640px){ .toc ol { columns:1; } }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="badge">IND3 eCommerce FC #8972 &bull; Reliability Team</span>
+  <h1>IND3 Passdown System — Walkthrough</h1>
+  <p>
+    A guided tour of a full shift lifecycle: technician sign-in, the live MST dashboard,
+    shift history, analytics, and the reference docs. Every screenshot below is captured
+    straight from the live production app — no mockups.
+  </p>
+</header>
+<div class="bar"></div>
+
+<div class="page">
+
+  <div class="toc">
+    <p class="label">Jump to a step</p>
+    <ol>
+      <li><a href="#s1">Homepage — starting or joining a shift</a></li>
+      <li><a href="#s2">Technician sign-in</a></li>
+      <li><a href="#s3">MST / Lead sign-in</a></li>
+      <li><a href="#s4">Live MST dashboard</a></li>
+      <li><a href="#s5">Shift history</a></li>
+      <li><a href="#s6">Analytics dashboard</a></li>
+      <li><a href="#s7">In-app user guide</a></li>
+      <li><a href="#s8">Technical / ops documentation</a></li>
+    </ol>
+  </div>
+
+  <div class="step" id="s1">
+    <div class="step-head">
+      <div class="step-num">1</div>
+      <div><h2>Homepage — Starting or Joining a Shift</h2><p>Everyone's entry point into the app</p></div>
+    </div>
+    <div class="step-body">
+      <p class="caption">
+        Whoever opens the site first each shift starts it here — pick the date and shift block, hit
+        <strong>Start Shift</strong>. Once a shift is active, this same page shows it live for everyone
+        else, with quick links into the Technician view, MST Dashboard, or a shareable QR code for
+        other devices on the floor.
+      </p>
+      <img src="screenshots/01_homepage.png" alt="Homepage showing shift start form and active shift card">
+    </div>
+  </div>
+
+  <div class="step" id="s2">
+    <div class="step-head">
+      <div class="step-num">2</div>
+      <div><h2>Technician Sign-In</h2><p>No passwords — just your associate number</p></div>
+    </div>
+    <div class="step-body">
+      <p class="caption">
+        Techs log in with their Walmart associate number — nothing to remember, nothing to reset.
+        Once signed in, they land straight on their personal shift report where they log work orders
+        as they go.
+      </p>
+      <img src="screenshots/02_tech_login.png" alt="Technician associate number sign-in screen">
+    </div>
+  </div>
+
+  <div class="step" id="s3">
+    <div class="step-head">
+      <div class="step-num">3</div>
+      <div><h2>MST / Lead Sign-In</h2><p>Associate number doubles as the MST PIN</p></div>
+    </div>
+    <div class="step-body">
+      <p class="caption">
+        The MST/Lead unlocks the dashboard the same way — their associate number acts as a PIN. An
+        emergency manager code exists as a backup if a lead's number ever isn't recognized mid-shift.
+      </p>
+      <img src="screenshots/03_lead_login.png" alt="MST Lead sign-in screen">
+    </div>
+  </div>
+
+  <div class="step" id="s4">
+    <div class="step-head">
+      <div class="step-num">4</div>
+      <div><h2>Live MST Dashboard</h2><p>The heart of the shift — everything updates in real time</p></div>
+    </div>
+    <div class="step-body">
+      <p class="caption">
+        This is where the MST spends the shift. Technician entries stream in live over a WebSocket as
+        they're logged — no manual refresh needed. The right rail handles Cetaris CMMS imports, LOTO
+        key verification, out-of-service tracking, and the one-click <strong>Generate Report</strong>
+        button that kicks off the AI-assisted passdown writeup at shift end.
+      </p>
+      <img src="screenshots/04_lead_dashboard.png" alt="Live MST dashboard with activity feed and shift monitoring panel">
+      <div class="callout">
+        &#128161; Notice each entry shows the associate, timestamp, asset ID, and a one-line description
+        pulled straight from a Cetaris work order remark — this raw feed is what later gets grouped and
+        polished into the final passdown report.
+      </div>
+    </div>
+  </div>
+
+  <div class="step" id="s5">
+    <div class="step-head">
+      <div class="step-num">5</div>
+      <div><h2>Shift History</h2><p>Every shift, forever, one click away</p></div>
+    </div>
+    <div class="step-body">
+      <p class="caption">
+        Nothing gets deleted. Every shift ever run shows up here with entry/report counts, the lead who
+        ran it, and one-click access to the exact report that got emailed out. Useful for pulling up
+        "what happened three weeks ago on this asset" in about five seconds.
+      </p>
+      <img src="screenshots/05_shift_history.png" alt="Shift history list showing all past shifts">
+    </div>
+  </div>
+
+  <div class="step" id="s6">
+    <div class="step-head">
+      <div class="step-num">6</div>
+      <div><h2>Analytics Dashboard</h2><p>All-time trends across every shift on record</p></div>
+    </div>
+    <div class="step-body">
+      <p class="caption">
+        Rolls up every shift into one view: most-worked assets, priority breakdowns, work-order and
+        PM-completion trends over the last 30 shifts, repeat problem assets, and top technicians by
+        entry count. Good for spotting a chronically failing asset before it becomes a bigger problem.
+      </p>
+      <img src="screenshots/06_analytics.png" alt="Analytics dashboard with charts for assets, priority, and trends">
+    </div>
+  </div>
+
+  <div class="step" id="s7">
+    <div class="step-head">
+      <div class="step-num">7</div>
+      <div><h2>In-App User Guide</h2><p>For techs and leads — no login required</p></div>
+    </div>
+    <div class="step-body">
+      <p class="caption">
+        A full end-user walkthrough lives right in the app at <code>/guide</code> — covering the
+        homepage, tech dashboard, MST dashboard, LOTO, Cetaris uploads, and the email workflow. Anyone
+        can open it, no login needed, and it's downloadable as a standalone HTML file too.
+      </p>
+      <img src="screenshots/07_user_guide.png" alt="In-app user guide landing page">
+    </div>
+  </div>
+
+  <div class="step" id="s8">
+    <div class="step-head">
+      <div class="step-num">8</div>
+      <div><h2>Technical / Ops Documentation</h2><p>For whoever's on call when something breaks</p></div>
+    </div>
+    <div class="step-body">
+      <p class="caption">
+        A separate, lead-gated page at <code>/tech-docs</code> covers architecture, the data model, how
+        the AI rewrite pipeline works, deployment specifics, and a troubleshooting runbook for the
+        common failure modes we've already hit in the field (port conflicts, zombie processes, Ollama
+        being down, etc). The same content also lives as Markdown in the repo under <code>docs/</code>
+        for anyone editing code directly.
+      </p>
+      <img src="screenshots/08_tech_docs.png" alt="Technical documentation and ops runbook page">
+    </div>
+  </div>
+
+  <div class="foot">
+    IND3 eCommerce Fulfillment Center #8972 &nbsp;&bull;&nbsp; MST Reliability Team<br/>
+    <a href="../ARCHITECTURE.md">Architecture Doc</a> &nbsp;&bull;&nbsp;
+    <a href="../DEPLOYMENT.md">Deployment Runbook</a>
+  </div>
+
+</div>
+</body>
+</html>

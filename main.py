@@ -1173,8 +1173,17 @@ async def analytics_dashboard(request: Request):
 
 @app.get("/guide", response_class=HTMLResponse)
 async def user_guide(request: Request):
-    """Public user guide — no auth required so techs can access it too."""
+    """Public user guide -- no auth required so techs can access it too."""
     return templates.TemplateResponse(request, "guide.html", {})
+
+
+@app.get("/tech-docs", response_class=HTMLResponse)
+async def tech_docs(request: Request):
+    """Internal ops/technical documentation -- architecture, deployment,
+    troubleshooting. Gated behind lead auth since it's not for techs."""
+    if not _is_lead_authed(request):
+        return _lead_redirect("/tech-docs")
+    return templates.TemplateResponse(request, "tech_docs.html", {})
 
 
 @app.get("/guide/download")
@@ -2829,35 +2838,7 @@ async def lead_generate(
                 title=asset_id, paragraph="", wo_number="", tech_name="", sub_points=sub_pts,
             ))
 
-    # Group by asset -- combine multiple WOs on the same asset into one entry
-    asset_groups: OrderedDict = OrderedDict()
-    for rh in raw_happenings:
-        asset_groups.setdefault(rh.title, []).append(rh)
 
-    happenings: list[RewrittenHappening] = []
-    for asset_id, group in asset_groups.items():
-        if len(group) == 1:
-            happenings.append(group[0])
-        else:
-            sentences: list[str] = []
-            for rh in group:
-                if rh.sub_points:
-                    for _, sp in rh.sub_points:
-                        if sp.strip() and sp.strip() not in ("-", "--"):
-                            wo_tag = f" (WO #{rh.wo_number})" if rh.wo_number else ""
-                            sentences.append(sp.rstrip(".") + wo_tag + ".")
-                else:
-                    wo_tag = f" (WO #{rh.wo_number})" if rh.wo_number else ""
-                    sentences.append(rh.paragraph.rstrip(".") + wo_tag + ".")
-            happenings.append(RewrittenHappening(
-                title=asset_id,
-                paragraph=" ".join(sentences),
-                wo_number="",
-                tech_name="",
-                sub_points=[],
-            ))
-
-    # Append any MST-authored extra happenings from the form
     for t, n in zip(extra_title, extra_note):
         if t.strip() and n.strip():
             happenings.append(RewrittenHappening(title=t.strip(), paragraph=n.strip()))

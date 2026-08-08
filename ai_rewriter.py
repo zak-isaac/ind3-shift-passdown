@@ -374,7 +374,11 @@ def rewrite(text: str) -> str:
         stop=["---", "\nOriginal:", "\nNote:", "\nExample", "\n\n"],
     )
     if not result or _is_garbage(result):
-        return text
+        # Fallback: raw input still carries the "ASSETID / " prefix from
+        # build_input() -- strip it so the caller doesn't double it up
+        # with the title it already renders separately.
+        fallback = _strip_leading_asset_id(text, asset_id)
+        return re.sub(r"\s*\|\s*", "; ", fallback)
     cleaned = _clean_output(_strip_leading_asset_id(result, asset_id))
     # AI signals "nothing worth reporting" with a bare dash
     if cleaned.strip() in ("-", "--", ""):
