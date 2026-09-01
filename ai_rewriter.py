@@ -100,6 +100,11 @@ Technical Terminology
 10. Preserve all directions exactly: Left, Right, Upper, Lower, Front, Rear, Top, Bottom.
 11. Preserve all measurements, work order numbers, fault codes, locations, identifiers,
     quantities, and equipment references exactly.
+11a. Never invent a descriptive name or label for a bare part/component ID
+     (e.g. M345, M507, X6). If the technician only gave the ID, keep only
+     the ID in the output -- do not guess or add what kind of part it is
+     (e.g. do not call M507 a "fill head", "motor", or "sensor" unless the
+     technician's remark itself said so).
 12. Preserve technician maintenance vocabulary whenever technically correct.
     Keep: Unjammed, Swapped, Power cycled, Recalibrated, Realigned, Deinstalled, Lubricated,
     Tightened, Pulled, Out of tape, Boxes getting stuck, Box crushing, Paper done, Sensor flickering.
@@ -347,6 +352,37 @@ def _strip_leading_asset_id(text: str, asset_id: str) -> str:
     return text
 
 
+# Component-type words the model reliably invents to label a bare part/motor
+# ID (e.g. turning "M345" into "fill head M345") based on general domain
+# knowledge rather than anything the technician actually said. Prompt-level
+# instructions (rule 11a) did NOT reliably stop this on live testing --
+# the model repeated the same invented label 3/3 runs -- so this is a
+# deterministic code-level scrubber instead.
+_INVENTED_COMPONENT_LABELS = [
+    "fill head", "photo eye", "motor", "actuator", "bearing", "roller",
+]
+
+
+def _strip_invented_component_labels(output: str, original: str) -> str:
+    """Remove a descriptive component label the model attached to a bare
+    part ID, when the technician's own remark never used that label.
+    """
+    orig_low = original.lower()
+    for label in _INVENTED_COMPONENT_LABELS:
+        if label in orig_low:
+            continue  # technician actually said this -- leave it alone
+        pattern = re.compile(
+            rf"\b{re.escape(label)}s?\s*(?:component)?s?,?\s*"
+            rf"(?=[A-Za-z]?\d{{2,5}}\b|\band\b)",
+            re.IGNORECASE,
+        )
+        output = pattern.sub("", output)
+    # Clean up a stray comma left behind where the label used to sit
+    output = re.sub(r",\s+(were|was)\b", r" \1", output)
+    output = re.sub(r"  +", " ", output).strip()
+    return output
+
+
 def _clean_output(text: str) -> str:
     """Strip informal phrases and fix formatting the model sometimes adds."""
     import re as _re
@@ -504,6 +540,7 @@ def rewrite(text: str) -> str:
         fallback = _strip_leading_asset_id(text, asset_id)
         return re.sub(r"\s*\|\s*", "; ", fallback)
     cleaned = _clean_output(_strip_leading_asset_id(result, asset_id))
+    cleaned = _strip_invented_component_labels(cleaned, text)
     # AI signals "nothing worth reporting" with a bare dash
     if cleaned.strip() in ("-", "--", ""):
         return ""
