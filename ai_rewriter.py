@@ -5,8 +5,10 @@ Public API
 check_ollama() -> bool
 rewrite(text: str) -> str
 rewrite_batch(inputs: list[str]) -> list[str]
-    inputs format: "ASSET_ID|||remark1|||remark2|||..."
-    The ||| separator tells the AI these are distinct tech remarks to synthesize.
+    inputs format (see build_input()): "ASSET_ID / remark1 | remark2 | ..."
+    The " | " separator tells the AI these are sequential remarks logged over
+    time for the same issue -- they must be synthesized into one continuous
+    narrative, not left as separate fragments.
     Output does NOT include the asset ID (report already shows it).
 """
 from __future__ import annotations
@@ -101,6 +103,21 @@ Technical Terminology
 13. Preserve maintenance acronyms exactly. Never expand:
     LOTO, VFD, PLC, HMI, PM, RTS, MST.
 
+Multi-Remark Synthesis
+13a. The input may contain several remarks separated by " | ". These are NOT
+     independent notes -- they are sequential log entries for the SAME issue,
+     written by one or more technicians as the work progressed over the shift.
+13b. Weave every " | "-separated remark into ONE continuous narrative paragraph,
+     in the order given. Never output them as a list, never separate them with
+     semicolons, and never simply concatenate them with "|" left in place.
+     Connect them the way a technician telling the story would: what was found,
+     what was tried, what happened as a result, what fixed it, how it was
+     verified. Use transition language (Following, After, Once, As a result)
+     to show cause-and-effect between remarks instead of just listing facts.
+13c. If only one remark is given, apply the same principle: read the vague or
+     shorthand parts within their surrounding context so the whole entry reads
+     as one coherent account rather than a fragment.
+
 Troubleshooting
 14. Preserve the complete troubleshooting sequence in order:
     Finding -> Investigation -> Escalation (if applicable) -> Recommendation -> Diagnosis ->
@@ -159,8 +176,11 @@ Output only the rewritten note. Nothing else.
 """
 
 _SINGLE_TEMPLATE = (
-    "Rewrite the following technician remark as a professional engineering shift passdown entry."
-    " Follow all rules exactly. Output only the rewritten note. Do not include the asset ID.\n"
+    "Rewrite the following technician remark(s) as a single, flowing professional"
+    " engineering shift passdown entry. If more than one remark is separated by"
+    " ' | ', they are sequential entries for the same issue -- synthesize them into"
+    " ONE continuous narrative, not a list. Follow all rules exactly."
+    " Output only the rewritten note. Do not include the asset ID.\n"
     "---\n"
     "Original: {text}\n"
     "Passdown:"
