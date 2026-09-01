@@ -366,7 +366,8 @@ def format_email(data: ReportData) -> str:
         h_lines.append(f"  •  {data.pm_count} PM{'s' if data.pm_count != 1 else ''} completed")
     for h in data.happenings:
         wo = f" (WO #{h.wo_number})." if h.wo_number else "."
-        h_lines.append(f"  \u2022  {h.title}: {h.paragraph}.{wo}")
+        para = h.paragraph.rstrip(".")
+        h_lines.append(f"  \u2022  {h.title}: {para}{wo}")
     secs.append(_txt_sec("Shift Happenings",
         h_lines or ["  No shift happenings recorded."]))
 
