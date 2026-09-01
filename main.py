@@ -7,7 +7,7 @@ import uuid
 from datetime import date, datetime, time, timedelta
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Form, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -15,8 +15,10 @@ import json
 from pathlib import Path
 
 import httpx
+from starlette.middleware.base import BaseHTTPMiddleware
 import associates as assoc_mod
 import db
+import dev_mode
 import emailer
 import signatures as _sigs
 import outlook_sender
@@ -73,6 +75,11 @@ class _WsManager:
         self._clients = [c for c in self._clients if c is not ws]
 
     async def broadcast(self, msg: dict):
+        # Dev/test-mode traffic must NEVER surface toasts/notifications on a
+        # real MST's live dashboard -- the sandbox DB already isolates the
+        # data, this stops the side-channel too.
+        if db.is_sandboxed():
+            return
         dead = []
         for client in self._clients:
             try:
@@ -90,6 +97,8 @@ _NOTIFY_PRIORITIES = {"down", "degraded"}
 
 async def _notify_teams(priority: str, tech: str, unit: str, issue: str) -> None:
     """POST an Adaptive Card to the configured Teams incoming webhook (fire-and-forget)."""
+    if db.is_sandboxed():
+        return  # never spam the real Teams channel from a test-mode session
     url = db.get_setting("teams_webhook_url", "")
     if not url or priority not in _NOTIFY_PRIORITIES:
         return
@@ -116,9 +125,12 @@ async def _notify_teams(priority: str, tech: str, unit: str, issue: str) -> None
         print(f"[teams] webhook error: {exc}", flush=True)
 
 
-# ── Email helper ────────────────────────────────────────────────────────────────────────
+# ── Email helper ──────────────────────────────────────────────────────────────────
 async def _send_passdown_email(subject: str, body: str) -> None:
     """Fire-and-forget: send via local Outlook COM automation."""
+    if db.is_sandboxed():
+        print("[email] dev/test mode -- skipping real send", flush=True)
+        return
     to_raw    = db.get_setting("email_to", "").strip()
     to_list   = [a.strip() for a in to_raw.split(",") if a.strip()]
     from_name = db.get_setting("email_from_name", "IND3 Shift Passdown").strip()
@@ -187,6 +199,37 @@ def _check_lead_credential(entered: str) -> bool:
     return False
 
 
+_END_SHIFT_GRACE_HOURS = 24
+
+
+def _find_end_shift_grace_shift(entered: str):
+    """If `entered` matches the associate who personally OPENED an active
+    tech-led shift (opened_by_role == 'tech', opened_by_assoc == entered),
+    and it's been less than _END_SHIFT_GRACE_HOURS since that shift started,
+    return the shift dict so they can be let into the MST dashboard to do
+    the end-of-shift passdown. Otherwise return None.
+
+    Scoped to the SPECIFIC shift they opened -- not a blanket MST grant, and
+    not available to other techs on the same shift.
+    """
+    entered = entered.strip()
+    if not entered:
+        return None
+    now = dev_mode.get_now()
+    for s in db.get_active_shifts():
+        if s.get("opened_by_role") != "tech":
+            continue
+        if (s.get("opened_by_assoc") or "").strip() != entered:
+            continue
+        try:
+            started = datetime.strptime(s["created_at"], "%Y-%m-%d %H:%M:%S")
+        except (ValueError, KeyError, TypeError):
+            continue
+        if (now - started) <= timedelta(hours=_END_SHIFT_GRACE_HOURS):
+            return s
+    return None
+
+
 def _is_lead_authed(request: Request) -> bool:
     return request.cookies.get(_LEAD_COOKIE) == _get_pin_hash()
 
@@ -233,6 +276,13 @@ async def lifespan(_: FastAPI):
         lead_pin_hash=_LEAD_PIN_DEFAULT,
         dc_number=active_slug,
     )
+
+    # 2b. Boot the dev/test-mode sandbox DB (separate file, own schema) so
+    # /dev/* routes have somewhere safe to write immediately on first use.
+    with db.use_sandbox_db(dev_mode.DEV_DB_PATH):
+        db.init_db()
+        db.purge_orphaned_shifts()
+        db.init_settings(lead_pin_hash=_LEAD_PIN_DEFAULT, dc_number="DEVTEST")
 
     # 3. Seed associates from Excel if DB table is empty
     db.seed_associates(_ROSTER)
@@ -313,7 +363,28 @@ def _sync_facility_globals(fac: dict) -> None:
 
 
 app = FastAPI(title="Shift Passdown Generator", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def _dev_mode_sandbox(request: Request, call_next):
+    """If this request carries a valid dev-mode session cookie, route the
+    ENTIRE request through the sandbox DB + frozen test date. Every other
+    request (the vast majority -- real production traffic) passes through
+    completely untouched. This is the single choke point that guarantees
+    dev/test traffic can never read or write the live shift.
+    """
+    if request.cookies.get(dev_mode.DEV_COOKIE) == dev_mode.DEV_TOKEN:
+        with db.use_sandbox_db(dev_mode.DEV_DB_PATH), dev_mode.freeze_time(dev_mode.dev_now()):
+            return await call_next(request)
+    return await call_next(request)
+
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
+# Screenshot walkthrough -- public, self-contained HTML+images. Replaces the
+# old separate /guide and /tech-docs pages as the single onboarding doc.
+app.mount("/walkthrough", StaticFiles(directory="docs/walkthrough", html=True), name="walkthrough")
+# Raw technical docs (ARCHITECTURE.md, DEPLOYMENT.md) linked from the walkthrough footer.
+app.mount("/docs", StaticFiles(directory="docs"), name="docs")
 templates = Jinja2Templates(directory="templates")
 
 # ── Site-wide config exposed to all templates ─────────────────────────────────
@@ -351,6 +422,63 @@ def _shift_deadline(shift: dict) -> datetime | None:
     shift_date = date.fromisoformat(shift["date"])
     end_date   = shift_date + timedelta(days=1) if next_day else shift_date
     return datetime.combine(end_date, end_time) + _SHIFT_GRACE
+
+
+_SHIFT_START_TIME = {
+    "S1": time(5, 30),
+    "S2": time(12, 0),
+    "S3": time(20, 30),
+    "S4": time(5, 30),
+    "S5": time(17, 30),
+}
+
+
+_SHIFT_EARLY_UNLOCK = timedelta(hours=1)  # window/button unlocks 1hr early, for handover
+
+
+def _shift_window(shift_type, ref_date):
+    start_time = _SHIFT_START_TIME.get(shift_type)
+    entry = _SHIFT_SCHEDULE.get(shift_type)
+    if not start_time or not entry:
+        return None
+    end_time, next_day = entry
+    start_dt = datetime.combine(ref_date, start_time)
+    end_date = ref_date + timedelta(days=1) if next_day else ref_date
+    end_dt = datetime.combine(end_date, end_time) + _SHIFT_GRACE
+    return start_dt, end_dt
+
+
+def _is_within_shift_window(shift_type, now):
+    for ref_date in (now.date(), now.date() - timedelta(days=1)):
+        window = _shift_window(shift_type, ref_date)
+        if window and (window[0] - _SHIFT_EARLY_UNLOCK) <= now <= window[1]:
+            return True
+    return False
+
+
+def _check_shift_start_eligibility(assoc, shift_type, now):
+    if not assoc:
+        if not _is_within_shift_window(shift_type, now):
+            return False, False, shift_type + " is not in its scheduled window right now."
+        return True, False, ""
+    if assoc.get("is_manager"):
+        return True, False, ""
+    assigned = (assoc.get("shift") or "").strip()
+    is_mst = bool(assoc.get("is_mst"))
+    name = assoc.get("display_name") or "You"
+    if not _is_within_shift_window(shift_type, now):
+        return False, False, shift_type + " is not in its scheduled window right now."
+    if is_mst:
+        if assigned and assigned != shift_type:
+            return True, True, ""
+        return True, False, ""
+    if not assigned or assigned != shift_type:
+        return False, False, name + " is assigned to " + (assigned or "a different shift") + ", not " + shift_type + "."
+    return True, False, ""
+    return False
+
+
+
 
 
 def _fmt_time(val: str) -> str:
@@ -408,16 +536,52 @@ def _local_ip() -> str:
     return "localhost"
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────────────
+# DEV / TEST MODE  (T8972 or any real associate number)
+#
+# Completely sandboxed: own SQLite file, frozen date. The middleware
+# installed on `app` (see near FastAPI() construction) does the actual
+# swap for every request carrying the dev-session cookie -- these routes
+# just handle getting the cookie set/cleared and landing on the exact
+# same home page production uses.
+# ─────────────────────────────────────────────────────────────────────────────────────
+
+@app.get("/dev/login", response_class=HTMLResponse)
+async def dev_login_get(request: Request, error: str = ""):
+    return templates.TemplateResponse(
+        request, "dev_login.html", {"error": error}
+    )
+
+
+@app.post("/dev/login")
+async def dev_login_post(request: Request, code: str = Form(...)):
+    if not dev_mode.is_dev_credential(code, _ROSTER):
+        from urllib.parse import quote
+        err = quote("Not recognized. Use the test code or your associate number.")
+        return RedirectResponse(f"/dev/login?error={err}", status_code=303)
+    resp = RedirectResponse("/", status_code=303)
+    resp.set_cookie(dev_mode.DEV_COOKIE, dev_mode.DEV_TOKEN,
+                     httponly=True, samesite="lax", path="/")
+    return resp
+
+
+@app.get("/dev/exit")
+async def dev_exit():
+    resp = RedirectResponse("/", status_code=303)
+    resp.delete_cookie(dev_mode.DEV_COOKIE, path="/")
+    return resp
+
+
+# ─────────────────────────────────────────────────────────────────────────────────────
 # HOME
-# ─────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request, error: str = ""):
     shifts = db.get_active_shifts()          # 0-2 active shifts
     shift  = shifts[0] if shifts else None   # backwards-compat for single-shift logic
-    today = date.today().isoformat()
-    now   = datetime.now()
+    now   = dev_mode.get_now()
+    today = now.date().isoformat()
     elapsed_hours: float = 0.0
     if shift:
         try:
@@ -431,7 +595,7 @@ async def home(request: Request, error: str = ""):
     return templates.TemplateResponse(
         request, "home.html",
         {"shift": shift, "shifts": shifts, "today": today,
-         "elapsed_hours": elapsed_hours,
+         "elapsed_hours": elapsed_hours, "is_dev_mode": dev_mode.is_active(),
          "day_name": day_name, "valid_shifts_today": valid_now, "error": error}
     )
 
@@ -493,9 +657,12 @@ async def shift_start(
     lead_name:   str = Form(...),
     assoc_num:   str = Form(""),
     ot_code:     str = Form(""),
+    confirm_dup: str = Form("0"),
 ):
-    # Two-shift cap — reject if already 2 running simultaneously
-    if len(db.get_active_shifts()) >= 2:
+    active_shifts = db.get_active_shifts()
+
+    # Two-shift cap -- reject if already 2 running simultaneously
+    if len(active_shifts) >= 2:
         return RedirectResponse(
             "/?error=Two+shifts+are+already+running.+End+one+before+starting+another.",
             status_code=303,
@@ -507,28 +674,97 @@ async def shift_start(
     except ValueError:
         return RedirectResponse("/?error=Invalid+date+format", status_code=303)
 
-    allowed_days = _WEEKDAY_SHIFTS.get(shift_type)
+    # No future dates -- today or earlier only (today = frozen dev date in test mode)
+    if parsed_date > dev_mode.get_today():
+        return RedirectResponse(
+            "/?error=Future+dates+are+not+allowed.+Pick+today+or+an+earlier+date.",
+            status_code=303,
+        )
+
+    # Dev/test mode intentionally bypasses the weekday<->shift_type pairing
+    # (frozen date is always a Friday) so every shift type can be exercised
+    # on the single frozen test date. Production traffic keeps the real rule.
+    allowed_days = None if dev_mode.is_active() else _WEEKDAY_SHIFTS.get(shift_type)
     if allowed_days is not None and parsed_date.weekday() not in allowed_days:
         day_label = parsed_date.strftime("%A")
-        rule = ("S1, S2 and S3 run Monday – Thursday only"
+        rule = ("S1, S2 and S3 run Monday - Thursday only"
                 if shift_type in ("S1", "S2", "S3")
-                else "S4 and S5 run Friday – Sunday only")
+                else "S4 and S5 run Friday - Sunday only")
         err = f"{shift_type}+cannot+start+on+a+{day_label}.+{rule}."
         return RedirectResponse(f"/?error={err}", status_code=303)
 
-    # ── Shift-assignment validation — OT code check DISABLED (hidden for future use)
-    # MSTs may start any shift without a code. Re-enable by restoring the block below.
-    # FUTURE USE:
-    #   assoc = _ROSTER.get(assoc_num)
-    #   if assoc and assoc.get("is_mst"):
-    #       assigned = (assoc.get("shift") or "").strip()
-    #       if assigned and assigned != shift_type:
-    #           code = ot_code.strip().upper()
-    #           if not code or not db.validate_ot_code(code, assoc_num, shift_type):
-    #               return RedirectResponse("/?error=Invalid+OT+code", status_code=303)
-    #           db.consume_ot_code(code)
+    entered = assoc_num.strip()
+    assoc   = _ROSTER.get(entered) if entered else None
+    is_mst  = bool(assoc and (assoc.get("is_mst") or assoc.get("is_manager")))
 
-    # ── All good — stash in cookie and redirect to PIN ───────────────────────
+    # -- Duplicate-start guard -- a NON-MST tech trying to open a NEW shift
+    # while one is already active gets a confirm prompt first. Confirming
+    # does NOT create a second shift for them -- it just logs them into the
+    # existing active one, since a tech can only ever be in one shift.
+    if active_shifts and assoc and not is_mst:
+        if confirm_dup != "1":
+            from urllib.parse import quote
+            err = quote("A shift is already running. Confirm you really want to join it instead of starting a new one.")
+            return RedirectResponse(f"/?error={err}&confirm_needed=1", status_code=303)
+        existing = active_shifts[0]
+        resp = RedirectResponse("/tech", status_code=303)
+        resp.set_cookie(_TECH_ASSOC_COOKIE, entered, httponly=False, samesite="lax", path="/")
+        resp.set_cookie(_TECH_SHIFT_COOKIE, str(existing["id"]), httponly=False, samesite="lax", path="/")
+        return resp
+
+    # -- Same-shift-type guard -- nobody (MST included) can start a SECOND
+    # instance of the SAME shift_type while one is already running. Legit
+    # overlaps are always two DIFFERENT shift types (e.g. S4/S5 at handover);
+    # starting the same type twice is always a mistake, not overtime. Hard
+    # block, no confirm prompt. Techs never reach this line -- they're
+    # already routed above.
+    if any(s["shift_type"] == shift_type for s in active_shifts):
+        from urllib.parse import quote
+        err = quote(f"{shift_type} is already running. It can't be started twice.")
+        return RedirectResponse(f"/?error={err}", status_code=303)
+
+    # -- Assigned-shift + time-window eligibility --
+    now = dev_mode.get_now()
+    allowed, is_ot, elig_err = _check_shift_start_eligibility(assoc, shift_type, now)
+    if not allowed:
+        from urllib.parse import quote
+        return RedirectResponse(f"/?error={quote(elig_err)}", status_code=303)
+
+    opened_by_role = "tech" if (assoc and not is_mst) else "mst"
+
+    # -- Techs land on their own dashboard, never the MST one --
+    if opened_by_role == "tech":
+        bound_shift_id = db.start_shift(shift_date, shift_type, lead_name,
+                                        opened_by_role="tech", is_ot=False,
+                                        opened_by_assoc=entered)
+        resp = RedirectResponse("/tech", status_code=303)
+        resp.set_cookie(_TECH_ASSOC_COOKIE, entered, httponly=False, samesite="lax", path="/")
+        resp.set_cookie(_TECH_SHIFT_COOKIE, str(bound_shift_id), httponly=False, samesite="lax", path="/")
+        return resp
+
+    # ── All good -- if the associate number typed in the modal is already a
+    # valid MST credential, skip the second PIN screen entirely: start the
+    # shift and drop them straight into the dashboard. Otherwise (blank,
+    # unrecognized, or non-MST number) fall back to asking for a PIN on the
+    # next screen -- same safety net as before, just no longer the default path.
+    if entered and _check_lead_credential(entered):
+        bound_shift_id = db.start_shift(shift_date, shift_type, lead_name,
+                                        opened_by_role="mst", is_ot=is_ot,
+                                        opened_by_assoc=entered)
+        resp = RedirectResponse("/lead?status=started", status_code=303)
+        resp.set_cookie(_LEAD_COOKIE, _get_pin_hash(),
+                        httponly=True, samesite="lax", path="/",
+                        max_age=86400 * 30)  # 30 days
+        resp.set_cookie(_LEAD_SHIFT_COOKIE, str(bound_shift_id),
+                        httponly=True, samesite="lax", path="/")
+        if entered == _EMERGENCY_CODE:
+            resp.set_cookie(_MGR_COOKIE, _MGR_TOKEN,
+                            httponly=True, samesite="lax", path="/",
+                            max_age=86400 * 30)
+        return resp
+
+    # ── Fallback -- no valid credential yet: stash the pending shift and
+    # ask for a PIN on the login page (creates the shift once they sign in).
     import json
     from urllib.parse import quote
     pending = json.dumps({"date": shift_date, "shift_type": shift_type, "lead_name": lead_name})
@@ -684,6 +920,17 @@ async def associate_lookup(code: str = ""):
         "is_mst":       bool(assoc.get("is_mst", False)),
         "is_manager":   bool(assoc.get("is_manager", False)),
     })
+
+
+@app.get("/api/active-shifts")
+async def api_active_shifts():
+    """JS polling endpoint -- which shift_types are currently running, so
+    the homepage can lock the Start Shift button until it is safe again."""
+    active = db.get_active_shifts()
+    return JSONResponse({"active_types": [s["shift_type"] for s in active]})
+
+
+
 
 
 @app.get("/tech/login", response_class=HTMLResponse)
@@ -1042,13 +1289,18 @@ async def lead_login_post(
     import json
     entered = pin.strip()
     if _check_lead_credential(entered):
-        # Credential OK — create any pending shift
+        # Credential OK -- create any pending shift
         pending_raw = request.cookies.get("__pending_shift")
         bound_shift_id = 0
         if pending_raw:
             try:
                 p = json.loads(pending_raw)
-                bound_shift_id = db.start_shift(p["date"], p["shift_type"], p["lead_name"])
+                assoc = _ROSTER.get(entered)
+                _, is_ot, _ = _check_shift_start_eligibility(assoc, p["shift_type"], dev_mode.get_now())
+                bound_shift_id = db.start_shift(
+                    p["date"], p["shift_type"], p["lead_name"],
+                    opened_by_role="mst", is_ot=is_ot, opened_by_assoc=entered,
+                )
             except Exception as exc:
                 print(f"[login] pending shift cookie invalid: {exc}", flush=True)
 
@@ -1090,6 +1342,25 @@ async def lead_login_post(
         else:
             resp.delete_cookie(_MGR_COOKIE, path="/")
         return resp
+
+    grace_shift = _find_end_shift_grace_shift(entered)
+    if grace_shift:
+        grace_next = "/lead?shift_id=" + str(grace_shift["id"])
+        grace_html = (
+            "<!DOCTYPE html><html><head>"
+            "<meta http-equiv='refresh' content='0;url=" + grace_next + "' />"
+            "</head><body><script>window.location.replace('" + grace_next + "');</script>"
+            "</body></html>"
+        )
+        grace_resp = HTMLResponse(content=grace_html)
+        grace_resp.set_cookie(_LEAD_COOKIE, _get_pin_hash(),
+                               httponly=True, samesite="lax", path="/",
+                               max_age=86400)
+        grace_resp.set_cookie(_LEAD_SHIFT_COOKIE, str(grace_shift["id"]),
+                               httponly=True, samesite="lax", path="/")
+        grace_resp.delete_cookie(_MGR_COOKIE, path="/")
+        return grace_resp
+
     return templates.TemplateResponse(
         request, "lead_login.html",
         {"next": next, "error": "Incorrect associate ID or PIN. Please try again."},
@@ -1173,43 +1444,23 @@ async def analytics_dashboard(request: Request):
 
 @app.get("/guide", response_class=HTMLResponse)
 async def user_guide(request: Request):
-    """Public user guide -- no auth required so techs can access it too."""
-    return templates.TemplateResponse(request, "guide.html", {})
+    """Legacy URL -- the standalone guide page was replaced by the unified
+    screenshot walkthrough. Redirect so old bookmarks/QR codes keep working."""
+    return RedirectResponse("/walkthrough/", status_code=303)
 
 
 @app.get("/tech-docs", response_class=HTMLResponse)
 async def tech_docs(request: Request):
-    """Internal ops/technical documentation -- architecture, deployment,
-    troubleshooting. Gated behind lead auth since it's not for techs."""
-    if not _is_lead_authed(request):
-        return _lead_redirect("/tech-docs")
-    return templates.TemplateResponse(request, "tech_docs.html", {})
+    """Legacy URL -- technical docs are now folded into the walkthrough page
+    (which links out to the Markdown docs in docs/ for deep technical detail)."""
+    return RedirectResponse("/walkthrough/", status_code=303)
 
 
 @app.get("/guide/download")
 async def download_guide(request: Request):
-    """Serve the guide as a self-contained downloadable HTML file."""
-    from fastapi.responses import Response
-    html: str = templates.get_template("guide.html").render({})
-
-    # Remove server-only dependencies that break in a local file
-    html = html.replace(
-        '<link rel="stylesheet" href="/static/tailwind.min.css">',
-        "",  # hero is 100% inline; content uses custom classes in <style>
-    )
-    html = html.replace('<script src="/static/htmx.min.js"></script>', "")
-
-    # Patch internal nav links so they open the live site in a new tab
-    # instead of going nowhere when the file is opened locally
-    html = html.replace('href="/lead"', 'href="http://localhost:8765/lead" target="_blank"')
-    html = html.replace('href="/analytics"', 'href="http://localhost:8765/analytics" target="_blank"')
-    html = html.replace('href="/guide/download"', 'href="#" onclick="alert(\"Open from the system to download again.\"); return false;"')
-
-    return Response(
-        content=html,
-        media_type="text/html; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="IND3-Reliability-Guide.html"'},
-    )
+    """Legacy URL -- redirect to the walkthrough, which has no download
+    step since it's already a self-contained static page."""
+    return RedirectResponse("/walkthrough/", status_code=303)
 
 
 
@@ -2205,6 +2456,10 @@ async def report_send_email(
 ):
     if not _is_lead_authed(request):
         return HTMLResponse("Unauthorized", status_code=401)
+    if db.is_sandboxed():
+        return HTMLResponse(
+            '<p class="text-amber-700 font-bold text-sm">&#129514; Dev/Test Mode &mdash; email sending is disabled here so nothing goes out to real recipients.</p>'
+        )
     if not db.get_setting("email_to", "").strip():
         return HTMLResponse(
             '<p class="text-red-600 font-bold text-sm">&#10060; No recipients configured — add them in Admin → Email Settings.</p>'
@@ -2586,6 +2841,60 @@ async def admin_assoc_toggle_mst(request: Request, assoc_num: str):
     )
 
 
+@app.get("/admin/associates/{assoc_num}/edit-form", response_class=HTMLResponse)
+async def admin_assoc_edit_form(request: Request, assoc_num: str):
+    """Swap a roster row into an inline edit form -- fix typos, reassign
+    assoc numbers, flip MST<->tech, without leaving the admin page."""
+    if not _is_lead_authed(request):
+        return HTMLResponse("", status_code=403)
+    assoc = db.get_associate(assoc_num)
+    if not assoc:
+        raise HTTPException(status_code=404)
+    return templates.TemplateResponse(
+        request, "partials/assoc_row_edit.html", {"a": assoc}
+    )
+
+
+@app.get("/admin/associates/{assoc_num}/edit-form/cancel", response_class=HTMLResponse)
+async def admin_assoc_edit_cancel(request: Request, assoc_num: str):
+    """Revert an in-progress edit row back to the normal display row."""
+    if not _is_lead_authed(request):
+        return HTMLResponse("", status_code=403)
+    assoc = db.get_associate(assoc_num)
+    if not assoc:
+        raise HTTPException(status_code=404)
+    return templates.TemplateResponse(
+        request, "partials/assoc_row.html", {"a": assoc}
+    )
+
+
+@app.post("/admin/associates/{assoc_num}/edit", response_class=HTMLResponse)
+async def admin_assoc_edit_save(
+    request: Request,
+    assoc_num: str,
+    new_assoc_num: str = Form(...),
+    full_name:     str = Form(...),
+    shift:         str = Form(""),
+    is_mst:        str = Form("0"),
+):
+    """Save an edited roster row -- rename, re-number, reassign shift, or
+    flip MST<->tech status all in one go."""
+    global _ROSTER
+    if not _is_lead_authed(request):
+        return HTMLResponse("", status_code=403)
+    if not new_assoc_num.strip() or not full_name.strip():
+        return HTMLResponse(
+            '<p class="text-red-600 text-xs font-semibold p-2">\u26a0\ufe0f Associate # and Name are required.</p>'
+        )
+    db.update_associate(assoc_num, new_assoc_num.strip(), full_name.strip(),
+                        shift.strip(), is_mst=(is_mst == "1"))
+    _ROSTER = db.associates_to_roster()
+    associates = db.get_associates()
+    return templates.TemplateResponse(
+        request, "partials/assoc_list.html", {"associates": associates}
+    )
+
+
 @app.delete("/admin/associates/{assoc_num}", response_class=HTMLResponse)
 async def admin_assoc_delete(request: Request, assoc_num: str):
     global _ROSTER
@@ -2775,13 +3084,22 @@ async def lead_generate(
                 cwo_match = cwo
                 break
 
-        if cwo_match and len(cwo_match.tech_remarks) > 1:
+        # Only split into per-tech sub-bullets when the WO genuinely had
+        # MULTIPLE DIFFERENT technicians contribute (cwo.techs is deduped by
+        # name). A single tech logging several sequential remarks over the
+        # shift must stay on the "else" path below so they're synthesized
+        # into one flowing narrative instead of being rewritten in isolation
+        # -- an isolated one-line remark has no story context, which is
+        # exactly when the model starts inventing connective filler to make
+        # the fragment sound complete.
+        if cwo_match and len(cwo_match.techs) > 1:
             # Multi-tech: one AI call per tech remark -- no asset ID in sub-bullet inputs
             for t_name, remark in cwo_match.tech_remarks:
                 ai_inputs.append(ai_rewriter.build_input("", [remark]))
                 input_meta.append((h_idx, t_name))
         else:
-            # Single-tech: one AI call for all remarks
+            # Single-tech (regardless of remark count): one AI call that
+            # synthesizes every remark into one continuous narrative.
             raw = []
             if cwo_match:
                 raw = [r for r in cwo_match.all_remarks if r and r.strip()]
