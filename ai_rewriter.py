@@ -219,23 +219,35 @@ _ASSET_TYPE_GLOSSARY: dict[str, tuple[str, bool]] = {
 }
 
 
+_CONTEXT_LINE = (
+    "Equipment context (background only, do not repeat this sentence or any"
+    " equipment-category label in the output): {vehicle_note} Refer to it only"
+    " as the asset, it, or whatever word the technician's own remark used.\n"
+)
+
+
 def _asset_type_context(asset_id: str) -> str:
     """Return an 'Equipment context' line for known asset prefixes, or ''.
 
-    This does NOT invent anything the model doesn't already know from the
-    ID prefix -- it just states a fact so the model stops guessing.
+    Deliberately says NOTHING about what kind of machine this is beyond
+    vehicle-or-not -- the fancy equipment name (e.g. "void-fill / autofill
+    packaging machine", set in _ASSET_TYPE_GLOSSARY purely for maintainer
+    reference) is never injected into the prompt, because the model was
+    caught parroting it verbatim into the output instead of just writing
+    "the asset" like a real technician would. All we actually need to stop
+    a hallucination is the yes/no vehicle fact.
     """
     if not asset_id:
         return ""
     upper = asset_id.upper()
-    for prefix, (equip_type, is_vehicle) in _ASSET_TYPE_GLOSSARY.items():
+    for prefix, (_equip_type, is_vehicle) in _ASSET_TYPE_GLOSSARY.items():
         if upper.startswith(prefix):
-            note = (
-                "This is a ride-on vehicle."
+            vehicle_note = (
+                "This asset is a ride-on vehicle."
                 if is_vehicle else
-                "This is NOT a vehicle, car, truck, or forklift -- never call it one."
+                "This asset is NOT a vehicle, car, truck, or forklift -- never call it one."
             )
-            return f"Equipment context: {asset_id} is a {equip_type}. {note}\n"
+            return _CONTEXT_LINE.format(vehicle_note=vehicle_note)
     return (
         "Equipment context: equipment type for this asset is unknown -- do not guess"
         " or invent one (e.g. do not call it a vehicle, car, truck, or forklift).\n"
