@@ -285,11 +285,28 @@ def check_ollama() -> bool:
         return False
 
     models = [m.get("name", "") for m in resp.json().get("models", [])]
+
+    # Re-run model selection now that we KNOW Ollama is reachable.
+    # _detect_best_model() also runs once at import time, but that can fire
+    # before Ollama has finished starting (e.g. fresh boot, before anyone's
+    # logged in to trigger the Ollama startup shortcut) -- in that case
+    # _MODEL is stuck on the hardcoded default forever, even if a perfectly
+    # good model is installed and running by the time we get here. Since we
+    # already have the live model list in hand, redo the selection for free.
+    global _MODEL
+    for candidate in _MODEL_PRIORITY:
+        if any(candidate in m for m in models):
+            _MODEL = candidate
+            break
+
     if not any(_MODEL in m for m in models):
-        print(f"\n{_sep}\n[AI REWRITER] phi4-mini NOT INSTALLED -- run: ollama pull phi4-mini\n{_sep}\n", flush=True)
-        log.warning("[ai_rewriter] phi4-mini not found. Installed: %s", models)
+        tried = ", ".join(_MODEL_PRIORITY)
+        print(f"\n{_sep}\n[AI REWRITER] No usable model installed (tried: {tried})"
+              f" -- run: ollama pull {_MODEL_PRIORITY[-1]}\n{_sep}\n", flush=True)
+        log.warning("[ai_rewriter] No priority model found. Installed: %s", models)
         return False
 
+    print(f"[ai_rewriter] Selected model: {_MODEL}", flush=True)
     print(f"[ai_rewriter] Warming up '{_MODEL}'...", flush=True)
     try:
         _call_ollama("warmup", num_predict=10)
@@ -506,16 +523,33 @@ def _simple_cleanup(text: str) -> str:
     return text
 
 
+# Real asset IDs in this shop are always a single token with no spaces
+# (VOIDFILL0501, CR0010, TRKGATE0001, BLDG...). A remark that happens to
+# contain a natural " / " ("belt / pulley assembly", "power supply / PLC")
+# must NOT be mistaken for an "ASSETID / body" prefix -- that mistake
+# silently deleted the entire first clause of a remark on live testing
+# ("Swapped the belt / pulley assembly..." lost "Swapped the belt" outright).
+_ASSET_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,20}$")
+
+
+def _looks_like_asset_id(candidate: str) -> bool:
+    return bool(_ASSET_ID_PATTERN.match(candidate.strip()))
+
+
 def rewrite(text: str) -> str:
     """Rewrite a single remark. Input via build_input().
     Returns description only (no asset ID prefix). Falls back to original on failure."""
     if not text or not text.strip():
         return text
 
-    # asset_id is only present when the input starts with "ASSETID / "
+    # asset_id is only present when the input starts with "ASSETID / " AND
+    # that prefix actually looks like an asset ID -- not just any text
+    # containing " / " (see _looks_like_asset_id).
     asset_id = ""
     if " / " in text:
-        asset_id = text.split(" / ", 1)[0].strip()
+        candidate = text.split(" / ", 1)[0].strip()
+        if _looks_like_asset_id(candidate):
+            asset_id = candidate
 
     body = text.split(" / ", 1)[1] if asset_id else text
     if " | " not in body and len(body.split()) <= _MIN_WORDS_FOR_AI:
