@@ -92,6 +92,11 @@ Technician Language
 
 Technical Terminology
 9.  Preserve all asset names, component names, and technical terminology exactly as written.
+9a. Never invent, assume, or guess the type or category of equipment being described
+    (examples of forbidden guesses: vehicle, car, truck, forklift, robot, cart).
+    Only use an equipment-type word if it appears in the technician's remark or in an
+    "Equipment context" line provided with the input. If the equipment type is not
+    stated anywhere, refer to it only as "the asset" or by its asset ID -- never guess.
 10. Preserve all directions exactly: Left, Right, Upper, Lower, Front, Rear, Top, Bottom.
 11. Preserve all measurements, work order numbers, fault codes, locations, identifiers,
     quantities, and equipment references exactly.
@@ -180,11 +185,53 @@ _SINGLE_TEMPLATE = (
     " engineering shift passdown entry. If more than one remark is separated by"
     " ' | ', they are sequential entries for the same issue -- synthesize them into"
     " ONE continuous narrative, not a list. Follow all rules exactly."
-    " Output only the rewritten note. Do not include the asset ID.\n"
+    " Output only the rewritten note. Do not include the asset ID anywhere in the output,"
+    " not even mid-sentence -- the report already shows it separately.\n"
+    "{context_block}"
     "---\n"
     "Original: {text}\n"
     "Passdown:"
 )
+
+# Known asset-ID prefixes -> (equipment type, is_a_vehicle).
+# Grounds the model so it never has to *guess* what kind of machine an asset
+# is -- that guessing is exactly what produced "vehicle" for an autofill
+# (Ranpak/void-fill) machine. Extend this list whenever a new asset family
+# shows up in the shop; it costs nothing and prevents a whole class of
+# hallucinated equipment-type words.
+_ASSET_TYPE_GLOSSARY: dict[str, tuple[str, bool]] = {
+    "TAPER":    ("taping machine", False),
+    "VOIDFILL": ("void-fill / autofill packaging machine", False),
+    "AUTOFILL": ("void-fill / autofill packaging machine", False),
+    "BALER":    ("baler", False),
+    "ROBOPAC":  ("stretch wrapping machine", False),
+    "TENNANT":  ("floor scrubber", False),
+    "TSP":      ("stand-up forklift", True),
+    "RC":       ("reach truck", True),
+}
+
+
+def _asset_type_context(asset_id: str) -> str:
+    """Return an 'Equipment context' line for known asset prefixes, or ''.
+
+    This does NOT invent anything the model doesn't already know from the
+    ID prefix -- it just states a fact so the model stops guessing.
+    """
+    if not asset_id:
+        return ""
+    upper = asset_id.upper()
+    for prefix, (equip_type, is_vehicle) in _ASSET_TYPE_GLOSSARY.items():
+        if upper.startswith(prefix):
+            note = (
+                "This is a ride-on vehicle."
+                if is_vehicle else
+                "This is NOT a vehicle, car, truck, or forklift -- never call it one."
+            )
+            return f"Equipment context: {asset_id} is a {equip_type}. {note}\n"
+    return (
+        "Equipment context: equipment type for this asset is unknown -- do not guess"
+        " or invent one (e.g. do not call it a vehicle, car, truck, or forklift).\n"
+    )
 
 # -- HTTP client ---------------------------------------------------------------
 _client: Optional[httpx.Client] = None
@@ -260,12 +307,24 @@ def _call_ollama(prompt: str, timeout: float = _TIMEOUT_SINGLE,
 
 
 def _strip_leading_asset_id(text: str, asset_id: str) -> str:
-    """Safety net: remove asset ID from start of output if AI included it anyway."""
+    """Safety net: remove asset ID anywhere it slipped into the output.
+
+    Handles both a leading prefix ("ASSETID: ...") and the model restating
+    the ID mid-sentence ("During troubleshooting of ASSETID, ...") -- the
+    report already renders the asset ID separately, so any occurrence here
+    is a duplicate. A leading occurrence is dropped outright; a mid-sentence
+    occurrence is swapped for "the asset" so the sentence stays grammatical.
+    """
     if not asset_id:
         return text
-    # Match "ASSETID" or "ASSETID:" or "ASSETID -" at the very start
-    pattern = rf"^{re.escape(asset_id)}\s*[-:/]?\s*"
-    return re.sub(pattern, "", text, flags=re.IGNORECASE).strip()
+    # Leading prefix: "ASSETID" / "ASSETID:" / "ASSETID -" / "ASSETID /"
+    text = re.sub(rf"^{re.escape(asset_id)}\s*[-:/]?\s*", "", text, flags=re.IGNORECASE)
+    # Any remaining mid-sentence mention -> "the asset" (keeps grammar intact)
+    text = re.sub(rf"\b{re.escape(asset_id)}\b", "the asset", text, flags=re.IGNORECASE)
+    # Collapse an accidental "the the asset"
+    text = re.sub(r"(?i)\bthe\s+the asset\b", "the asset", text)
+    text = re.sub(r"  +", " ", text).strip()
+    return text
 
 
 def _clean_output(text: str) -> str:
@@ -387,8 +446,9 @@ def rewrite(text: str) -> str:
     input_words = len(text.split())
     num_predict  = max(180, min(400, input_words * 2))
 
+    context_block = _asset_type_context(asset_id)
     result = _call_ollama(
-        _SINGLE_TEMPLATE.format(text=text, context_block=""),
+        _SINGLE_TEMPLATE.format(text=text, context_block=context_block),
         timeout=_TIMEOUT_SINGLE,
         num_predict=num_predict,
         stop=["---", "\nOriginal:", "\nNote:", "\nExample", "\n\n"],
