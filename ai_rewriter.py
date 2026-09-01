@@ -119,9 +119,13 @@ Multi-Remark Synthesis
      what was tried, what happened as a result, what fixed it, how it was
      verified. Use transition language (Following, After, Once, As a result)
      to show cause-and-effect between remarks instead of just listing facts.
-13c. If only one remark is given, apply the same principle: read the vague or
-     shorthand parts within their surrounding context so the whole entry reads
-     as one coherent account rather than a fragment.
+13c. If only one remark is given, only rephrase the words actually present --
+     fix grammar and tighten wording, nothing more. Do NOT invent additional
+     troubleshooting steps, root causes, parts, or verification that were
+     never stated, even if the remark is very short or feels incomplete.
+     A one-sentence remark must produce a one-sentence passdown entry.
+     Padding a short remark with fabricated detail to sound more complete
+     is strictly forbidden -- it is worse than leaving it short.
 
 Troubleshooting
 14. Preserve the complete troubleshooting sequence in order:
@@ -139,10 +143,9 @@ Troubleshooting
 20. Preserve every recommendation received from Technical Support, Engineering, Controls,
     OEMs, or vendors.
 21. Preserve cause-and-effect relationships. Never remove statements explaining why the
-    next troubleshooting step occurred.
-    Example: Following calibration, the asset continued crushing boxes during operation.
-    Technical Support was contacted. Technical Support recommended troubleshooting the X6
-    photo eye. X6 photo eye inspected.
+    next troubleshooting step occurred. Use transition language (Following, After,
+    As a result) to connect steps that were actually described -- never invent a
+    cause, a next step, a part, or an escalation that the technician did not state.
 
 Operational Status
 22. Only state operational status when explicitly supported by the technician's remarks.
@@ -206,8 +209,13 @@ _ASSET_TYPE_GLOSSARY: dict[str, tuple[str, bool]] = {
     "BALER":    ("baler", False),
     "ROBOPAC":  ("stretch wrapping machine", False),
     "TENNANT":  ("floor scrubber", False),
+    "SCRUB":    ("floor scrubber", False),
     "TSP":      ("stand-up forklift", True),
     "RC":       ("reach truck", True),
+    "CR":       ("reach truck", True),
+    "PERCART":  ("personnel cart", True),
+    "TRKGATE":  ("dock/truck gate -- stationary equipment, not a vehicle", False),
+    "BLDG":     ("building/facility -- not a piece of mobile equipment", False),
 }
 
 
@@ -430,6 +438,26 @@ def build_input(asset_id: str, remarks: list[str]) -> str:
     return f"{asset_id} / {body}"
 
 
+# Local models reliably "pad" very short single remarks with fabricated detail
+# to sound more complete (proven live: "Load paper" -> invented paper jams,
+# "Misalignment of conveyor sensor." -> invented Technical Support escalations
+# that never happened). Below this word count, for a single remark, skip the
+# AI entirely and use deterministic cleanup -- there's no safe way to prompt
+# a small local model out of this behavior, so don't give it the chance.
+_MIN_WORDS_FOR_AI = 8
+
+
+def _simple_cleanup(text: str) -> str:
+    """Deterministic, zero-fabrication cleanup for very short remarks."""
+    text = text.strip()
+    if not text:
+        return text
+    text = text[0].upper() + text[1:]
+    if text[-1] not in ".!?":
+        text += "."
+    return text
+
+
 def rewrite(text: str) -> str:
     """Rewrite a single remark. Input via build_input().
     Returns description only (no asset ID prefix). Falls back to original on failure."""
@@ -440,6 +468,10 @@ def rewrite(text: str) -> str:
     asset_id = ""
     if " / " in text:
         asset_id = text.split(" / ", 1)[0].strip()
+
+    body = text.split(" / ", 1)[1] if asset_id else text
+    if " | " not in body and len(body.split()) <= _MIN_WORDS_FOR_AI:
+        return _simple_cleanup(body)
 
     # Give longer inputs more room -- rough heuristic: 1 token ≈ 4 chars.
     # Cap at 400 so we never blow up on garbage input.
