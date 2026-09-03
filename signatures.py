@@ -118,10 +118,41 @@ _FALLBACK = (
 )
 
 
+def _generic_signature(display_name: str) -> str:
+    """Build a signature block for anyone NOT in the hand-customized _SIGS
+    dict above. Every person who logs into the lead dashboard and starts a
+    shift gets their own real name on the signature -- MST, tech, whoever
+    started it (see db.start_shift's opened_by_role) -- never a nameless
+    'IND3 Maintenance Team' fallback just because they aren't one of the
+    handful of people who happened to get a bespoke block made for them.
+    """
+    return (
+        "<div style='font-family:Calibri,Arial,sans-serif;margin-top:24px;"
+        "padding-top:14px;border-top:1px solid #d1d5db;line-height:1.5;'>"
+        f"<p style='margin:0;font-size:15px;font-weight:700;color:#4da6ff;'>"
+        f"{display_name}</p>"
+        "<p style='margin:2px 0;font-size:14px;font-weight:700;color:#4da6ff;'>"
+        "IND3 Maintenance Team &nbsp;&bull;&nbsp; eCommerce Fulfillment Center #8972</p>"
+        f"<p style='margin:4px 0;font-size:13px;color:#374151;'>{_ADDR}</p>"
+        f"<p style='margin:10px 0 0;'>{_WM_LOGO}</p>"
+        "</div>"
+    )
+
+
 def get_signature_html(lead_name: str) -> str:
     """Return the HTML signature block for the given lead name.
-    Matches case-insensitively on first name.
-    Falls back to a generic IND3 block if no match found.
+
+    A few individuals have their own hand-customized block above (_SIGS,
+    matched case-insensitively on first name) -- those are kept as-is.
+    Everyone else gets a generic-but-personalized block built from their
+    actual name, regardless of role (MST, tech, whoever started the
+    shift). Only a genuinely blank name falls back to the fully generic,
+    nameless block.
     """
-    first = lead_name.strip().split()[0].lower() if lead_name.strip() else ""
-    return _SIGS.get(first, _FALLBACK)
+    name  = lead_name.strip()
+    first = name.split()[0].lower() if name else ""
+    if first in _SIGS:
+        return _SIGS[first]
+    if name:
+        return _generic_signature(name)
+    return _FALLBACK
