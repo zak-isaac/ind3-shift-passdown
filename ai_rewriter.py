@@ -73,8 +73,17 @@ Core Rules
 Technician Language
 6. Remove all first-person language.
    I replaced -> Replaced | We adjusted -> Adjusted | I noticed -> Found | I checked -> Inspected
+   We may need X -> X may be needed | We might have to -> It may be necessary to
+6a. Never invent a subject noun to replace the removed pronoun. Do NOT write
+    "Technician replaced", "The technician found", "Tech adjusted", "MST inspected",
+    or "Associate noticed" -- these are just as wrong as leaving "I" or "We" in.
+    Go straight to the action verb with no subject at all, exactly like the
+    examples in rule 6 (Replaced / Adjusted / Found / Inspected).
+    This applies everywhere in the output, not just the first sentence --
+    a remark with several sentences must never introduce a human subject
+    partway through either.
 7. When a remark begins with "Assisted with" or "Assisting with", remove the participation
-   wording and rewrite only the completed maintenance action.
+    wording and rewrite only the completed maintenance action.
    Never use: Assisted, Accomplished, Participated, Helped, Supported.
    Assisting with calibration of the Fill Head -> Fill Head calibrated.
    Assisted with deinstalling the old light -> Old flickering light deinstalled.
@@ -400,6 +409,26 @@ def _strip_invented_component_labels(output: str, original: str) -> str:
     return output
 
 
+# Rule 6/6a say never insert a human-subject noun in place of the removed
+# "I"/"We" -- but the model doesn't always comply (this is the exact bug
+# reported live: "Technician adjusted...", "Technician observed..."). This
+# is a deterministic safety net, same pattern as the scrubber above: catch
+# it at the start of the output OR right after any sentence boundary, not
+# just the very first word.
+_INVENTED_SUBJECT_PATTERN = re.compile(
+    r"(?:^|(?<=[.!?]\s))(?:the\s+)?(?:technician|tech|mst|associate)\s+(\w+)",
+    re.IGNORECASE,
+)
+
+
+def _strip_technician_subject(text: str) -> str:
+    """Remove an invented "Technician/Tech/MST/Associate <verb>" subject
+    and go straight to the verb, matching the subject-free style the
+    prompt already asks for everywhere else (rule 6 examples).
+    """
+    return _INVENTED_SUBJECT_PATTERN.sub(lambda m: m.group(1).capitalize(), text)
+
+
 def _clean_output(text: str) -> str:
     """Strip informal phrases and fix formatting the model sometimes adds."""
     import re as _re
@@ -575,6 +604,7 @@ def rewrite(text: str) -> str:
         return re.sub(r"\s*\|\s*", "; ", fallback)
     cleaned = _clean_output(_strip_leading_asset_id(result, asset_id))
     cleaned = _strip_invented_component_labels(cleaned, text)
+    cleaned = _strip_technician_subject(cleaned)
     # AI signals "nothing worth reporting" with a bare dash
     if cleaned.strip() in ("-", "--", ""):
         return ""
