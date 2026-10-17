@@ -60,6 +60,7 @@ class ConsolidatedWO:
     raw_entry_ids: list[int]
     entry_count: int
     conflicting: bool = False   # resolved KW AND ongoing KW both found
+    possible_duplicate: bool = False  # two remarks look like the same work restated
 
 
 @dataclass
@@ -67,6 +68,27 @@ class ConsolidationResult:
     """Full output of consolidate_entries()."""
     consolidated: list[ConsolidatedWO]  # one per WO, sorted by first_logged
     passthrough: list[dict]             # entries with empty wo_number (untouched)
+
+
+def has_real_remarks(cwo: ConsolidatedWO) -> bool:
+    """True if a technician actually wrote something for this WO.
+
+    False means all_remarks is empty and cwo.summary is OUR OWN synthetic
+    placeholder from _build_wo ("WO #X worked on by Y. No remarks
+    recorded."), not real technician content.
+
+    Callers (main.py's /lead/generate) must NEVER hand that placeholder to
+    the AI rewriter: it has nothing real to rewrite, so it fabricates a
+    narrative to fill the gap instead. Proven live 2026-09-17: WO#27815641
+    (TRKGATE0002) had zero remarks, and "No remarks recorded" came back
+    from the model as an invented "gate was serviced... no further
+    observations... following our engineer Isaac S.'s intervention" --
+    complete with the tech's real name folded into fabricated prose. The
+    placeholder is 10 words, comfortably over ai_rewriter._MIN_WORDS_FOR_AI
+    (8), so word-count alone does not catch this -- it must be checked
+    explicitly, here, at the source of truth for "is there real content".
+    """
+    return bool(cwo.all_remarks)
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
@@ -105,6 +127,34 @@ def _detect_conflict(remarks: list[str]) -> bool:
     return has_resolved and has_ongoing
 
 
+# Time window for flagging "these remarks might overlap" -- deliberately
+# a purely TIME-based signal, not text-similarity based. A character/word
+# similarity approach was tried first and immediately proven unreliable by
+# its own tests: it flagged "replaced belt on left side" vs "...right
+# side" as near-duplicates (dangerous false positive -- that's real,
+# different work) while MISSING an actual near-duplicate case, because a
+# single word swap that completely changes meaning scores just as
+# "similar" as two remarks restating the same thing. Timestamp proximity
+# can't misjudge content -- it just tells the lead "two check-ins landed
+# within N minutes of each other on this WO, might be worth a glance" and
+# lets them read the actual words, which they'd have to do anyway.
+_POSSIBLE_DUP_WINDOW_MINUTES = 15
+
+
+def _detect_possible_duplicates(times: list[datetime]) -> bool:
+    """True if any two (already-deduped) remarks for this WO were logged
+    within _POSSIBLE_DUP_WINDOW_MINUTES of each other. Never inspects
+    remark text -- see module comment above for why content-similarity
+    was rejected.
+    """
+    for i in range(len(times)):
+        for j in range(i + 1, len(times)):
+            delta = abs((times[i] - times[j]).total_seconds())
+            if delta <= _POSSIBLE_DUP_WINDOW_MINUTES * 60:
+                return True
+    return False
+
+
 def _collect_remarks(entry: dict) -> list[str]:
     """Pull remarks out of an entry, falling back to issue text for manual entries."""
     raw: list[str] = []
@@ -140,12 +190,16 @@ def _build_wo(wo_number: str, group: list[dict]) -> ConsolidatedWO:
             techs.append(name)
 
     # Collect all remarks across every entry, then dedup
-    # Also keep per-tech pairing for sub-point display
+    # Also keep per-tech pairing for sub-point display, and each unique
+    # remark's logging time (for the timestamp-proximity duplicate check --
+    # see _detect_possible_duplicates()).
     all_raw: list[str] = []
     tech_remarks: list[tuple[str, str]] = []
+    remark_times: list[datetime] = []
     seen_tr: set[str] = set()
     for e in group:
         t_name   = (e.get("tech_name") or "Unknown").strip()
+        e_time   = _parse_dt(e.get("created_at", ""))
         remarks  = _collect_remarks(e)
         all_raw.extend(remarks)
         for r in remarks:
@@ -153,6 +207,7 @@ def _build_wo(wo_number: str, group: list[dict]) -> ConsolidatedWO:
             if key and key not in seen_tr:
                 seen_tr.add(key)
                 tech_remarks.append((t_name, r.strip()))
+                remark_times.append(e_time)
     all_remarks = _dedup_remarks(all_raw)
 
     # Summary: smart-concat the deduped remarks; guarantee non-empty string
@@ -175,6 +230,7 @@ def _build_wo(wo_number: str, group: list[dict]) -> ConsolidatedWO:
         raw_entry_ids= [e["id"] for e in group],
         entry_count  = len(group),
         conflicting  = _detect_conflict(all_remarks),
+        possible_duplicate = _detect_possible_duplicates(remark_times),
     )
 
 
@@ -224,25 +280,38 @@ def consolidate_entries(entries: list[dict]) -> ConsolidationResult:
 def consolidated_to_happenings(
     result: ConsolidationResult,
     wo_prefix_re: re.Pattern | None = None,
+    cause_lookup: dict[str, str] | None = None,
 ) -> list[dict]:
     """Convert a ConsolidationResult into a list of plain dicts suitable for
     building RewrittenHappening objects in both the lead_generate and
     shift_end report paths.
 
     Each dict has keys: title, paragraph, wo_number, tech_name, conflicting
+
+    cause_lookup: optional {wo_number: cause_text} from a separate Cetaris
+    "cause" export (see cause_lookup.py), joined in by WO Number. When a
+    match exists, title becomes "AssetID- Cause text" instead of just
+    "AssetID" -- everything else (summary, grouping, etc.) is untouched, and
+    behavior is 100% identical to before whenever no cause file is uploaded.
     """
     out: list[dict] = []
+    cause_lookup = cause_lookup or {}
 
     for wo in result.consolidated:
         tech_str = ", ".join(wo.techs) if wo.techs else ""
-        conflict_note = " [⚠ Conflicting notes — verify status]" if wo.conflicting else ""
+        conflict_note = " [ Conflicting notes — verify status]" if wo.conflicting else ""
+        dup_note = " [ Possible duplicate remarks — verify these describe separate work]" if wo.possible_duplicate else ""
+        asset_title = wo.asset_id or f"WO #{wo.wo_number}"
+        cause = cause_lookup.get(wo.wo_number, "")
+        title = f"{asset_title}- {cause}" if cause else asset_title
         out.append({
-            "title":      wo.asset_id or f"WO #{wo.wo_number}",
-            "paragraph":  wo.summary + conflict_note,
+            "title":      title,
+            "paragraph":  wo.summary + conflict_note + dup_note,
             "all_remarks": wo.all_remarks,          # raw remarks for direct AI input
             "wo_number":  wo.wo_number,
             "tech_name":  tech_str,
             "conflicting": wo.conflicting,
+            "possible_duplicate": wo.possible_duplicate,
         })
 
     for e in result.passthrough:

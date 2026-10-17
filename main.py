@@ -38,7 +38,9 @@ from formatter import format_html_preview, format_email, format_email_passdown, 
 from rewriter import rewrite_all
 import ai_rewriter
 from cetaris_parser import parse_cetaris, ParseResult
+import cause_lookup
 from summarizer import summarize_remarks
+import spelling_fix
 from exporters import export_docx, export_pdf
 
 
@@ -822,7 +824,10 @@ async def shift_end(request: Request, shift_id: int = Form(...)):
         from wo_consolidator import consolidate_entries, consolidated_to_happenings
         raw_entries   = db.get_entries(shift_id)
         co_result     = consolidate_entries(raw_entries)
-        co_happenings = consolidated_to_happenings(co_result, wo_prefix_re=_WO_PREFIX_RE)
+        co_happenings = consolidated_to_happenings(
+            co_result, wo_prefix_re=_WO_PREFIX_RE,
+            cause_lookup=db.get_wo_causes(shift_id),
+        )
         happenings_input = [
             HappeningInput(
                 title=h["title"],
@@ -837,6 +842,7 @@ async def shift_end(request: Request, shift_id: int = Form(...)):
             lead_name=shift["lead_name"],
             dc_number=DC_NUMBER,
             happenings=rewritten,
+            shift_notes=db.get_shift_notes(shift_id),
         )
         content = format_email(email_data)
         db.save_report(shift_id, content, email_data.model_dump_json())
@@ -1043,78 +1049,102 @@ async def tech_delete_entry(
 async def _process_cmms_upload(
     request: Request,
     shift_id: int,
-    file: UploadFile,
+    files: list[UploadFile],
     uploader_name: str = "CMMS Import",
     include_entries_oob: bool = False,
 ) -> HTMLResponse:
-    """Shared logic for both tech and lead CMMS CSV uploads."""
+    """Shared logic for both tech and lead CMMS CSV uploads.
+
+    Accepts one or more files (tech dashboard supports multi-select) --
+    each is parsed and imported in turn, then results are combined into a
+    single response so the UI shows one consolidated summary instead of
+    one banner per file.
+    """
     import json as _json
 
     shift = db.get_shift(shift_id)
     if not shift:
         return HTMLResponse(
-            '<p class="text-red-500 text-sm font-semibold p-3">❌ Shift not found.</p>',
+            '<p class="text-red-500 text-sm font-semibold p-3"> Shift not found.</p>',
             status_code=404,
         )
 
-    if not file.filename or not file.filename.lower().endswith((".csv", ".xlsx", ".xls")):
+    valid_files = [f for f in files if f.filename and f.filename.lower().endswith((".csv", ".xlsx", ".xls"))]
+    bad_file_count = len(files) - len(valid_files)
+    if not valid_files:
         return HTMLResponse(
-            '<p class="text-red-500 text-sm font-semibold p-3">❌ Please upload a CSV or Excel file exported from Cetaris.</p>',
+            '<p class="text-red-500 text-sm font-semibold p-3"> Please upload a CSV or Excel file exported from Cetaris.</p>',
             status_code=400,
         )
 
-    content = await file.read()
-    result: ParseResult = parse_cetaris(content)
-    work_orders          = result.work_orders
-    skipped              = result.skipped
-    pm_count             = result.pm_count
-    pm_wos               = result.pm_wo_numbers
-    manager_task_count   = result.manager_task_count
+    imported: list[dict] = []
+    skipped = 0
+    pm_wos: list[str] = []
+    skipped_unchanged = 0
+    cause_wos: list[str] = []  # WO numbers newly linked from a cause file
 
-    if not work_orders and pm_count == 0 and manager_task_count == 0:
+    for f in valid_files:
+        content = await f.read()
+
+        # Cause/repair-description export (WO Number + Repair Description) --
+        # separate file type from the timecard export. Detected by header
+        # shape so it never gets routed through parse_cetaris(). Just joins
+        # by WO Number and stores the text; doesn't touch entries/pm_wos.
+        if cause_lookup.looks_like_cause_file(content):
+            causes = cause_lookup.parse_cause_file(content)
+            for wo_number, cause_text in causes.items():
+                db.upsert_wo_cause(shift_id=shift_id, wo_number=wo_number, cause_text=cause_text)
+            cause_wos.extend(causes.keys())
+            continue
+
+        result: ParseResult = parse_cetaris(content)
+        skipped += result.skipped
+        pm_wos.extend(result.pm_wo_numbers)
+
+        for wo in result.work_orders:
+            # Fetch the existing entry for THIS tech + WO in one call --
+            # reflects whatever the previous file in this same batch just
+            # wrote, so remarks correctly accumulate across files too.
+            existing_entry   = db.get_cmms_entry(shift_id, wo.wo_number, uploader_name)
+            existing_remarks: list[str] = []
+            if existing_entry:
+                try:
+                    existing_remarks = _json.loads(existing_entry.get("raw_remarks", "[]"))
+                except (ValueError, TypeError):
+                    existing_remarks = []
+
+            merged_remarks = list(dict.fromkeys(existing_remarks + wo.remarks))
+
+            # Nothing new — preserve the original entry and timestamp untouched
+            if existing_entry and merged_remarks == existing_remarks:
+                skipped_unchanged += 1
+                imported.append({
+                    "wo": wo.wo_number,
+                    "asset": wo.asset_id,
+                    "summary": existing_entry.get("issue", ""),
+                    "unchanged": True,
+                })
+                continue
+
+            summary = await summarize_remarks(merged_remarks)
+            summary = spelling_fix.correct_spelling(summary)
+            db.upsert_cmms_entry(
+                shift_id=shift_id,
+                wo_number=wo.wo_number,
+                asset_id=wo.asset_id,
+                summary=summary,
+                raw_remarks_json=_json.dumps(merged_remarks),
+                tech_name=uploader_name,
+            )
+            imported.append({"wo": wo.wo_number, "asset": wo.asset_id, "summary": summary, "unchanged": False})
+
+    if not imported and not pm_wos and not cause_wos:
         return templates.TemplateResponse(
             request, "partials/cmms_import_result.html",
-            {"imported": [], "skipped": skipped, "pm_count": 0,
-             "manager_task_count": 0,
+            {"imported": [], "skipped": skipped, "pm_count": 0, "cause_count": 0,
              "error": "No reliability work orders found in this file.",
              "include_entries_oob": False},
         )
-
-    imported = []
-    skipped_unchanged = 0
-    for wo in work_orders:
-        # Fetch the existing entry for THIS tech + WO in one call
-        existing_entry   = db.get_cmms_entry(shift_id, wo.wo_number, uploader_name)
-        existing_remarks: list[str] = []
-        if existing_entry:
-            try:
-                existing_remarks = _json.loads(existing_entry.get("raw_remarks", "[]"))
-            except (ValueError, TypeError):
-                existing_remarks = []
-
-        merged_remarks = list(dict.fromkeys(existing_remarks + wo.remarks))
-
-        # Nothing new — preserve the original entry and timestamp untouched
-        if existing_entry and merged_remarks == existing_remarks:
-            skipped_unchanged += 1
-            imported.append({
-                "wo": wo.wo_number,
-                "asset": wo.asset_id,
-                "summary": existing_entry.get("issue", ""),
-                "unchanged": True,
-            })
-            continue
-
-        summary = await summarize_remarks(merged_remarks)
-        db.upsert_cmms_entry(
-            shift_id=shift_id,
-            wo_number=wo.wo_number,
-            asset_id=wo.asset_id,
-            summary=summary,
-            raw_remarks_json=_json.dumps(merged_remarks),
-            tech_name=uploader_name,
-        )
-        imported.append({"wo": wo.wo_number, "asset": wo.asset_id, "summary": summary, "unchanged": False})
 
     # Track PM WOs silently — deduplicated by UNIQUE constraint in DB
     for wo_num in pm_wos:
@@ -1135,7 +1165,7 @@ async def _process_cmms_upload(
             "skipped":             skipped,
             "skipped_unchanged":   skipped_unchanged,
             "pm_count":            pm_count,
-            "manager_task_count":  manager_task_count,
+            "cause_count":         len(set(cause_wos)),
             "error":               "",
             "include_entries_oob": include_entries_oob,
             "entries":             entries,
@@ -1149,19 +1179,20 @@ async def _process_cmms_upload(
 async def tech_cmms_upload(
     request: Request,
     shift_id: int  = Form(...),
-    file: UploadFile = File(...),
+    files: list[UploadFile] = File(...),
 ):
-    """Tech dashboard CMMS CSV upload endpoint."""
+    """Tech dashboard CMMS CSV upload endpoint. Accepts one or more files
+    selected at once -- results are combined into a single summary."""
     assoc_code = request.cookies.get(_TECH_ASSOC_COOKIE, "")
     assoc = _ROSTER.get(assoc_code) if assoc_code else None
     if not assoc:
         return HTMLResponse(
-            '<p class="text-red-500 text-sm font-semibold p-3">❌ Session expired. Please sign in again.</p>',
+            '<p class="text-red-500 text-sm font-semibold p-3">Session expired. Please sign in again.</p>',
             status_code=401,
         )
     uploader_name = assoc.get("display_name") or assoc.get("full_name", "CMMS Import")
     return await _process_cmms_upload(
-        request, shift_id, file,
+        request, shift_id, files,
         uploader_name=uploader_name,
         include_entries_oob=True,
     )
@@ -1179,7 +1210,7 @@ async def lead_cmms_upload(
     shift = db.get_shift(shift_id)
     uploader_name = f"{shift['lead_name']} (MST)" if shift else "MST Import"
     return await _process_cmms_upload(
-        request, shift_id, file,
+        request, shift_id, [file],
         uploader_name=uploader_name,
         include_entries_oob=False,
     )
@@ -2024,8 +2055,7 @@ def _render_pm_section(shift_id: int) -> str:
     if not rows:
         table_html = ""
     else:
-        from datetime import date as _dt
-        today = _dt.today().strftime("%m/%d/%Y")
+        from pm_table_style import pm_zebra_hex
         th = "px-3 py-2 text-left text-xs font-bold text-white uppercase bg-wm-blue"
         td = "px-3 py-2 text-xs text-gray-800"
         hdr = (
@@ -2034,14 +2064,14 @@ def _render_pm_section(shift_id: int) -> str:
             f'<th class="{th}">WO Date</th></tr>'
         )
         body = "".join(
-            f'<tr style="{"background:#fef08a;" if today in r["pm_due_date"] else ""}" class="border-b border-gray-100 last:border-0">'
+            f'<tr style="background:#{pm_zebra_hex(i)};" class="border-b border-gray-100 last:border-0">'
             f'<td class="{td} font-mono">{r["wo_number"]}</td>'
             f'<td class="{td} font-semibold">{r["asset_num"]}</td>'
             f'<td class="{td} font-bold">{r["pm_due_date"]}</td>'
             f'<td class="{td}">{r["promise_date"]}</td>'
             f'<td class="{td} text-gray-500">{r["wo_date"]}</td>'
             f'</tr>'
-            for r in rows
+            for i, r in enumerate(rows)
         )
         table_html = (
             f'<div class="mt-3 overflow-x-auto rounded-lg border border-gray-200">'
@@ -3060,10 +3090,13 @@ async def lead_generate(
     # ── Pull FRESH entries and consolidate duplicate WOs ──────────────────
     # Same WO from multiple techs → one merged block with all remarks + tech list.
     # Raw rows are never deleted; consolidation is view-only.
-    from wo_consolidator import consolidate_entries, consolidated_to_happenings, ConsolidatedWO
+    from wo_consolidator import consolidate_entries, consolidated_to_happenings, ConsolidatedWO, has_real_remarks
     db_entries  = db.get_entries(shift_id)
     co_result   = consolidate_entries(db_entries)   # handles excluded filter internally
-    co_happenings = consolidated_to_happenings(co_result, wo_prefix_re=_WO_PREFIX_RE)
+    co_happenings = consolidated_to_happenings(
+        co_result, wo_prefix_re=_WO_PREFIX_RE,
+        cause_lookup=db.get_wo_causes(shift_id),
+    )
 
     # Optional: upgrade merged summaries via Element LLM if key is configured
     from summarizer import summarize_remarks as _summarize, _ELEMENT_API_KEY as _EL_KEY
@@ -3071,9 +3104,11 @@ async def lead_generate(
     # Build passdown notes using the rule-based cleaner (deterministic, instant,
     # zero hallucinations). AI rewriting was removed -- phi4-mini was too small
     # Build AI inputs and track per-tech remarks for multi-tech WOs
-    ai_inputs: list[str] = []          # flat list: one entry per remark
+    ai_inputs: list[str] = []          # flat list: one entry per remark needing AI
     # (happening_idx, tech_name, is_sub) so we can reconstruct sub_points
     input_meta: list[tuple[int, str]] = []
+    ai_positions: list[int] = []        # position in input_meta -> position in ai_inputs
+    no_ai_positions: dict[int, str] = {}  # position in input_meta -> final text (AI bypassed)
 
     for h_idx, h in enumerate(co_happenings):
         title    = h["title"]
@@ -3084,31 +3119,47 @@ async def lead_generate(
                 cwo_match = cwo
                 break
 
-        # Only split into per-tech sub-bullets when the WO genuinely had
-        # MULTIPLE DIFFERENT technicians contribute (cwo.techs is deduped by
-        # name). A single tech logging several sequential remarks over the
-        # shift must stay on the "else" path below so they're synthesized
-        # into one flowing narrative instead of being rewritten in isolation
-        # -- an isolated one-line remark has no story context, which is
-        # exactly when the model starts inventing connective filler to make
-        # the fragment sound complete.
-        if cwo_match and len(cwo_match.techs) > 1:
-            # Multi-tech: one AI call per tech remark -- no asset ID in sub-bullet inputs
-            for t_name, remark in cwo_match.tech_remarks:
-                ai_inputs.append(ai_rewriter.build_input("", [remark]))
-                input_meta.append((h_idx, t_name))
-        else:
-            # Single-tech (regardless of remark count): one AI call that
-            # synthesizes every remark into one continuous narrative.
-            raw = []
-            if cwo_match:
-                raw = [r for r in cwo_match.all_remarks if r and r.strip()]
-            if not raw:
-                raw = [fallback]
-            ai_inputs.append(ai_rewriter.build_input(title, raw))
-            input_meta.append((h_idx, h.get("tech_name", "")))
+        # Always synthesize every remark for this WO into ONE continuous
+        # narrative, whether it's one technician or several. Multi-tech WOs
+        # used to get one isolated AI call per tech (separate sub-bullets),
+        # which produced redundant, repeated-fact sentences when two techs
+        # described the same work ("Replaced brush on motor 4... / Installed
+        # a new brush for the motor..."). Rule 13b in ai_rewriter.py now
+        # explicitly forbids inventing connective tissue/outcomes during
+        # synthesis, so the hallucination risk that justified the old split
+        # is covered -- merging is safe and reads far better.
+        # cwo_match.all_remarks is already a deduped union across all techs.
+        raw = []
+        if cwo_match:
+            raw = [r for r in cwo_match.all_remarks if r and r.strip()]
 
-    rewritten_flat = await asyncio.to_thread(ai_rewriter.rewrite_batch, ai_inputs)
+        pos = len(input_meta)
+        input_meta.append((h_idx, h.get("tech_name", "")))
+
+        if not cwo_match or not has_real_remarks(cwo_match):
+            # No real technician remarks exist for this WO -- `fallback` is
+            # OUR OWN synthetic placeholder (wo_consolidator._build_wo's
+            # "WO #X worked on by Y. No remarks recorded."), not something a
+            # technician actually wrote. Feeding synthetic filler to the AI
+            # gives it nothing real to rewrite, so it fabricates a narrative
+            # to fill the gap -- proven live 2026-09-17: "No remarks
+            # recorded" for TRKGATE0002/WO#27815641 became an invented "gate
+            # was serviced... no further observations... following our
+            # engineer Isaac S.'s intervention", complete with the tech's
+            # real name folded into fabricated prose. The 10-word placeholder
+            # is long enough to sail past _MIN_WORDS_FOR_AI, so word-count
+            # alone doesn't catch this -- it must be skipped explicitly.
+            no_ai_positions[pos] = fallback
+        else:
+            ai_positions.append(pos)
+            ai_inputs.append(ai_rewriter.build_input(title, raw))
+
+    ai_results  = await asyncio.to_thread(ai_rewriter.rewrite_batch, ai_inputs)
+    rewritten_flat: list[str] = [""] * len(input_meta)
+    for pos, result in zip(ai_positions, ai_results):
+        rewritten_flat[pos] = result
+    for pos, text in no_ai_positions.items():
+        rewritten_flat[pos] = text
 
     # Reconstruct per-happening with sub_points for multi-tech
     from collections import defaultdict, OrderedDict
@@ -3175,6 +3226,7 @@ async def lead_generate(
         ro=[r.strip() for r in ro_item if r.strip()],
         rts=rts_clean,
         oos=[OosUnit(unit=u) for u in oos_units],
+        shift_notes=db.get_shift_notes(shift_id),
     )
 
     email_text   = format_email(data)

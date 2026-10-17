@@ -3,7 +3,7 @@
   <span class="text-red-500 text-lg shrink-0">&#9888;&#65039;</span>
   <p class="text-red-700 text-sm font-semibold">{{ error }}</p>
 </div>
-{% elif imported or pm_count or manager_task_count %}
+{% elif imported or pm_count or cause_count %}
 
 {% set new_count       = imported | selectattr('unchanged', 'equalto', false) | list | length %}
 {% set unchanged_count = imported | selectattr('unchanged', 'defined') | selectattr('unchanged') | list | length %}
@@ -26,8 +26,8 @@
       {% if pm_count %}
       <p class="text-indigo-700 font-semibold text-sm">&#128295; {{ pm_count }} PM{{ 's' if pm_count != 1 else '' }} completed this shift</p>
       {% endif %}
-      {% if manager_task_count %}
-      <p class="text-slate-600 font-semibold text-sm">&#128203; {{ manager_task_count }} Manager Task{{ 's' if manager_task_count != 1 else '' }} excluded</p>
+      {% if cause_count %}
+      <p class="text-purple-700 font-semibold text-sm">&#128269; {{ cause_count }} cause description{{ 's' if cause_count != 1 else '' }} linked by WO Number</p>
       {% endif %}
       {% if skipped and skipped > 0 %}
       <p class="text-gray-400 text-xs">{{ skipped }} indirect labor rows skipped</p>
@@ -59,13 +59,6 @@
   <div class="bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 flex items-center gap-2">
     <span class="text-indigo-600 text-sm">&#128295;</span>
     <p class="text-indigo-700 text-xs font-semibold">{{ pm_count }} PM WO{{ 's' if pm_count != 1 else '' }} counted for this shift. Not listed individually.</p>
-  </div>
-  {% endif %}
-
-  {% if manager_task_count %}
-  <div class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 flex items-center gap-2">
-    <span class="text-slate-500 text-sm">&#128203;</span>
-    <p class="text-slate-600 text-xs font-semibold">{{ manager_task_count }} Manager Task WO{{ 's' if manager_task_count != 1 else '' }} excluded from happenings.</p>
   </div>
   {% endif %}
 

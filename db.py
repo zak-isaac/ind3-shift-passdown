@@ -2,14 +2,24 @@
 
 DB_PATH is set at startup by main.py via set_db_path() so each facility
 gets its own isolated SQLite file under dbs/{slug}.db.
+
+Dev/Test mode (see main.py's /dev/* routes) uses a contextvar to swap in a
+completely separate sandbox DB file (dbs/_devtest.db) for the duration of a
+request -- this guarantees test traffic can NEVER leak into the real
+production shift, even under concurrent requests, without threading a
+db-path parameter through every single function in this file.
 """
 import sqlite3
+from contextvars import ContextVar
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 # Overridden at startup — do NOT import this directly; use _conn()
 _DB_PATH = Path(__file__).parent / "passdowns.db"
+
+# Per-request override for dev/test-mode sandboxing. None = use _DB_PATH.
+_DB_PATH_OVERRIDE: ContextVar[Optional[Path]] = ContextVar("_DB_PATH_OVERRIDE", default=None)
 
 
 def set_db_path(path: Path) -> None:
@@ -19,11 +29,43 @@ def set_db_path(path: Path) -> None:
 
 
 def get_db_path() -> Path:
-    return _DB_PATH
+    return _DB_PATH_OVERRIDE.get() or _DB_PATH
+
+
+def is_sandboxed() -> bool:
+    """True when the current request is running against the dev/test sandbox
+    DB rather than the real facility DB. Callers use this to suppress
+    side-effects that shouldn't leak into production (WebSocket pushes to
+    live MST dashboards, Teams notifications, outbound email, etc.).
+    """
+    return _DB_PATH_OVERRIDE.get() is not None
+
+
+def use_sandbox_db(path: Path):
+    """Context manager -- route all db.* calls inside the `with` block at a
+    sandbox SQLite file instead of the real one. Used exclusively by the
+    /dev/* test-mode routes in main.py. Safe under concurrent requests
+    because ContextVar is request/task-scoped, not global mutable state.
+    """
+    return _SandboxDb(path)
+
+
+class _SandboxDb:
+    def __init__(self, path: Path):
+        self._path = path
+        self._token = None
+
+    def __enter__(self):
+        self._token = _DB_PATH_OVERRIDE.set(self._path)
+        return self
+
+    def __exit__(self, *exc):
+        _DB_PATH_OVERRIDE.reset(self._token)
+        return False
 
 
 def _conn() -> sqlite3.Connection:
-    c = sqlite3.connect(_DB_PATH)
+    c = sqlite3.connect(get_db_path())
     c.row_factory = sqlite3.Row
     return c
 
@@ -145,6 +187,17 @@ def init_db() -> None:
         """)
 
         c.execute("""
+            CREATE TABLE IF NOT EXISTS wo_causes (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                shift_id   INTEGER NOT NULL REFERENCES shifts(id),
+                wo_number  TEXT    NOT NULL,
+                cause_text TEXT    NOT NULL DEFAULT '',
+                created_at TEXT    NOT NULL,
+                UNIQUE(shift_id, wo_number)
+            )
+        """)
+
+        c.execute("""
             CREATE TABLE IF NOT EXISTS associates (
                 assoc_num    TEXT PRIMARY KEY,
                 full_name    TEXT NOT NULL,
@@ -167,6 +220,14 @@ def init_db() -> None:
             c.execute("ALTER TABLE shifts ADD COLUMN loto_verified INTEGER NOT NULL DEFAULT 0")
         if "loto_missing_keys" not in existing_shift_cols:
             c.execute("ALTER TABLE shifts ADD COLUMN loto_missing_keys TEXT NOT NULL DEFAULT ''")
+        # Who opened this shift and how -- 'mst' or 'tech', plus an OT flag for MSTs
+        # who started a shift outside their normal assignment (legit overtime).
+        if "opened_by_role" not in existing_shift_cols:
+            c.execute("ALTER TABLE shifts ADD COLUMN opened_by_role TEXT NOT NULL DEFAULT 'mst'")
+        if "is_ot" not in existing_shift_cols:
+            c.execute("ALTER TABLE shifts ADD COLUMN is_ot INTEGER NOT NULL DEFAULT 0")
+        if "opened_by_assoc" not in existing_shift_cols:
+            c.execute("ALTER TABLE shifts ADD COLUMN opened_by_assoc TEXT NOT NULL DEFAULT ''")
 
         # PM files table
         c.execute("""
@@ -213,9 +274,16 @@ def init_db() -> None:
 # Shifts
 # ---------------------------------------------------------------------------
 
-def start_shift(date: str, shift_type: str, lead_name: str) -> int:
+def start_shift(date: str, shift_type: str, lead_name: str,
+                opened_by_role: str = "mst", is_ot: bool = False,
+                opened_by_assoc: str = "") -> int:
     """Open a new shift. Up to 2 can run simultaneously during overlap windows.
     Raises ValueError('max_active') if 2 are already running.
+
+    opened_by_role: 'mst' or 'tech' -- who actually started this shift.
+    is_ot: True when an MST started a shift outside their normal assignment
+    (legit overtime) -- surfaced as a badge on the dashboard for visibility.
+    opened_by_assoc: the associate number that started it, for audit trail.
     """
     with _conn() as c:
         active_count = c.execute(
@@ -224,9 +292,11 @@ def start_shift(date: str, shift_type: str, lead_name: str) -> int:
         if active_count >= 2:
             raise ValueError("max_active")
         cur = c.execute(
-            "INSERT INTO shifts (date, shift_type, lead_name, created_at, is_active)"
-            " VALUES (?,?,?,?,1)",
-            (date, shift_type, lead_name, _now()),
+            "INSERT INTO shifts (date, shift_type, lead_name, created_at, is_active, "
+            "opened_by_role, is_ot, opened_by_assoc)"
+            " VALUES (?,?,?,?,1,?,?,?)",
+            (date, shift_type, lead_name, _now(), opened_by_role,
+             1 if is_ot else 0, opened_by_assoc.strip()),
         )
         return cur.lastrowid
 
@@ -761,6 +831,35 @@ def get_pm_count(shift_id: int) -> int:
     return row[0] if row else 0
 
 
+def upsert_wo_cause(shift_id: int, wo_number: str, cause_text: str) -> None:
+    """Store/update the cause/repair description for a WO this shift.
+
+    Comes from a separate Cetaris "cause" export (WO Number + Repair
+    Description), joined by WO Number against the timecard import that
+    already populates `entries`/`pm_wos` via cetaris_parser.py. Re-uploading
+    replaces the stored text for that WO (REPLACE, not IGNORE).
+    """
+    with _conn() as c:
+        c.execute(
+            """
+            INSERT INTO wo_causes (shift_id, wo_number, cause_text, created_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(shift_id, wo_number) DO UPDATE SET cause_text=excluded.cause_text
+            """,
+            (shift_id, wo_number, cause_text, _now()),
+        )
+
+
+def get_wo_causes(shift_id: int) -> dict:
+    """Return {wo_number: cause_text} for every cause row logged this shift."""
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT wo_number, cause_text FROM wo_causes WHERE shift_id = ?",
+            (shift_id,),
+        ).fetchall()
+    return {row[0]: row[1] for row in rows}
+
+
 def set_carry_over(entry_id: int, state: bool) -> None:
     with _conn() as c:
         c.execute("UPDATE entries SET carry_over=? WHERE id=?", (1 if state else 0, entry_id))
@@ -1207,6 +1306,30 @@ def set_associate_mst(assoc_num: str, is_mst: bool) -> None:
     with _conn() as c:
         c.execute("UPDATE associates SET is_mst=? WHERE assoc_num=?",
                   (1 if is_mst else 0, assoc_num))
+
+
+def update_associate(old_assoc_num: str, new_assoc_num: str, full_name: str,
+                     shift: str = "", is_mst: bool | None = None) -> None:
+    """Edit an existing associate's number/name/shift, optionally their MST flag.
+    Used by the admin roster editor to fix typos or promote/demote MST<->tech.
+    Refuses to touch the hardcoded manager bypass row.
+    """
+    old_assoc_num = old_assoc_num.strip()
+    new_assoc_num = new_assoc_num.strip()
+    full_name = full_name.strip().upper()
+    display = _make_display_name(full_name)
+    with _conn() as c:
+        existing = c.execute(
+            "SELECT is_mst, is_manager FROM associates WHERE assoc_num=?", (old_assoc_num,)
+        ).fetchone()
+        if not existing or existing["is_manager"]:
+            return
+        mst_val = (1 if is_mst else 0) if is_mst is not None else existing["is_mst"]
+        c.execute(
+            "UPDATE associates SET assoc_num=?, full_name=?, display_name=?, shift=?, is_mst=? "
+            "WHERE assoc_num=?",
+            (new_assoc_num, full_name, display, shift.strip(), mst_val, old_assoc_num),
+        )
 
 
 def delete_associate(assoc_num: str) -> None:
