@@ -15,6 +15,16 @@ import io
 # Any of these headers (checked in order) counts as the cause text for a row.
 _CAUSE_FIELDS = ("Repair Description", "RFR")
 
+# RFR values that mean "Preventive Maintenance" -- these WOs are counted,
+# never pulled into shift happenings. This mirrors _PM_WORK_ACCOMPLISHED in
+# cetaris_parser.py (same rule, independent signal): the timecard file's
+# Work Accomplished field is the primary PM filter and already keeps these
+# WOs out of `entries`/happenings entirely; this is a second, independent
+# check on the cause file's own RFR classification so a PM row can never
+# hand its cause text to a happening even if the two files' codes ever
+# disagree on what counts as PM.
+_PM_RFR_VALUES = {"preventive maintenance", "pm"}
+
 # Headers that mean "this is a timecard file, not a cause file" -- if this
 # shows up, looks_like_cause_file() returns False so we never mis-route a
 # normal timecard upload through the cause-only path.
@@ -88,17 +98,24 @@ def looks_like_cause_file(content: bytes | str) -> bool:
     return "WO Number" in headers and any(f in headers for f in _CAUSE_FIELDS)
 
 
+def _is_pm_rfr(row: dict) -> bool:
+    """True if this cause-file row's RFR marks it Preventive Maintenance."""
+    rfr = _clean_text(row.get("RFR")).lower()
+    return rfr in _PM_RFR_VALUES
+
+
 def parse_cause_file(content: bytes | str) -> dict[str, str]:
     """Parse a cause-description export into {wo_number: cause_text}.
 
     Prefers 'Repair Description'; falls back to 'RFR' if that column is
     blank for a given row. Rows without a usable WO Number or cause text
-    are skipped.
+    are skipped. Preventive Maintenance rows (per RFR) are always skipped --
+    PMs are counted, never pulled into shift happenings. See _PM_RFR_VALUES.
     """
     lookup: dict[str, str] = {}
     for row in _rows(content):
         wo_number = _normalize_wo(row.get("WO Number"))
-        if not wo_number:
+        if not wo_number or _is_pm_rfr(row):
             continue
 
         cause = ""
