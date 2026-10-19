@@ -290,9 +290,13 @@ def consolidated_to_happenings(
 
     cause_lookup: optional {wo_number: cause_text} from a separate Cetaris
     "cause" export (see cause_lookup.py), joined in by WO Number. When a
-    match exists, title becomes "AssetID- Cause text" instead of just
-    "AssetID" -- everything else (summary, grouping, etc.) is untouched, and
-    behavior is 100% identical to before whenever no cause file is uploaded.
+    match exists, title becomes "AssetID : Cause text " (note the trailing
+    space) instead of just "AssetID". Both live formatters (format_email and
+    format_html_preview in formatter.py) build their line as
+    f"{title}: {paragraph}" -- that trailing space plus their hardcoded
+    ": " is what turns this into a clean "AssetID : Cause : Remark" with
+    consistent " : " separators everywhere, with zero changes needed on
+    their end. No cause match -> title is unchanged, same output as always.
     """
     out: list[dict] = []
     cause_lookup = cause_lookup or {}
@@ -302,8 +306,8 @@ def consolidated_to_happenings(
         conflict_note = " [ Conflicting notes — verify status]" if wo.conflicting else ""
         dup_note = " [ Possible duplicate remarks — verify these describe separate work]" if wo.possible_duplicate else ""
         asset_title = wo.asset_id or f"WO #{wo.wo_number}"
-        cause = cause_lookup.get(wo.wo_number, "")
-        title = f"{asset_title}- {cause}" if cause else asset_title
+        cause = cause_lookup.get(wo.wo_number, "").rstrip(".")
+        title = f"{asset_title} : {cause} " if cause else asset_title
         out.append({
             "title":      title,
             "paragraph":  wo.summary + conflict_note + dup_note,

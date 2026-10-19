@@ -64,7 +64,7 @@ def format_html_preview(data: ReportData) -> str:
         )
 
     for h in data.happenings:
-        wo_tag = f" <span style='color:#555;font-size:13px;'>(WO #{h.wo_number})</span>" if h.wo_number else ""
+        wo_tag = f" <span style='color:#555;font-size:13px;'>(WO#{h.wo_number})</span>" if h.wo_number else ""
         if h.sub_points:
             # Sub-points: either (wo_number, remark) for multi-WO asset
             # or (tech_name, remark) for multi-tech single WO
@@ -365,7 +365,7 @@ def format_email(data: ReportData) -> str:
     if data.pm_count:
         h_lines.append(f"  •  {data.pm_count} PM{'s' if data.pm_count != 1 else ''} completed")
     for h in data.happenings:
-        wo = f" (WO #{h.wo_number})." if h.wo_number else "."
+        wo = f" (WO#{h.wo_number})." if h.wo_number else "."
         para = h.paragraph.rstrip(".")
         h_lines.append(f"  \u2022  {h.title}: {para}{wo}")
     secs.append(_txt_sec("Shift Happenings",
