@@ -4,6 +4,9 @@ Only rows with both an Asset # and WO Number are kept.
 Indirect Labor and Unallocated rows are discarded.
 Rows tagged as Preventive Maintenance (Work Accomplished = "Prev Maintenance"
 or similar) are separated out — counted but NOT added to shift happenings.
+Manager Task WOs are NOT separated out -- they flow through to happenings
+just like any other work order, per Isaac's call: they should show up as
+full entries with synthesized remarks, not just a silent count.
 Multiple rows sharing the same WO Number are merged — all remarks collected.
 Supports .csv and .xlsx / .xls exports from Cetaris.
 """
@@ -25,20 +28,17 @@ class ParseResult:
     """Full result of a Cetaris file parse.
 
     Attributes:
-        work_orders:             Non-PM, non-manager work orders for happenings.
-        pm_count:                Number of Preventive Maintenance WOs found
-                                 (excluded from work_orders).
-        pm_wo_numbers:           WO numbers of PM entries (for traceability).
-        manager_task_count:      Number of Manager Task WOs found (excluded).
-        manager_task_wo_numbers: WO numbers of manager task entries.
-        skipped:                 Rows with no Asset/WO or Indirect Labor rows.
+        work_orders:   Non-PM work orders for happenings (includes Manager
+                       Tasks -- they're treated as regular happenings).
+        pm_count:      Number of Preventive Maintenance WOs found
+                       (excluded from work_orders).
+        pm_wo_numbers: WO numbers of PM entries (for traceability).
+        skipped:       Rows with no Asset/WO or Indirect Labor rows.
     """
-    work_orders:             list[ImportedWO]
-    pm_count:                int
-    pm_wo_numbers:           list[str]
-    manager_task_count:      int = 0
-    manager_task_wo_numbers: list[str] = field(default_factory=list)
-    skipped:                 int = 0
+    work_orders:   list[ImportedWO]
+    pm_count:      int
+    pm_wo_numbers: list[str]
+    skipped:       int = 0
 
 
 # Statuses that mean "nothing to import here"
@@ -51,16 +51,6 @@ _PM_WORK_ACCOMPLISHED = {
     "preventive maintenance",
     "pm",
     "pm - preventive maintenance",
-}
-
-# Work Accomplished values that indicate a Manager Task WO — excluded just
-# like PMs: counted for the summary but not added to shift happenings.
-_MANAGER_TASK_WORK_ACCOMPLISHED = {
-    "manager task",
-    "manager tasks",
-    "mgr task",
-    "mgr tasks",
-    "management task",
 }
 
 
@@ -104,12 +94,6 @@ def _is_pm(row: dict) -> bool:
     return wa in _PM_WORK_ACCOMPLISHED
 
 
-def _is_manager_task(row: dict) -> bool:
-    """Return True if the row's Work Accomplished tag marks it as a Manager Task."""
-    wa = row.get("Work Accomplished", "").strip().lower()
-    return wa in _MANAGER_TASK_WORK_ACCOMPLISHED
-
-
 def parse_cetaris(content: bytes | str) -> ParseResult:
     """Parse a Cetaris CSV or Excel export and return a full ParseResult.
 
@@ -127,10 +111,9 @@ def parse_cetaris(content: bytes | str) -> ParseResult:
 
     rows = _rows_from_xlsx(content) if _is_xlsx(content) else _rows_from_csv(content)
 
-    wo_map:       dict[str, ImportedWO] = {}
-    pm_wos:       dict[str, str]        = {}  # wo_number -> asset_id
-    manager_wos:  dict[str, str]        = {}  # wo_number -> asset_id
-    skipped       = 0
+    wo_map: dict[str, ImportedWO] = {}
+    pm_wos: dict[str, str]        = {}  # wo_number -> asset_id
+    skipped = 0
 
     for row in rows:
         asset_id  = row.get("Asset #", "")
@@ -149,11 +132,6 @@ def parse_cetaris(content: bytes | str) -> ParseResult:
             pm_wos[wo_number] = asset_id
             continue
 
-        # Manager Task work orders: count separately, don't add to happenings
-        if _is_manager_task(row):
-            manager_wos[wo_number] = asset_id
-            continue
-
         remark = row.get("Tech Remarks", "")
         if wo_number not in wo_map:
             wo_map[wo_number] = ImportedWO(wo_number=wo_number, asset_id=asset_id)
@@ -164,8 +142,6 @@ def parse_cetaris(content: bytes | str) -> ParseResult:
         work_orders=sorted(wo_map.values(), key=lambda w: w.wo_number),
         pm_count=len(pm_wos),
         pm_wo_numbers=sorted(pm_wos.keys()),
-        manager_task_count=len(manager_wos),
-        manager_task_wo_numbers=sorted(manager_wos.keys()),
         skipped=skipped,
     )
 
