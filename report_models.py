@@ -36,3 +36,4 @@ class ReportData(BaseModel):
     rts:       list[str]               = Field(default_factory=list)
     oos:       list[OosUnit]           = Field(default_factory=list)
     summary:   list[str]               = Field(default_factory=list)
+    shift_notes: str                   = ""

@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 from datetime import datetime
 from report_models import ReportData
+from pm_table_style import pm_zebra_hex, PM_HEADER_HEX
 
 
 def _fmt(iso: str) -> str:
@@ -166,6 +167,12 @@ def export_docx(data: ReportData, pending_pms: list[dict] | None = None, loto_mi
 
     # ── Shift Happenings ─────────────────────────────────────────────────
     _sec("Shift Happenings")
+    if getattr(data, "shift_notes", "") and data.shift_notes.strip():
+        p = doc.add_paragraph()
+        p.paragraph_format.left_indent = Inches(0.25)
+        p.paragraph_format.space_after = Pt(5)
+        r = p.add_run(data.shift_notes.strip())
+        r.font.size, r.font.color.rgb = Pt(10), MED_GRAY
     if data.happenings:
         for h in data.happenings:
             _item(h.title, color=BLACK, bold=True)
@@ -175,9 +182,10 @@ def export_docx(data: ReportData, pending_pms: list[dict] | None = None, loto_mi
             r = p.add_run(h.paragraph)
             r.font.size, r.font.color.rgb = Pt(10), MED_GRAY
     else:
-        _none("No shift happenings recorded.")
+        if not (getattr(data, "shift_notes", "") and data.shift_notes.strip()):
+            _none("No shift happenings recorded.")
 
-    # ── PM's Needing to be Completed ────────────────────────────────────
+    # ── PM's Needing to be Completed ────────────────────────
     _sec("PM's Needing to be Completed")
     if pending_pms:
         from docx.enum.text import WD_ALIGN_PARAGRAPH as _WAP
@@ -190,15 +198,13 @@ def export_docx(data: ReportData, pending_pms: list[dict] | None = None, loto_mi
             hdr_cells[ci].text = lbl
             r = hdr_cells[ci].paragraphs[0].runs[0]
             r.bold, r.font.size, r.font.color.rgb = True, Pt(9), WHITE
-            _shade(hdr_cells[ci], "1a56db")
+            _shade(hdr_cells[ci], PM_HEADER_HEX)
             _cell_pad(hdr_cells[ci], top=50, bottom=50)
-        from datetime import date as _dt
-        today = _dt.today().strftime("%m/%d/%Y")
         for i, r in enumerate(pending_pms):
             row = pm_tbl.add_row()
             vals = [r.get("wo_number",""), r.get("asset_num",""), r.get("pm_due_date",""),
                     r.get("promise_date",""), r.get("wo_date","")]
-            bg = "fef08a" if today in r.get("pm_due_date","") else ("f9fafb" if i % 2 == 0 else "ffffff")
+            bg = pm_zebra_hex(i)
             for ci, v in enumerate(vals):
                 row.cells[ci].text = v
                 run = row.cells[ci].paragraphs[0].runs[0]
@@ -421,6 +427,8 @@ def export_pdf(data: ReportData, pending_pms: list[dict] | None = None, loto_mis
 
     # ── SHIFT HAPPENINGS ──────────────────────────────────────────────────
     add_section("Shift Happenings")
+    if getattr(data, "shift_notes", "") and data.shift_notes.strip():
+        story.append(Paragraph(data.shift_notes.strip(), BODY))
     if data.happenings:
         for h in data.happenings:
             story.append(KeepTogether([
@@ -429,21 +437,18 @@ def export_pdf(data: ReportData, pending_pms: list[dict] | None = None, loto_mis
                 Spacer(1, 2),
             ]))
     else:
-        add_none("No shift happenings recorded.")
+        if not (getattr(data, "shift_notes", "") and data.shift_notes.strip()):
+            add_none("No shift happenings recorded.")
 
-    # ── PM'S NEEDING TO BE COMPLETED ──────────────────────────────
+    # ── PM'S NEEDING TO BE COMPLETED ────────────────────────
     add_section("PM's Needing to be Completed")
     if pending_pms:
-        from datetime import date as _dt
-        today = _dt.today().strftime("%m/%d/%Y")
-        YELLOW = colors.HexColor("#fef08a")
         PM_HDR = S("PH", fontSize=9,  textColor=WHITE,     fontName="Helvetica-Bold",  spaceAfter=0)
         PM_TD  = S("PT", fontSize=9,  textColor=MED_GRAY,  fontName="Helvetica",        spaceAfter=0)
         PM_TDB = S("PTB",fontSize=9,  textColor=BLACK,     fontName="Helvetica-Bold",   spaceAfter=0)
         headers = [[Paragraph(h, PM_HDR) for h in ["WO #", "Asset", "PM Due Date", "Promise Date/Time", "WO Date/Time"]]]
         rows = []
         for i, r in enumerate(pending_pms):
-            hot = today in r.get("pm_due_date","")
             row = [
                 Paragraph(r.get("wo_number",""),  PM_TD),
                 Paragraph(r.get("asset_num",""),   PM_TDB),
@@ -465,11 +470,7 @@ def export_pdf(data: ReportData, pending_pms: list[dict] | None = None, loto_mis
             ("VALIGN",        (0,0),(-1,-1), "MIDDLE"),
         ]
         for i, r in enumerate(pending_pms):
-            hot = today in r.get("pm_due_date","")
-            if hot:
-                style_cmds.append(("BACKGROUND",(0,i+1),(-1,i+1),YELLOW))
-            elif i % 2 == 0:
-                style_cmds.append(("BACKGROUND",(0,i+1),(-1,i+1),BG_ROW_ALT))
+            style_cmds.append(("BACKGROUND",(0,i+1),(-1,i+1),colors.HexColor(f"#{pm_zebra_hex(i)}")))
         pm_tbl.setStyle(TableStyle(style_cmds))
         story.append(pm_tbl)
     elif data.ro:

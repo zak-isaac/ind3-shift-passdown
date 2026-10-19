@@ -8,6 +8,7 @@ format_email(data)         -> str   (plain-text email version)
 from __future__ import annotations
 from datetime import datetime
 from report_models import ReportData
+from pm_table_style import pm_zebra_hex, PM_HEADER_HEX
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────────────────
@@ -53,8 +54,15 @@ def format_html_preview(data: ReportData) -> str:
         body = _none("No vendor activity recorded during this shift.")
     out.append(_sec("&#128666;", "Vendors", body))
 
-    # 2. Shift Happenings — PM count first (auto), then asset entries
+    # 2. Shift Happenings — MST notes first (general shift context), then
+    # PM count (auto), then asset entries
     happening_lines: list[str] = []
+
+    if data.shift_notes and data.shift_notes.strip():
+        happening_lines.append(
+            f'<li style="padding:8px 0;border-bottom:1px solid #eee;font-size:14px;color:#111;line-height:1.7;white-space:pre-wrap;">'
+            f'{data.shift_notes.strip()}</li>'
+        )
 
     if data.pm_count:
         label = f"{data.pm_count} PM{'s' if data.pm_count != 1 else ''} completed this shift"
@@ -179,8 +187,10 @@ def format_email_passdown(data: ReportData) -> str:
     # ── Vendors ──
     lines += ["Vendors", _bullets(data.vendors), ""]
 
-    # ── Shift Happenings ──
+    # ── Shift Happenings ── (MST notes lead, then PM count, then asset entries)
     h_items: list[str] = []
+    if data.shift_notes and data.shift_notes.strip():
+        h_items.append(data.shift_notes.strip())
     if data.pm_count:
         label = f"{data.pm_count} PM{'s' if data.pm_count != 1 else ''} completed this shift"
         h_items.append(label)
@@ -217,7 +227,6 @@ def format_email_passdown_html(
     loto_verified: bool = False,
 ) -> str:
     """HTML passdown email: bold titles, real bordered PM table, signature block."""
-    from datetime import date as _date
 
     def _li(items: list[str]) -> str:
         """Outlook needs explicit font-size on every element -- body inheritance is ignored."""
@@ -234,8 +243,10 @@ def format_email_passdown_html(
             f"font-size:14px;font-family:Calibri,Arial,sans-serif;'>{_li(items)}</ul>"
         )
 
-    # Shift Happenings
+    # Shift Happenings (MST notes lead, then PM count, then asset entries)
     h_items: list[str] = []
+    if data.shift_notes and data.shift_notes.strip():
+        h_items.append(data.shift_notes.strip().replace("\n", "<br>"))
     if data.pm_count:
         h_items.append(f"{data.pm_count} PM{'s' if data.pm_count != 1 else ''} completed this shift")
     for h in data.happenings:
@@ -262,9 +273,10 @@ def format_email_passdown_html(
             h_items.append(f"{h.paragraph}{wo_tag}")
 
     # PM section: proper bordered table or bullet fallback
-    today  = _date.today().strftime("%m/%d/%Y")
+    # No due-date alarm color -- these are routine daily PMs, "due today"
+    # is the normal state, not an exception. See pm_table_style.py.
     border = "border:1px solid #d1d5db;"
-    th_s   = f"padding:8px 12px;text-align:left;font-size:14px;font-weight:bold;background:#1a56db;color:#fff;font-family:Calibri,Arial,sans-serif;{border}"
+    th_s   = f"padding:8px 12px;text-align:left;font-size:14px;font-weight:bold;background:#{PM_HEADER_HEX};color:#fff;font-family:Calibri,Arial,sans-serif;{border}"
     td_s   = f"padding:7px 12px;font-size:14px;font-family:Calibri,Arial,sans-serif;{border}"
 
     if pending_pms:
@@ -275,15 +287,13 @@ def format_email_passdown_html(
         )
         body_rows = ""
         for i, r in enumerate(pending_pms):
-            due     = r.get("pm_due_date", "")
-            hot     = today in due
-            row_bg  = "#fef08a" if hot else ("#f9fafb" if i % 2 == 0 else "#ffffff")
-            due_col = "color:#c00;" if hot else ""
+            due    = r.get("pm_due_date", "")
+            row_bg = f"#{pm_zebra_hex(i)}"
             body_rows += (
                 f"<tr style='background:{row_bg};'>"
                 f"<td style='{td_s}font-family:monospace;'>{r.get('wo_number','')}</td>"
                 f"<td style='{td_s}font-weight:bold;'>{r.get('asset_num','')}</td>"
-                f"<td style='{td_s}font-weight:bold;{due_col}'>{due}</td>"
+                f"<td style='{td_s}font-weight:bold;'>{due}</td>"
                 f"<td style='{td_s}'>{r.get('promise_date','')}</td>"
                 f"<td style='{td_s}color:#666;'>{r.get('wo_date','')}</td>"
                 f"</tr>"
@@ -362,8 +372,10 @@ def format_email(data: ReportData) -> str:
         or ["  No vendor activity recorded during this shift."]))
 
     h_lines: list[str] = []
+    if data.shift_notes and data.shift_notes.strip():
+        h_lines.append(f"  \u2022  {data.shift_notes.strip()}")
     if data.pm_count:
-        h_lines.append(f"  •  {data.pm_count} PM{'s' if data.pm_count != 1 else ''} completed")
+        h_lines.append(f"  \u2022  {data.pm_count} PM{'s' if data.pm_count != 1 else ''} completed")
     for h in data.happenings:
         wo = f" (WO#{h.wo_number})." if h.wo_number else "."
         para = h.paragraph.rstrip(".")
