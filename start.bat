@@ -18,6 +18,6 @@ echo Starting server on http://localhost:8765
 echo Press Ctrl+C to stop.
 echo.
 
-uv run uvicorn main:app --host 0.0.0.0 --port 8765
+uv run python run_server.py
 
 pause

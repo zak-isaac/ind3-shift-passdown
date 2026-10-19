@@ -10,7 +10,7 @@ cd /d "%PROJECT%"
 
 :loop
 echo [%DATE% %TIME%] Starting passdown server... >> "%LOG%"
-"%PYTHON%" -m uvicorn main:app --host 0.0.0.0 --port 8765 >> "%LOG%" 2>&1
+"%PYTHON%" run_server.py >> "%LOG%" 2>&1
 echo [%DATE% %TIME%] Server exited - restarting in 5s >> "%LOG%"
 ping -n 6 127.0.0.1 >nul
 goto loop
