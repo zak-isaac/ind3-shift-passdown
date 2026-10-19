@@ -103,11 +103,8 @@
             <a href="/analytics" class="text-blue-200 hover:bg-blue-900 hover:text-white px-4 py-2.5 text-xs transition">
               &#128200; Analytics
             </a>
-            <a href="/guide" target="_blank" class="text-blue-200 hover:bg-blue-900 hover:text-white px-4 py-2.5 text-xs transition">
-              &#128214; Guide
-            </a>
-            <a href="/tech-docs" target="_blank" class="text-blue-200 hover:bg-blue-900 hover:text-white px-4 py-2.5 text-xs transition">
-              &#128736; Tech Docs
+            <a href="/walkthrough/" target="_blank" class="text-blue-200 hover:bg-blue-900 hover:text-white px-4 py-2.5 text-xs transition font-semibold">
+              &#128064; App Walkthrough
             </a>
             <a href="/lead/print-report" target="_blank" class="text-blue-200 hover:bg-blue-900 hover:text-white px-4 py-2.5 text-xs transition">
               &#128438; Print Report
@@ -145,12 +142,19 @@
           &nbsp;&bull;&nbsp;{{ shift.date }}
           &nbsp;&bull;&nbsp;<span class="font-semibold text-white">{{ shift.lead_name }}</span>
           &nbsp;&bull;&nbsp;<span class="text-wm-spark">Started {{ shift.created_at | fmt_time }}</span>
+          {% if shift.is_ot %}
+          &nbsp;&bull;&nbsp;<span class="bg-amber-400 text-amber-950 text-xs font-black px-2 py-0.5 rounded-full">MST ON OT</span>
+          {% endif %}
         </p>
       </div>
     </div>
 
     <!-- Right: always-visible badges only -->
     <div class="flex items-center gap-2 shrink-0">
+      <a href="/walkthrough/" target="_blank"
+        class="flex items-center gap-1.5 bg-wm-spark hover:bg-yellow-400 text-gray-900 text-xs font-black px-3 py-1.5 rounded-full transition shadow">
+        &#128064; Walkthrough
+      </a>
       <span class="text-wm-spark font-black font-mono bg-white bg-opacity-10 px-2.5 py-1 rounded-full border border-wm-spark border-opacity-40 text-xs">{{ dc_number }}</span>
       <span class="bg-green-400 text-green-900 text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">LIVE</span>
       <a href="/" class="text-blue-200 hover:text-white text-xs font-medium transition px-2 py-1 rounded">&#127968; Home</a>
@@ -216,21 +220,31 @@
         <p class="section-label">Live Activity</p>
         <h2 class="text-slate-800 font-black text-lg leading-tight">Activity Log</h2>
       </div>
-      <input id="feedSearch" type="search"
-        placeholder="&#128269; Filter unit or tech..."
-        oninput="filterFeed(this.value)"
-        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs
-               focus:border-wm-blue outline-none transition w-48 shadow-sm" />
+      <div class="flex items-center gap-2">
+        <button id="feed-freeze-btn" type="button" onclick="toggleFeedFreeze()"
+          title="Pause live updates so exclude/pin/edit/delete clicks are never interrupted"
+          class="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs
+                 font-bold text-slate-500 hover:border-wm-blue hover:text-wm-blue transition shadow-sm">
+          <span id="feed-freeze-icon">&#10074;&#10074;</span>
+          <span id="feed-freeze-label">Freeze</span>
+        </button>
+        <input id="feedSearch" type="search"
+          placeholder="&#128269; Filter unit or tech..."
+          oninput="filterFeed(this.value)"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs
+                 focus:border-wm-blue outline-none transition w-48 shadow-sm" />
+      </div>
     </div>
 
     <!-- Live feed -->
-    <!-- hx-trigger: 'every 10s' is conditional — skipped silently when any
-         edit form is open inside the feed so typing is never interrupted.
-         The 'refresh' event is still fired unconditionally by JS after
-         save / cancel so the feed catches up immediately. -->
+    <!-- hx-trigger: 'every 10s' and 'refresh' are gated on !isFeedBusy() --
+         skipped silently while the MST has the feed manually frozen OR has
+         an inline edit form open (typing a note), so exclude/pin/edit/
+         delete clicks and in-progress edits are never interrupted or
+         wiped out mid-action. See toggleFeedFreeze() below. -->
     <div id="live-feed"
       hx-get="/lead/feed?shift_id={{ shift.id }}"
-      hx-trigger="load, every 10s, refresh"
+      hx-trigger="load, every 10s [isFeedIdle()], refresh [isFeedIdle()]"
       hx-swap="innerHTML"
       class="flex flex-col gap-2">
       <div class="text-slate-400 text-sm italic p-4">Loading entries...</div>
@@ -683,6 +697,37 @@ function filterFeed(q) {
     const tech = (row.dataset.tech || '').toLowerCase();
     row.style.display = (!q || unit.includes(q) || tech.includes(q)) ? '' : 'none';
   });
+}
+
+// ── Live feed freeze -- manual toggle so the MST can exclude/pin/edit/
+//    delete tech entries without the list refreshing and jumping under
+//    them mid-click. Also auto-freezes whenever an inline edit form (note
+//    editing) is open, so in-progress typing is never wiped out even if
+//    the MST forgets to hit the button first.
+var _feedFrozenManually = false;
+
+function isFeedIdle() {
+  if (_feedFrozenManually) return false;
+  if (document.querySelector('#live-feed textarea[name="issue"]')) return false;
+  return true;
+}
+
+function toggleFeedFreeze() {
+  _feedFrozenManually = !_feedFrozenManually;
+  var icon  = document.getElementById('feed-freeze-icon');
+  var label = document.getElementById('feed-freeze-label');
+  var btn   = document.getElementById('feed-freeze-btn');
+  if (_feedFrozenManually) {
+    icon.innerHTML  = '&#9654;';
+    label.textContent = 'Frozen';
+    btn.classList.add('bg-amber-50', 'border-amber-300', 'text-amber-600');
+  } else {
+    icon.innerHTML  = '&#10074;&#10074;';
+    label.textContent = 'Freeze';
+    btn.classList.remove('bg-amber-50', 'border-amber-300', 'text-amber-600');
+    // Catch up immediately on resume so nothing looks stale.
+    htmx.trigger(document.getElementById('live-feed'), 'refresh');
+  }
 }
 
 // ── Browser Notifications ──────────────────────────────────────────────
