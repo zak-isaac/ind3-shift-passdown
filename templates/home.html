@@ -18,9 +18,22 @@
       <span class="text-blue-400 mx-1 font-thin">|</span>
       <span class="text-blue-100 text-sm font-medium tracking-wide">MST Reliability Operations</span>
     </div>
-    <span class="text-wm-spark text-sm font-black font-mono bg-white bg-opacity-10 px-3 py-1 rounded-full border border-wm-spark border-opacity-30">{{ dc_number }}</span>
+    <div class="flex items-center gap-3">
+      <a href="/walkthrough/" target="_blank"
+        class="flex items-center gap-1.5 bg-wm-spark hover:bg-yellow-400 text-gray-900 text-xs font-black px-3.5 py-2 rounded-full transition shadow">
+        &#128064; App Walkthrough
+      </a>
+      <span class="text-wm-spark text-sm font-black font-mono bg-white bg-opacity-10 px-3 py-1 rounded-full border border-wm-spark border-opacity-30">{{ dc_number }}</span>
+    </div>
   </div>
 </nav>
+
+{% if is_dev_mode %}
+<div class="bg-amber-400 text-amber-950 text-center text-xs font-black py-1.5 tracking-wide">
+  &#129514; DEVELOPER / TEST MODE &mdash; sandboxed data, frozen date {{ today }} &mdash; nothing here touches the live shift &bull;
+  <a href="/dev/exit" class="underline hover:text-amber-800">Exit Test Mode</a>
+</div>
+{% endif %}
 
 <!-- ░░ HERO ░░ -->
 <section class="bg-wm-dark" style="background:linear-gradient(135deg,#001e50 0%,#002d72 55%,#0053e2 100%)">
@@ -82,11 +95,11 @@
           <input type="hidden" name="lead_name" id="hidden_lead_name" value="" />
           <input type="hidden" name="assoc_num" id="hidden_assoc_num" value="" />
           <input type="hidden" name="ot_code"   id="hidden_ot_code"   value="" />
-
+          <input type="hidden" name="confirm_dup" id="hidden_confirm_dup" value="0" />
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1">Date</label>
-              <input id="shift_date" name="shift_date" type="date" value="{{ today }}" required
+              <input id="shift_date" name="shift_date" type="date" value="{{ today }}" max="{{ today }}" required
                 onchange="onDateOrShiftChange()"
                 class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-wm-blue focus:ring-2 focus:ring-blue-200 outline-none transition" />
             </div>
@@ -109,6 +122,7 @@
             class="mt-auto bg-wm-blue hover:bg-blue-700 text-white font-black py-2.5 rounded-xl transition text-sm shadow">
             &#9889; Start Shift
           </button>
+          <p id="start-btn-lock-msg" class="hidden text-xs text-amber-600 font-semibold text-center -mt-1"></p>
         </form>
       </div>
 
@@ -120,13 +134,22 @@
           <div class="bg-white rounded-2xl border-2 border-wm-blue shadow-sm p-5 flex flex-col gap-3">
             <div class="flex items-center justify-between gap-2">
               <span class="bg-green-400 text-green-900 text-xs font-black px-2.5 py-1 rounded-full animate-pulse">&#9679; ACTIVE SHIFT</span>
-              {% if shifts | length > 1 %}
-              <span class="bg-blue-50 border border-blue-200 text-wm-blue text-xs font-bold px-2 py-0.5 rounded-full">{{ loop.index }}/{{ shifts | length }}</span>
-              {% endif %}
+              <div class="flex items-center gap-1.5">
+                {% if s.is_ot %}
+                <span class="bg-amber-400 text-amber-950 text-xs font-black px-2 py-0.5 rounded-full">MST ON OT</span>
+                {% endif %}
+                {% if shifts | length > 1 %}
+                <span class="bg-blue-50 border border-blue-200 text-wm-blue text-xs font-bold px-2 py-0.5 rounded-full">{{ loop.index }}/{{ shifts | length }}</span>
+                {% endif %}
+              </div>
             </div>
             <div>
               <p class="text-wm-dark font-black text-3xl leading-none">{{ s.shift_type }}</p>
+              {% if s.opened_by_role == 'tech' %}
+              <p class="text-gray-500 text-sm mt-1">{{ s.date }} &bull; <span class="text-amber-600 font-bold">No MST yet</span></p>
+              {% else %}
               <p class="text-gray-500 text-sm mt-1">{{ s.date }} &bull; MST: <strong class="text-gray-700">{{ s.lead_name }}</strong></p>
+              {% endif %}
             </div>
             <div class="flex flex-col gap-2 mt-auto">
               <a href="/tech/login?shift_id={{ s.id }}"
@@ -154,7 +177,7 @@
 
 <footer class="bg-wm-dark border-t border-blue-900 text-blue-400 text-center text-xs py-2">
   Shift Passdown Generator &bull; MST Reliability &bull; Walmart &copy; 2026 &bull;
-  <a href="/guide" target="_blank" class="underline hover:text-gray-300">User Guide</a>
+  <a href="/walkthrough/" target="_blank" class="underline hover:text-gray-300 font-bold">&#128064; App Walkthrough</a>
 </footer>
 
 <!-- ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ -->
@@ -241,7 +264,7 @@
 <!-- /MST IDENTITY MODAL -->
 
 <script>
-  // ── Constants ───────────────────────────────────────────────────────────────
+  // -- Constants --
   const SHIFT_DAYS = {
     S1: [0,1,2,3], S2: [0,1,2,3], S3: [0,1,2,3],
     S4: [4,5,6],   S5: [4,5,6],
@@ -250,7 +273,23 @@
     S1: 'Mon\u2013Thu', S2: 'Mon\u2013Thu', S3: 'Mon\u2013Thu',
     S4: 'Fri\u2013Sun', S5: 'Fri\u2013Sun',
   };
+  const HAS_ACTIVE_SHIFT = {{ 'true' if shifts else 'false' }};
+  const IS_DEV_MODE = {{ 'true' if is_dev_mode else 'false' }};
+  const SERVER_TODAY = {{ today | tojson }};  // frozen test date in dev mode, real today otherwise
 
+  // Each shift: { id, startDays (0=Mon), startMin, endMin (may exceed 1440 = next day) }
+  const SHIFT_WINDOWS = [
+    { id: 'S1', startDays:[0,1,2,3], startMin: 330,  endMin: 960  },  // 5:30–16:00 same day
+    { id: 'S2', startDays:[0,1,2,3], startMin: 720,  endMin: 1350 },  // 12:00–22:30 same day
+    { id: 'S3', startDays:[0,1,2,3], startMin: 1230, endMin: 1860 },  // 20:30–7:00 next
+    { id: 'S4', startDays:[4,5,6],   startMin: 330,  endMin: 1080 },  // 5:30–18:00 same day
+    { id: 'S5', startDays:[4,5,6],   startMin: 1050, endMin: 1800 },  // 17:30–6:00 next
+  ];
+  // Mirrors _SHIFT_EARLY_UNLOCK / _SHIFT_GRACE on the server: a shift is
+  // considered "live" starting 1hr before its scheduled start (handover
+  // overlap) and stays live/open until 1hr after its scheduled end
+  // (same grace window the server uses before auto-terminating it).
+  const SHIFT_GRACE_MIN = 60;
 
   // ── State ───────────────────────────────────────────────────────────────────
   let _curAssoc    = null;
@@ -277,16 +316,61 @@
   function selShift() { return document.getElementById('shift_type').value; }
   function selDate()  { return document.getElementById('shift_date').value; }
 
-  // ── Card: date/shift change ─────────────────────────────────────────────────
+  function todayISO() {
+    if (IS_DEV_MODE) return SERVER_TODAY;  // frozen test date -- never drifts to the real "today"
+    const n = new Date();
+    return n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0') + '-' + String(n.getDate()).padStart(2,'0');
+  }
+
+  // Defensive clamp -- some browsers/keyboards can still type a future date
+  // into a date input despite the max attribute. Snap back to today.
+  function clampFutureDate() {
+    const input = document.getElementById('shift_date');
+    if (input.value && input.value > todayISO()) input.value = todayISO();
+  }
+
+  // Mirrors the server's _is_within_shift_window() -- real-time freeze with
+  // the same 1hr early-unlock allowance before start AND the same 1hr
+  // grace period after the scheduled end (handover overlap on both ends).
+  // In dev mode the day-of-week is pinned to the frozen test date (real
+  // time-of-day still flows through so windows open/close live).
+  function isShiftLiveOrEarly(shiftId) {
+    const now    = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const pyDay  = IS_DEV_MODE ? toPy(dow(SERVER_TODAY)) : toPy(now.getDay());
+    const prevPy = (pyDay + 6) % 7;
+    const s = SHIFT_WINDOWS.find(w => w.id === shiftId);
+    if (!s) return false;
+    const overnight  = s.endMin > 1440;
+    const earlyStart = s.startMin - SHIFT_GRACE_MIN;
+    const lateEnd     = s.endMin + SHIFT_GRACE_MIN;
+    if (!overnight) {
+      return s.startDays.includes(pyDay) && nowMin >= earlyStart && nowMin < lateEnd;
+    }
+    if (s.startDays.includes(pyDay) && nowMin >= earlyStart) return true;
+    if (s.startDays.includes(prevPy) && nowMin < (lateEnd - 1440)) return true;
+    return false;
+  }
+
+  // ── Card: date/shift change ──────────────────────────────────────────────────
+  // Real hard freeze -- an option is only pickable if it's actually in its
+  // live window right now (plus the 1hr early-unlock allowance and the 1hr
+  // closing grace, both for handover). Past dates skip the live-window check (day-of-week only,
+  // since there's no "now" for a historical backfill). Future dates can't
+  // even be selected (input has a max="today" attribute + JS clamp below).
   function onDateOrShiftChange() {
+    clampFutureDate();
     const ds  = selDate();
     const sel = document.getElementById('shift_type');
 
     if (ds) {
-      const py = toPy(dow(ds));
+      const py      = toPy(dow(ds));
+      const isToday = ds === todayISO();
       let first = null;
       for (const o of sel.options) {
-        const ok = (SHIFT_DAYS[o.value]||[]).includes(py);
+        const dayOk  = IS_DEV_MODE || (SHIFT_DAYS[o.value]||[]).includes(py);
+        const timeOk = !isToday || isShiftLiveOrEarly(o.value);
+        const ok = dayOk && timeOk;
         o.disabled = !ok; o.style.color = ok ? '' : '#ccc';
         if (ok && !first) first = o.value;
       }
@@ -301,12 +385,20 @@
     const btn  = document.getElementById('open-modal-btn');
     const ds = selDate(), st = selShift();
     if (!ds || !st) { warn.classList.add('hidden'); return; }
-    const py = toPy(dow(ds));
-    if (!(SHIFT_DAYS[st]||[]).includes(py)) {
+    const py      = toPy(dow(ds));
+    const isToday = ds === todayISO();
+    const dayOk   = IS_DEV_MODE || (SHIFT_DAYS[st]||[]).includes(py);
+    const timeOk  = !isToday || isShiftLiveOrEarly(st);
+
+    if (!dayOk) {
       const pts = ds.split('-').map(Number);
       const dn  = new Date(pts[0],pts[1]-1,pts[2]).toLocaleDateString('en-US',{weekday:'long'});
       warn.textContent = '\u26a0\ufe0f ' + st + ' is only available '
         + SHIFT_LABELS[st] + '. ' + dn + ' is not valid.';
+      warn.classList.remove('hidden');
+      btn.disabled = true; btn.classList.add('opacity-50','cursor-not-allowed');
+    } else if (!timeOk) {
+      warn.textContent = '\u26a0\ufe0f ' + st + ' is not in its scheduled window right now. Frozen until it opens.';
       warn.classList.remove('hidden');
       btn.disabled = true; btn.classList.add('opacity-50','cursor-not-allowed');
     } else {
@@ -377,7 +469,7 @@
         }
         name.value = d.display_name;
         _curAssoc  = { assoc_num: val, display_name: d.display_name,
-                       assigned_shift: d.shift || '', is_mst: d.is_mst };
+                       assigned_shift: d.shift || '', is_mst: d.is_mst, is_manager: d.is_manager };
         document.getElementById('hidden_assoc_num').value = val;
         if (d.is_mst) {
           badge.textContent = '\ud83d\udcca MST';
@@ -465,10 +557,22 @@
     btn.disabled = false; btn.classList.remove('opacity-50','cursor-not-allowed');
   }
 
-  // ── Final submit ────────────────────────────────────────────────────────────
+  // -- Final submit --
   function confirmAndStart() {
     const nameVal = (document.getElementById('modal_lead_name').value || '').trim();
     if (!nameVal) { alert('Please enter your name.'); return; }
+
+    // Non-MST tech + a shift is already running -- confirm before joining it.
+    const isMst = _curAssoc && (_curAssoc.is_mst || _curAssoc.is_manager);
+    if (HAS_ACTIVE_SHIFT && _curAssoc && !isMst) {
+      const ok = window.confirm(
+        'A shift is already running. This will log you into that existing ' +
+        'shift instead of starting a new one. Continue?'
+      );
+      if (!ok) return;
+      document.getElementById('hidden_confirm_dup').value = '1';
+    }
+
     document.getElementById('hidden_lead_name').value = nameVal;
     closeMstModal();
     document.getElementById('shift-start-form').submit();
@@ -498,34 +602,30 @@
   }
 
   // ── Active-shift detection (time + day aware) ────────────────────────────────
-  // Each shift: { id, pyDays (start days, 0=Mon), startMin, endMin (may exceed 1440 = next day) }
-  const SHIFT_WINDOWS = [
-    { id: 'S1', startDays:[0,1,2,3], startMin: 330,  endMin: 960  },  // 5:30–16:00 same day
-    { id: 'S2', startDays:[0,1,2,3], startMin: 720,  endMin: 1350 },  // 12:00–22:30 same day
-    { id: 'S3', startDays:[0,1,2,3], startMin: 1230, endMin: 1860 },  // 20:30–7:00 next
-    { id: 'S4', startDays:[4,5,6],   startMin: 330,  endMin: 1080 },  // 5:30–18:00 same day
-    { id: 'S5', startDays:[4,5,6],   startMin: 1050, endMin: 1800 },  // 17:30–6:00 next
-  ];
-
+  // In dev mode the day-of-week is pinned to the frozen test date so this
+  // matches the same reality the server + dropdown are using. Includes the
+  // same 1hr closing grace as isShiftLiveOrEarly()/the server, so this line
+  // doesn't claim "no shift active" during the hour a shift is still open.
   function getActiveShiftsNow() {
     const now    = new Date();
     const nowMin = now.getHours() * 60 + now.getMinutes();
-    const pyDay  = toPy(now.getDay());
+    const pyDay  = IS_DEV_MODE ? toPy(dow(SERVER_TODAY)) : toPy(now.getDay());
     const prevPy = (pyDay + 6) % 7;
     const active = [];
 
     for (const s of SHIFT_WINDOWS) {
       const overnight = s.endMin > 1440;
+      const lateEnd   = s.endMin + SHIFT_GRACE_MIN;
       if (!overnight) {
         // Same-day shift
-        if (s.startDays.includes(pyDay) && nowMin >= s.startMin && nowMin < s.endMin)
+        if (s.startDays.includes(pyDay) && nowMin >= s.startMin && nowMin < lateEnd)
           active.push(s.id);
       } else {
         // Started today, still running
         if (s.startDays.includes(pyDay) && nowMin >= s.startMin)
           active.push(s.id);
-        // OR started yesterday (prevPy), now in the overnight tail
-        else if (s.startDays.includes(prevPy) && nowMin < (s.endMin - 1440))
+        // OR started yesterday (prevPy), now in the overnight tail (plus grace)
+        else if (s.startDays.includes(prevPy) && nowMin < (lateEnd - 1440))
           active.push(s.id);
       }
     }
@@ -546,7 +646,7 @@
       // Find the next shift starting today
       const now    = new Date();
       const nowMin = now.getHours() * 60 + now.getMinutes();
-      const pyDay  = toPy(now.getDay());
+      const pyDay  = IS_DEV_MODE ? toPy(dow(SERVER_TODAY)) : toPy(now.getDay());
       let nextLabel = null;
       let nextStart = Infinity;
       for (const s of SHIFT_WINDOWS) {
@@ -566,11 +666,65 @@
     }
   }
 
+  function getNextShiftStart(from) {
+    let best = null;
+    for (let d = 0; d <= 7; d++) {
+      const day = new Date(from);
+      day.setDate(day.getDate() + d);
+      day.setHours(0, 0, 0, 0);
+      const pyDay = toPy(day.getDay());
+      for (const s of SHIFT_WINDOWS) {
+        if (!s.startDays.includes(pyDay)) continue;
+        const candidate = new Date(day.getTime() + s.startMin * 60000);
+        if (candidate > from && (!best || candidate < best.at)) {
+          best = { at: candidate, id: s.id };
+        }
+      }
+    }
+    return best;
+  }
+
+  async function updateStartButtonLock() {
+    const btn = document.getElementById('open-modal-btn');
+    const msg = document.getElementById('start-btn-lock-msg');
+    let activeTypes = [];
+    try {
+      const res = await fetch('/api/active-shifts');
+      const data = await res.json();
+      activeTypes = data.active_types || [];
+    } catch (e) { return; }
+
+    if (activeTypes.length === 0) {
+      btn.disabled = false;
+      btn.classList.remove('opacity-50', 'cursor-not-allowed');
+      msg.classList.add('hidden');
+      return;
+    }
+
+    const now  = new Date();
+    const next = getNextShiftStart(now);
+    const oneHourOut = next ? (next.at.getTime() - now.getTime()) <= 3600000 : false;
+
+    if (oneHourOut) {
+      btn.disabled = false;
+      btn.classList.remove('opacity-50', 'cursor-not-allowed');
+      msg.textContent = next.id + ' starts soon -- you can start it now for handover.';
+      msg.classList.remove('hidden');
+    } else {
+      btn.disabled = true;
+      btn.classList.add('opacity-50', 'cursor-not-allowed');
+      const nextLabel = next
+        ? ('Unlocks 1hr before ' + next.id + ' (' + fmtMin(next.at.getHours()*60 + next.at.getMinutes()) + ').')
+        : 'a shift is already running.';
+      msg.textContent = 'Locked -- ' + activeTypes.join(' & ') + ' running. ' + nextLabel;
+      msg.classList.remove('hidden');
+    }
+  }
+
   function autoSelectCurrentShift() {
     // Only auto-select if the form date is today
     const formDate = selDate();
-    const todayStr = new Date().toISOString().slice(0, 10);
-    if (formDate !== todayStr) return;
+    if (formDate !== todayISO()) return;
 
     const active = getActiveShiftsNow();
     if (active.length === 0) return;
@@ -585,9 +739,11 @@
     }
   }
 
-  // ── Init ─────────────────────────────────────────────────────────────────────
+  // -- Init --
   updateActiveShiftLine();
   setInterval(updateActiveShiftLine, 60000); // refresh every minute
+  updateStartButtonLock();
+  setInterval(updateStartButtonLock, 30000); // refresh every 30s
   onDateOrShiftChange();
   autoSelectCurrentShift();
 </script>
