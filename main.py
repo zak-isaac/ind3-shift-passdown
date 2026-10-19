@@ -175,9 +175,13 @@ def _get_tech_session(request: Request, shift_id: int) -> dict | None:
 # ── Lead PIN auth ─────────────────────────────────────────────────────────────
 _LEAD_PIN_DEFAULT = hashlib.sha256(b"8972").hexdigest()
 _EMERGENCY_CODE   = "8972"   # always works even if PIN was changed — this IS the manager code
+# Master credentials — full manager/emergency override, same power as 8972.
+# Add more associate numbers here later for other operators; every check in
+# this file goes through _is_master_credential() so one list covers all of it.
+_MASTER_CODES     = {_EMERGENCY_CODE, "2759"}   # 2759 = Isaac, same rights as 8972
 _LEAD_COOKIE      = "lead_auth"
 _LEAD_SHIFT_COOKIE = "lead_shift_id"   # which shift this MST session owns
-_MGR_COOKIE       = "mgr_session"   # set ONLY when 8972 is entered
+_MGR_COOKIE       = "mgr_session"   # set when a master credential is entered
 _MGR_TOKEN        = hashlib.sha256(b"mgr:8972").hexdigest()  # opaque, never sent to client
 
 
@@ -186,14 +190,19 @@ def _get_pin_hash() -> str:
     return db.get_setting("lead_pin_hash", _LEAD_PIN_DEFAULT)
 
 
+def _is_master_credential(entered: str) -> bool:
+    """True for any credential in _MASTER_CODES -- same override rights as 8972."""
+    return entered.strip() in _MASTER_CODES
+
+
 def _check_lead_credential(entered: str) -> bool:
-    """Accepts: stored PIN, hardcoded emergency code, OR any associate marked is_mst."""
+    """Accepts: stored PIN, any master credential, OR any associate marked is_mst."""
     entered = entered.strip()
     if not entered:
         return False
     if hashlib.sha256(entered.encode()).hexdigest() == _get_pin_hash():
         return True
-    if entered == _EMERGENCY_CODE:
+    if _is_master_credential(entered):
         return True
     assoc = _ROSTER.get(entered)
     if assoc and assoc.get("is_mst"):
@@ -245,16 +254,53 @@ def _get_lead_shift_id(request: Request) -> int:
 
 
 def _can_manage_shift(request: Request, shift_id: int) -> bool:
-    """True if this session is allowed to mutate the given shift.
-    Manager override (8972) bypasses the check; regular MSTs are bound to their shift.
+    """True if this session is allowed to view/mutate the given shift.
+    Master credential (_MASTER_CODES) bypasses the check entirely. A regular
+    MST session may ONLY manage the exact shift it's bound to -- an unbound
+    session (bound == 0, e.g. an old cookie from before binding existed, or
+    a login that couldn't tell which of several active shifts was theirs)
+    is fail-closed: it can't touch ANY specific shift until it picks one
+    explicitly (see lead_page()'s shift-resolution logic). This is what
+    stops an S5 MST from opening an S4 shift, or any other shift that isn't
+    theirs, just by guessing a shift_id.
     """
     if _is_manager_authed(request):
         return True
     bound = _get_lead_shift_id(request)
-    return bound == 0 or bound == shift_id  # 0 = unbound legacy session
+    return bound != 0 and bound == shift_id
+
+
+def _require_shift_access(request: Request, shift_id: int) -> None:
+    """Raise 403 unless this session may manage `shift_id`. Call this at the
+    top of every route that mutates a specific shift's data."""
+    if not _can_manage_shift(request, shift_id):
+        raise HTTPException(
+            status_code=403,
+            detail="This shift belongs to a different MST session. Open your "
+                   "own shift from Home, or use the manager code to override.",
+        )
+
+
+def _resolve_my_shift(request: Request) -> dict | None:
+    """The shift this MST session should act on by default: their own bound
+    shift if they have one, otherwise -- only when there's truly no
+    ambiguity (a master session, or exactly one shift running at all) --
+    the most recently active shift. Never silently guesses among multiple
+    concurrently active shifts for a regular, unbound MST session.
+    """
+    bound = _get_lead_shift_id(request)
+    if bound:
+        return db.get_shift(bound)
+    shifts = db.get_active_shifts()
+    if len(shifts) == 1:
+        return shifts[0]
+    if _is_manager_authed(request) and shifts:
+        return shifts[0]
+    return None
+
 
 def _is_manager_authed(request: Request) -> bool:
-    """True only when the session was opened with the hardcoded 8972 code."""
+    """True only when the session was opened with a master credential (see _MASTER_CODES)."""
     return request.cookies.get(_MGR_COOKIE) == _MGR_TOKEN
 
 def _lead_redirect(dest: str = "/lead"):
@@ -759,7 +805,7 @@ async def shift_start(
                         max_age=86400 * 30)  # 30 days
         resp.set_cookie(_LEAD_SHIFT_COOKIE, str(bound_shift_id),
                         httponly=True, samesite="lax", path="/")
-        if entered == _EMERGENCY_CODE:
+        if _is_master_credential(entered):
             resp.set_cookie(_MGR_COOKIE, _MGR_TOKEN,
                             httponly=True, samesite="lax", path="/",
                             max_age=86400 * 30)
@@ -791,8 +837,8 @@ async def lead_force_end(request: Request):
     """Force-close the active shift with no report — for when previous MST forgot to end."""
     if not _is_lead_authed(request):
         return _lead_redirect("/lead/force-end")
-    shift = db.get_active_shift()
-    if shift:
+    shift = _resolve_my_shift(request)
+    if shift and _can_manage_shift(request, shift["id"]):
         db.close_shift(shift["id"])
     return RedirectResponse("/", status_code=303)
 
@@ -1207,6 +1253,7 @@ async def lead_cmms_upload(
     """Lead/MST dashboard CMMS CSV upload endpoint."""
     if not _is_lead_authed(request):
         return _lead_redirect("/lead")
+    _require_shift_access(request, shift_id)
     shift = db.get_shift(shift_id)
     uploader_name = f"{shift['lead_name']} (MST)" if shift else "MST Import"
     return await _process_cmms_upload(
@@ -1283,8 +1330,8 @@ async def lead_auth_json(request: Request, pin: str = Form(...)):
         resp.set_cookie(_LEAD_COOKIE, _get_pin_hash(),
                         httponly=True, samesite="lax", path="/",
                         max_age=86400 * 30)  # 30 days — survives browser/PC restarts
-        # Manager cookie — set ONLY when the hardcoded 8972 code is entered
-        if pin.strip() == _EMERGENCY_CODE:
+        # Manager cookie — set when a master credential is entered (see _MASTER_CODES)
+        if _is_master_credential(pin):
             resp.set_cookie(_MGR_COOKIE, _MGR_TOKEN,
                             httponly=True, samesite="lax", path="/",
                             max_age=86400 * 30)
@@ -1335,17 +1382,32 @@ async def lead_login_post(
             except Exception as exc:
                 print(f"[login] pending shift cookie invalid: {exc}", flush=True)
 
-        # If no pending shift, try to bind to the most-recent active shift for
-        # this credential (associate-ID login finds their shift by lead_name)
+        # If no pending shift, prefer an explicit shift_id carried in `next`
+        # (set when the user clicked a specific shift's MST login button on
+        # Home, or an overlap-window link) -- far more reliable than guessing.
+        if not bound_shift_id:
+            from urllib.parse import urlparse, parse_qs
+            next_qs = parse_qs(urlparse(next).query)
+            requested_raw = (next_qs.get("shift_id") or [None])[0]
+            if requested_raw and requested_raw.isdigit():
+                candidate = db.get_shift(int(requested_raw))
+                if candidate and candidate.get("is_active"):
+                    bound_shift_id = candidate["id"]
+
+        # Still nothing explicit -- try matching this credential's own shift
+        # by lead name, but ONLY when that's unambiguous. With 2+ shifts
+        # active at once, a name match (or lack of one) is not reliable
+        # enough to bind to -- leave unbound rather than guess wrong.
         if not bound_shift_id:
             assoc = _ROSTER.get(entered)
-            if assoc:
+            active = db.get_active_shifts()
+            if assoc and len(active) == 1:
+                bound_shift_id = active[0]["id"]
+            elif assoc:
                 lead_display = assoc.get("display_name") or assoc.get("full_name", "")
-                active = db.get_active_shifts()
-                for s in active:
-                    if s["lead_name"] == lead_display:
-                        bound_shift_id = s["id"]
-                        break
+                matches = [s for s in active if s["lead_name"] == lead_display]
+                if len(matches) == 1:
+                    bound_shift_id = matches[0]["id"]
 
         safe_next = next if next.startswith("/") else "/lead"
         html = f"""
@@ -1366,8 +1428,8 @@ async def lead_login_post(
                             httponly=True, samesite="lax", path="/")
         else:
             resp.delete_cookie(_LEAD_SHIFT_COOKIE, path="/")
-        # Manager cookie — only granted when 8972 is the credential
-        if entered == _EMERGENCY_CODE:
+        # Manager cookie — granted when a master credential is entered (see _MASTER_CODES)
+        if _is_master_credential(entered):
             resp.set_cookie(_MGR_COOKIE, _MGR_TOKEN,
                             httponly=True, samesite="lax", path="/")
         else:
@@ -1405,10 +1467,16 @@ async def lead_page(request: Request, status: str = "", shift_id: int = 0):
     shifts = db.get_active_shifts()
     if not shifts:
         return RedirectResponse("/", status_code=303)
-    # Honour shift_id param when there are multiple active (overlap window)
-    active_ids = {s["id"] for s in shifts}
-    matched    = [s for s in shifts if s["id"] == shift_id]
-    shift      = matched[0] if matched else shifts[0]
+    # Which shift are we showing? Explicit request > this session's own bound
+    # shift > (only when truly unambiguous) the single active shift. Then the
+    # access check is what actually stops an MST from viewing a shift that
+    # isn't theirs -- an explicit shift_id that fails the check sends them
+    # home instead of silently rendering someone else's shift.
+    bound_id  = _get_lead_shift_id(request)
+    target_id = shift_id or bound_id or (shifts[0]["id"] if len(shifts) == 1 else 0)
+    shift = next((s for s in shifts if s["id"] == target_id), None)
+    if not shift or not _can_manage_shift(request, target_id):
+        return RedirectResponse("/?pick_shift=1", status_code=303)
     entries = db.get_entries(shift["id"])
     carry_overs = db.get_carry_over_entries(current_shift_id=shift["id"])
     shift_notes = db.get_shift_notes(shift["id"])
@@ -1604,6 +1672,7 @@ async def dismiss_carry_over(
     """Clear the carry-over flag — item is resolved, stop showing it."""
     if not _is_lead_authed(request):
         raise HTTPException(status_code=403)
+    _require_shift_access(request, shift_id)
     db.set_carry_over(entry_id, False)
     carry_overs = db.get_carry_over_entries(current_shift_id=shift_id)
     return templates.TemplateResponse(
@@ -1623,6 +1692,7 @@ async def adopt_carry_over(
     """
     if not _is_lead_authed(request):
         raise HTTPException(status_code=403)
+    _require_shift_access(request, shift_id)
     source = db.get_entry(entry_id)
     if source:
         lead_name = db.get_shift(shift_id)["lead_name"] if db.get_shift(shift_id) else "MST"
@@ -1655,6 +1725,10 @@ async def toggle_carry_over(
 ):
     if not _is_lead_authed(request):
         raise HTTPException(status_code=403)
+    entry = db.get_entry(entry_id)
+    if not entry:
+        raise HTTPException(status_code=404)
+    _require_shift_access(request, entry["shift_id"])
     db.set_carry_over(entry_id, bool(state))
     return HTMLResponse("")
 
@@ -1670,12 +1744,13 @@ async def lead_exclude_entry(
     """Toggle exclusion of an entry from the generated report."""
     if not _is_lead_authed(request):
         raise HTTPException(status_code=403)
+    entry = db.get_entry(entry_id)
+    if not entry:
+        return HTMLResponse("")
+    _require_shift_access(request, entry["shift_id"])
     db.set_entry_excluded(entry_id, bool(excluded))
     # Re-render just this entry row so the button + styling update in place
-    shift = db.get_active_shift()
-    if not shift:
-        return HTMLResponse("")
-    entries = db.get_entries(shift["id"])
+    entries = db.get_entries(entry["shift_id"])
     entry = next((e for e in entries if e["id"] == entry_id), None)
     if not entry:
         return HTMLResponse("")  # deleted or wrong shift
@@ -1692,6 +1767,10 @@ async def lead_delete_entry(
     """Hard-delete an entry from the shift (MST only)."""
     if not _is_lead_authed(request):
         raise HTTPException(status_code=403)
+    entry = db.get_entry(entry_id)
+    if not entry:
+        return HTMLResponse("")
+    _require_shift_access(request, entry["shift_id"])
     db.delete_entry(entry_id)
     return HTMLResponse("")  # target row gets removed by HTMX hx-swap outerHTML
 
@@ -1732,12 +1811,14 @@ async def lead_entry_update(
     """MST updates the issue text of an entry in place."""
     if not _is_lead_authed(request):
         raise HTTPException(status_code=403)
-    db.update_entry_issue(entry_id, issue.strip())
     # Fetch the entry directly — never rely on get_active_shift() here
     # because the entry may belong to any shift (overlap window, etc.)
     entry = db.get_entry(entry_id)
     if not entry:
         raise HTTPException(status_code=404)
+    _require_shift_access(request, entry["shift_id"])
+    db.update_entry_issue(entry_id, issue.strip())
+    entry = db.get_entry(entry_id)
     return templates.TemplateResponse(
         request, "partials/live_feed_row.html", {"e": entry}
     )
@@ -1754,6 +1835,7 @@ async def save_shift_notes(
 ):
     if not _is_lead_authed(request):
         raise HTTPException(status_code=403)
+    _require_shift_access(request, shift_id)
     db.save_shift_notes(shift_id, notes)
     return HTMLResponse(
         '<span class="text-green-600 text-xs font-semibold">&#10003; Saved</span>'
@@ -1885,6 +1967,7 @@ async def lead_save_loto(
     if not _is_lead_authed(request):
         return HTMLResponse("Unauthorized", status_code=401)
 
+    _require_shift_access(request, shift_id)
     # If any missing keys recorded — LOTO was checked (just missing some)
     keys_clean = ", ".join(k.strip() for k in missing_keys.split(",") if k.strip())
     verified   = bool(keys_clean) or loto_verified.lower() in ("on", "true", "1", "yes")
@@ -1900,6 +1983,7 @@ async def lead_loto_remove_key(
 ):
     if not _is_lead_authed(request):
         return HTMLResponse("Unauthorized", status_code=401)
+    _require_shift_access(request, shift_id)
     loto = db.get_loto(shift_id)
     existing = loto.get("loto_missing_keys", "")
     keys     = [k.strip() for k in existing.split(",") if k.strip()]
@@ -1965,6 +2049,7 @@ async def lead_pm_upload(
 ):
     if not _is_lead_authed(request):
         return HTMLResponse("Unauthorized", status_code=401)
+    _require_shift_access(request, shift_id)
     ext = Path(pm_file.filename or "").suffix.lower()
     if ext not in ALLOWED_PM_EXTS:
         return HTMLResponse(
@@ -2020,6 +2105,7 @@ async def lead_pm_download(request: Request, file_id: int):
 async def lead_pm_delete(request: Request, file_id: int, shift_id: int = Form(...)):
     if not _is_lead_authed(request):
         return HTMLResponse("Unauthorized", status_code=401)
+    _require_shift_access(request, shift_id)
     stored = db.delete_pm_file(file_id)
     if stored:
         p = PM_UPLOAD_DIR / stored
@@ -2135,6 +2221,7 @@ async def lead_happenings_upload(
 ):
     if not _is_lead_authed(request):
         return HTMLResponse("Unauthorized", status_code=401)
+    _require_shift_access(request, shift_id)
     ext = Path(happenings_file.filename or "").suffix.lower()
     if ext not in ALLOWED_HAPPENINGS_EXTS:
         return HTMLResponse(
@@ -2169,6 +2256,7 @@ async def lead_happenings_file_download(request: Request, file_id: int):
 async def lead_happenings_file_delete(request: Request, file_id: int, shift_id: int = Form(...)):
     if not _is_lead_authed(request):
         return HTMLResponse("Unauthorized", status_code=401)
+    _require_shift_access(request, shift_id)
     stored = db.delete_happenings_file(file_id)
     if stored:
         p = HAPPENINGS_UPLOAD_DIR / stored
@@ -3014,7 +3102,7 @@ async def lead_rts_log(request: Request):
     """Return the RTS log partial for the current shift (used on page load + OOB refresh)."""
     if not _is_lead_authed(request):
         raise HTTPException(status_code=403)
-    shift = db.get_active_shift()
+    shift = _resolve_my_shift(request)
     rts_units = db.get_rts_events(shift["id"]) if shift else []
     html = templates.env.get_template("partials/rts_log.html").render(rts_units=rts_units)
     return HTMLResponse(html, headers={"HX-Trigger": json.dumps({"rtsUpdated": {"count": len(rts_units)}})})
@@ -3025,7 +3113,7 @@ async def delete_rts_entry(request: Request, unit: str):
     """Remove a single entry from the current shift's RTS log."""
     if not _is_lead_authed(request):
         raise HTTPException(status_code=403)
-    shift = db.get_active_shift()
+    shift = _resolve_my_shift(request)
     if shift:
         db.delete_rts_event(shift["id"], unit)
     rts_units = db.get_rts_events(shift["id"]) if shift else []
@@ -3039,7 +3127,7 @@ async def oos_remove(request: Request, unit: str = Form(...)):
         raise HTTPException(status_code=403, detail="Not authorised")
     clean = unit.strip()
     # Log the RTS event against the active shift BEFORE removing from OOS
-    shift = db.get_active_shift()
+    shift = _resolve_my_shift(request)
     db.log_rts_event(shift["id"] if shift else None, clean)
     db.remove_oos_unit(clean)
 
@@ -3070,8 +3158,9 @@ async def lead_generate(
 ):
     if not _is_lead_authed(request):
         raise HTTPException(status_code=403, detail="Not authorised")
-    shift = db.get_active_shift()
-    if not shift or shift["id"] != shift_id:
+    _require_shift_access(request, shift_id)
+    shift = db.get_shift(shift_id)
+    if not shift or not shift.get("is_active"):
         raise HTTPException(status_code=404, detail="Shift not found")
 
     # RTS: merge DB log (from OOS panel removals) + any extra manual form entries
