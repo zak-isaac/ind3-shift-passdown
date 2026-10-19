@@ -44,13 +44,21 @@
         <p class="text-blue-200 text-sm truncate">
           <span class="text-wm-spark font-bold">{{ shift.shift_type }}</span>
           &nbsp;&bull;&nbsp;{{ shift.date }}
+          {% if shift.opened_by_role == 'tech' %}
+          &nbsp;&bull;&nbsp;<span class="bg-amber-400 text-amber-950 text-xs font-black px-2 py-0.5 rounded-full">NO MST YET</span>
+          {% else %}
           &nbsp;&bull;&nbsp;MST: <span class="font-semibold text-white">{{ shift.lead_name }}</span>
+          {% endif %}
           &nbsp;&bull;&nbsp;Logged in as: <span class="text-wm-spark font-black">{{ tech_name }}</span>
           &nbsp;&bull;&nbsp;<span class="text-wm-spark">Signed on <span id="signon-time"></span></span>
         </p>
       </div>
     </div>
     <div class="flex items-center gap-2 shrink-0">
+      <a href="/walkthrough/" target="_blank"
+        class="flex items-center gap-1.5 bg-wm-spark hover:bg-yellow-400 text-gray-900 text-xs font-black px-3 py-1.5 rounded-full transition shadow">
+        &#128064; Walkthrough
+      </a>
       <span class="text-wm-spark font-black font-mono bg-white bg-opacity-10 px-2.5 py-1 rounded-full border border-wm-spark border-opacity-40 text-xs">{{ dc_number }}</span>
       <a href="/" class="text-blue-200 hover:text-white text-xs font-medium transition px-2 py-1 rounded">&#127968; Home</a>
       <button onclick="toggleDark()" class="text-blue-200 hover:text-white text-sm transition px-2 py-1 rounded" title="Toggle dark mode">&#9790;</button>
@@ -218,12 +226,13 @@
     >
       <input type="hidden" name="shift_id" value="{{ shift.id }}" />
       <label class="flex flex-col gap-1">
-        <span class="text-xs font-bold text-gray-600 uppercase tracking-wide">Select Cetaris CSV</span>
+        <span class="text-xs font-bold text-gray-600 uppercase tracking-wide">Select Cetaris CSV (one or more files)</span>
         <input
           id="cmms-file-input"
           type="file"
-          name="file"
+          name="files"
           accept=".csv,.xlsx,.xls"
+          multiple
           required
           class="text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0
                  file:text-xs file:font-bold file:bg-wm-blue file:text-white hover:file:bg-blue-700
@@ -474,7 +483,7 @@
   }
 
   function _cmmsUploadStart() {
-    _setUploadStatus('\uD83D\uDCE4 Uploading file\u2026');
+    _setUploadStatus('\uD83D\uDCE4 Uploading file(s)\u2026');
     const txt = document.getElementById('cmms-spinner-text');
     if (txt) txt.textContent = 'Uploading\u2026';
     _importTimer = setTimeout(() => {
