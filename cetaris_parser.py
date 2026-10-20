@@ -14,6 +14,8 @@ import csv
 import io
 from dataclasses import dataclass, field
 
+from cause_lookup import normalize_wo
+
 
 @dataclass
 class ImportedWO:
@@ -117,7 +119,11 @@ def parse_cetaris(content: bytes | str) -> ParseResult:
 
     for row in rows:
         asset_id  = row.get("Asset #", "")
-        wo_number = row.get("WO Number", "")
+        # Normalized the same way cause_lookup.py normalizes WO Number from
+        # the cause export -- otherwise an .xlsx timecard (Excel stores WO
+        # Number as a numeric cell, e.g. 28017126.0) never matches the cause
+        # file's '28017126' and repair causes silently vanish from reports.
+        wo_number = normalize_wo(row.get("WO Number", ""))
         status    = row.get("Status", "").lower()
 
         if not asset_id or not wo_number:

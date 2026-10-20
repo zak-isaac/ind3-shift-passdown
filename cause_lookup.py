@@ -68,12 +68,25 @@ def _rows(content: bytes | str) -> list[dict]:
     return _rows_from_xlsx(content) if _is_xlsx(content) else _rows_from_csv(content)
 
 
-def _normalize_wo(value) -> str:
-    """'28017126.0' / 28017126.0 / '28017126' -> '28017126'."""
+def normalize_wo(value) -> str:
+    """'28017126.0' / 28017126.0 / '28017126' -> '28017126'.
+
+    PUBLIC on purpose: cetaris_parser.py's timecard import must use this
+    exact same normalization for its WO Number column, or an .xlsx export
+    (where Excel stores WO Number as a numeric cell, e.g. 28017126.0)
+    produces a happening keyed by '28017126.0' that can never match this
+    module's cause lookup keyed by '28017126' -- the cause silently never
+    shows up in the report, with no error anywhere. See cetaris_parser.py
+    for the matching call site.
+    """
     text = str(value).strip() if value is not None else ""
     if text.endswith(".0"):
         text = text[:-2]
     return text
+
+
+# Old private name kept as an alias in case anything else imported it directly.
+_normalize_wo = normalize_wo
 
 
 def _clean_text(value) -> str:
