@@ -3493,4 +3493,5 @@ app.include_router(create_v3_router(
     now_func=dev_mode.get_now,
     get_v2_cookie_value=_get_pin_hash,
     legacy_lead_page=lead_page,
+    generate_report=lead_generate,
 ))
