@@ -1,0 +1,81 @@
+/* Primary/secondary action button component.
+   Base interaction pattern from Uiverse.io by kamehame-ha, adapted to the
+   Walmart brand blue palette used throughout IND3 Shift Passdown.
+
+   Usage:
+     <button class="button"><span class="text">Label</span></button>
+     <button class="button button--secondary"><span class="text">Label</span></button>
+
+   Only use this on real primary-action buttons (submit/CTA). Icon-only
+   toggles, tab switchers, and color-coded chip selectors should keep
+   their own styling -- this component isn't meant for those patterns. */
+
+.button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 10px 15px;
+  gap: 10px;
+  background-color: #0071ce;
+  color: #fff;
+  outline: 3px #0071ce solid;
+  outline-offset: -3px;
+  border-radius: 5px;
+  border: none;
+  cursor: pointer;
+  transition: 400ms;
+  text-decoration: none;
+  font: inherit;
+}
+.button .text {
+  color: #fff;
+  font-weight: 700;
+  font-size: 1em;
+  transition: 400ms;
+}
+.button svg path {
+  transition: 400ms;
+  fill: #fff;
+}
+.button:hover {
+  background-color: transparent;
+}
+.button:hover .text {
+  color: #0071ce;
+}
+.button:hover svg path {
+  fill: #0071ce;
+}
+.button:disabled,
+.button[disabled] {
+  opacity: .55;
+  cursor: not-allowed;
+}
+.button:disabled:hover,
+.button[disabled]:hover {
+  background-color: #0071ce;
+}
+.button:disabled:hover .text,
+.button[disabled]:hover .text {
+  color: #fff;
+}
+
+/* Secondary variant: starts inverted (outline look), fills on hover. */
+.button--secondary {
+  background-color: transparent;
+}
+.button--secondary .text {
+  color: #0071ce;
+}
+.button--secondary svg path {
+  fill: #0071ce;
+}
+.button--secondary:hover {
+  background-color: #0071ce;
+}
+.button--secondary:hover .text {
+  color: #fff;
+}
+.button--secondary:hover svg path {
+  fill: #fff;
+}
