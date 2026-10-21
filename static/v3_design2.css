@@ -1,6 +1,6 @@
 /* Design 2 — faithful Command Center layout overlay; leaves legacy V2 CSS untouched. */
 :root{--wm:#0053e2;--navy:#071b37;--yellow:#ffc220;--bg:#f3f6fb;--border:#e0e6ef;--text:#142742}
-body{font-family:Inter,'Segoe UI',Arial,sans-serif;color:var(--text);background:var(--bg);font-size:13px}
+body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--text);background:var(--bg);font-size:13px}
 .design2-shell .navy-sidebar{width:205px;flex:0 0 205px;background:#081933;color:#d3def3}
 .d2-brand{display:flex;gap:9px;align-items:center;padding:19px 18px 17px;border-bottom:none}
 .d2-spark{font-size:41px;color:var(--yellow);line-height:1}.d2-brand strong{font-size:14px;color:white;letter-spacing:-.2px;white-space:nowrap}.d2-brand strong span{font-weight:500;color:#cbd8ed}.d2-brand small{display:block;font-size:9px;color:#8fa5c7;margin-top:2px;white-space:nowrap}
