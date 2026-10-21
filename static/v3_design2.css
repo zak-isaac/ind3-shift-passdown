@@ -2,7 +2,7 @@
 :root{--wm:#0053e2;--navy:#071b37;--yellow:#ffc220;--bg:#f3f6fb;--border:#e0e6ef;--text:#142742}
 body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--text);background:var(--bg);font-size:14px}
 .design2-shell .navy-sidebar{width:205px;flex:0 0 205px;background:#081933;color:#d3def3}
-.d2-brand{display:flex;gap:9px;align-items:center;padding:19px 18px 17px;border-bottom:none}
+.d2-brand{display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:19px 18px 17px;border-bottom:none}
 .d2-spark{font-size:41px;color:var(--yellow);line-height:1}.d2-brand strong{font-size:14px;color:white;letter-spacing:-.2px;white-space:nowrap}.d2-brand strong span{font-weight:500;color:#cbd8ed}.d2-brand small{display:block;font-size:9px;color:#8fa5c7;margin-top:2px;white-space:nowrap}
 .design2-shell .nav-block{padding:15px 10px 10px}.design2-shell .nav-cap{font-size:9px;padding:0 10px;color:#8299c0;margin-bottom:8px}.design2-shell .nav-link{font-size:11px;padding:11px 11px;gap:9px;font-weight:600;border-radius:6px;margin:2px 0}.design2-shell .nav-link.active{background:#1d3c70;box-shadow:inset 3px 0 var(--yellow)}.design2-shell .nav-link em{border-radius:30px;background:#2e507e;font-size:9px;font-weight:800;padding:2px 6px;font-style:normal}.d2-nav-icon{display:inline-grid;place-items:center;width:16px;min-width:16px;font-size:15px}.d2-nav-bottom{margin-top:auto;padding:0 13px 16px}.d2-current-shift{background:#17365e;border:1px solid #31527a;border-radius:10px;padding:14px 12px;color:#d9e6fb}.d2-current-shift small{display:block;font-size:9px;font-weight:800;letter-spacing:1px;color:#a0b9d9;margin-bottom:7px}.d2-current-shift b{display:block;font-size:12px;line-height:1.5;color:#fff}.d2-current-shift span{display:block;color:#a9c0df;font-size:10px;margin:5px 0}.d2-current-shift i{display:inline-block;border-radius:50%;background:#16c784;width:7px;height:7px;margin-right:5px}.d2-current-shift div{font-size:10px;color:#7ee6b9}.d2-version{font-size:9px;color:#839ec7;display:flex;justify-content:space-between;margin:14px 5px 0}
 .design2-shell .d2-topbar{height:58px;padding:10px 25px;border-bottom:1px solid #e7ebf3;box-shadow:none}.d2-topbar .crumb{font-size:11px;color:#9aa9bd;font-weight:500}.d2-topbar .crumb b{color:#273d5b}.d2-topbar .crumb span{margin:0 6px;color:#9aacca}.d2-topbar .header-right{gap:9px}.d2-mode{padding:7px 9px;border:1px solid #e4eaf1;border-radius:7px;font-size:10px;color:#687d99;font-weight:700}.d2-avatar{width:29px;height:29px;display:grid;place-items:center;border-radius:50%;background:#d9e7ff;color:#0b57bc;font-size:10px;font-weight:900}.d2-profile b{font-size:10px;display:block;line-height:1.25}.d2-profile small{color:#94a3b7;font-size:9px;display:block}.d2-signout{padding:4px 8px;font-size:14px;color:#8ca0b6}
@@ -24,7 +24,7 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
 
 /* V3 clarity pass — text-first, no decorative pictograms or oversized graphics. */
 .design2-shell { font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; font-size: 14px; }
-.d2-brand .d2-mark { width: 10px; height: 30px; background: var(--yellow); border-radius: 3px; display: block; flex: 0 0 10px; }
+.d2-logo{width:132px;height:auto;display:block}
 .d2-brand strong { font-size: 16px; letter-spacing: 0; }
 .d2-brand small, .d2-nav-bottom, .design2-shell .nav-cap { font-size: 11px; }
 .design2-shell .nav-link { font-size: 13px; padding: 12px 13px; }
