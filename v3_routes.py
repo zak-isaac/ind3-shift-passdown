@@ -73,11 +73,13 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                 return day
         return None
 
-    def entry_page(request, error=""):
+    def entry_page(request, error="", master_verified=False):
         shifts=_v3_live_shifts()
         now=now_func() if now_func else datetime.now()
         return templates.TemplateResponse(request,"v3/login.html",{
             "error":error,"shifts":shifts,"today":now.date().isoformat(),
+            "master_verified":master_verified,
+            "eligible_shifts":[code for code in ("S1","S2","S3","S4","S5") if _v3_shift_day(code)],
             "valid_shifts": [code for code,days in (allowed_shift_days or {}).items()
                              if now.date().weekday() in days] or ["S1","S2","S3","S4","S5"],
         })
@@ -151,6 +153,41 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                                is_ot=is_ot if role=="mst" else False,opened_by_assoc=associate)
         except ValueError:
             return entry_page(request,"The active-shift limit was reached. Try again.")
+        response=RedirectResponse(f"/v3?shift_id={sid}",status_code=303)
+        set_session_cookies(response,who,sid)
+        return response
+
+    @router.post("/master/verify", response_class=HTMLResponse)
+    async def verify_master(request:Request, master_code:str=Form(...)):
+        if not hmac.compare_digest(master_code.strip(), "8972"):
+            return entry_page(request, "Invalid testing master code.")
+        profile = (get_mst_roster() or {}).get("8972") if get_mst_roster else None
+        if not profile or not profile.get("is_manager"):
+            return entry_page(request, "Manager test profile is missing.")
+        response = entry_page(request, master_verified=True)
+        set_session_cookies(response, {"associate":"8972","profile":profile}, 0)
+        return response
+
+    @router.post("/master/select")
+    async def master_select(request:Request, shift_type:str=Form(...)):
+        who=decode_session(request)
+        if not who or not who["profile"].get("is_manager"):
+            return RedirectResponse("/v3/login", status_code=303)
+        day=_v3_shift_day(shift_type) if shift_type in ("S1","S2","S3","S4","S5") else None
+        if not day:
+            return entry_page(request, "Shift is outside its working window.", master_verified=True)
+        active=_v3_live_shifts()
+        chosen=next((sh for sh in active if sh["shift_type"]==shift_type),None)
+        if not chosen:
+            if len(active)>=2:
+                return entry_page(request, "Two shifts are already active.", master_verified=True)
+            try:
+                sid=db.start_shift(day.isoformat(),shift_type,"Manager",
+                                   opened_by_role="mst",is_ot=False,opened_by_assoc="8972")
+            except ValueError:
+                return entry_page(request, "Unable to start shift.", master_verified=True)
+        else:
+            sid=chosen["id"]
         response=RedirectResponse(f"/v3?shift_id={sid}",status_code=303)
         set_session_cookies(response,who,sid)
         return response
