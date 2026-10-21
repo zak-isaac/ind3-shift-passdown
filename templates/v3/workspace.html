@@ -1,27 +1,27 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>IND3 / Passdown — Shift workspace</title>
-<link rel="stylesheet" href="/static/v3.css"><link rel="stylesheet" href="/static/v3_design2.css"><script src="/static/v3.js" defer></script>
+<link rel="stylesheet" href="/static/v3.css"><link rel="stylesheet" href="/static/v3_design2.css"><script src="/static/htmx.min.js"></script><script src="/static/v3.js" defer></script>
 </head><body>
 <div class="shell design2-shell">
 <aside class="navy-sidebar" aria-label="Primary navigation">
   <div class="brand d2-brand"><img src="/static/walmart-logo-white.svg" alt="Walmart" class="d2-logo"><div><strong>IND3 <span>/ Passdown</span></strong><small>Maintenance Reliability</small></div></div>
   <nav class="nav-block"><div class="nav-cap">WORKSPACE</div>
-    <a class="nav-link active" aria-current="page" href="/v3?shift_id={{ shift.id }}"><span>Shift workspace</span><em>V3</em></a>
+    <a class="nav-link active" aria-current="page" href="/v3?shift_id={{ shift.id }}" hx-get="/v3?shift_id={{ shift.id }}" hx-select="#main-content" hx-target="#main-content" hx-swap="outerHTML" hx-push-url="true"><span>Shift workspace</span><em>V3</em></a>
   </nav>
   <nav class="nav-block"><div class="nav-cap">RECORDS &amp; INSIGHTS</div>
-    <a class="nav-link" href="/v3/history?shift_id={{ shift.id }}"><span>Shift history</span></a>
-    <a class="nav-link" href="/v3/analytics?shift_id={{ shift.id }}"><span>Analytics</span></a>
+    <a class="nav-link" href="/v3/history?shift_id={{ shift.id }}" hx-get="/v3/history?shift_id={{ shift.id }}" hx-select="#main-content" hx-target="#main-content" hx-swap="outerHTML" hx-push-url="true"><span>Shift history</span></a>
+    <a class="nav-link" href="/v3/analytics?shift_id={{ shift.id }}" hx-get="/v3/analytics?shift_id={{ shift.id }}" hx-select="#main-content" hx-target="#main-content" hx-swap="outerHTML" hx-push-url="true"><span>Analytics</span></a>
   </nav>
   <nav class="nav-block"><div class="nav-cap">SYSTEM</div>
-    <a class="nav-link" href="/v3/admin"><span>Administration</span></a>
-    <a class="nav-link" href="/v3/operations?shift_id={{ shift.id }}"><span>Maintenance operations</span></a>
+    <a class="nav-link" href="/v3/admin" hx-get="/v3/admin" hx-select="#main-content" hx-target="#main-content" hx-swap="outerHTML" hx-push-url="true"><span>Administration</span></a>
+    <a class="nav-link" href="/v3/operations?shift_id={{ shift.id }}" hx-get="/v3/operations?shift_id={{ shift.id }}" hx-select="#main-content" hx-target="#main-content" hx-swap="outerHTML" hx-push-url="true"><span>Maintenance operations</span></a>
   </nav>
   <div class="d2-nav-bottom"><div class="d2-version">IND3 Passdown <span>V3</span></div></div>
 </aside>
 <div class="viewport">
 <header class="topbar d2-topbar"><div class="crumb">Maintenance <span>›</span> <b>Shift workspace</b></div><div class="header-right"><span class="d2-mode">Shift owner</span><div class="d2-profile"><b>{{ shift.lead_name or 'Shift owner' }}</b><small>Authorized session</small></div><a class="d2-signout" href="/v3/logout" title="Sign out">Sign out</a></div></header>
-<main class="dashboard d2-dashboard">
+<main class="dashboard d2-dashboard" id="main-content">
  {% if notice %}<div class="banner success" role="status">{{ notice }}</div>{% endif %}
  {% if warning %}<div class="banner warn" role="alert">{{ warning }}</div>{% endif %}
  <div class="page-intro d2-page-intro"><div><div class="eyebrow">MAINTENANCE OPERATIONS · IND3</div><h1>Shift workspace</h1><p>One place to collect, review, and hand off everything that happened this shift.</p></div><div class="header-actions"><a class="button button-outline" href="/v3/preview?shift_id={{ shift.id }}">Preview passdown</a><button class="button button-blue" type="button" onclick="v3OpenImport()">Upload Cetaris File</button></div></div>
