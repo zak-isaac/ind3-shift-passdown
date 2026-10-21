@@ -102,7 +102,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         if not profile or profile.get("is_manager"):
             return entry_page(request,"Associate number not found in the current roster.")
         who={"associate":associate,"profile":profile}
-        owned=[sh for sh in db.get_active_shifts() if shift_owned_by(sh,who)]
+        owned=[sh for sh in _v3_live_shifts() if shift_owned_by(sh,who)]
         if mode=="resume":
             chosen=next((sh for sh in owned if sh["id"]==shift_id),None)
             if not chosen:
@@ -110,10 +110,18 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             response=RedirectResponse(f"/v3?shift_id={chosen['id']}",status_code=303)
             set_session_cookies(response,who,chosen["id"])
             return response
-        if mode=="signin":
-            response=RedirectResponse(f"/v3?shift_id={owned[0]['id']}" if len(owned)==1 else "/v3/choose",status_code=303)
-            set_session_cookies(response,who,owned[0]["id"] if len(owned)==1 else 0)
+        if owned:
+            chosen = owned[0]
+            response = RedirectResponse(f"/v3?shift_id={chosen['id']}", status_code=303)
+            set_session_cookies(response, who, chosen["id"])
             return response
+        assigned = str(profile.get("shift") or "").strip().upper()
+        if assigned not in ("S1","S2","S3","S4","S5"):
+            return entry_page(request, "No assigned shift found in the roster.")
+        day = _v3_shift_day(assigned)
+        if day is None:
+            return entry_page(request, f"{assigned} is outside its scheduled shift window.")
+        shift_type, shift_date = assigned, day.isoformat()
         # Start a shift. Validate date and shift before allocating any records.
         if not shift_date or not shift_type:
             return entry_page(request,"Select a shift date and shift code.")
@@ -128,9 +136,9 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             return entry_page(request,"Selected shift is not scheduled for this date.")
         # Never create a second instance of a shift code; allow distinct shift
         # codes to overlap, each under their own starter's identity.
-        if any(sh["shift_type"]==shift_type for sh in db.get_active_shifts()):
+        if any(sh["shift_type"]==shift_type for sh in _v3_live_shifts()):
             return entry_page(request,f"{shift_type} is already active. Resume your own shift or contact its starter.")
-        if len(db.get_active_shifts())>=2:
+        if len(_v3_live_shifts())>=2:
             return entry_page(request,"Two overlapping shifts are already running.")
         if start_eligibility:
             allowed,is_ot,message=start_eligibility(profile,shift_type,now_func() if now_func else datetime.now())
