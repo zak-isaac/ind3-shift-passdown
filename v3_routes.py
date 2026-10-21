@@ -474,6 +474,31 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             "today":(now_func() if now_func else datetime.now()).date().isoformat(),
             "allow_start":get_mst_roster is not None})
 
+    @router.get("/history", response_class=HTMLResponse)
+    async def v3_history(request:Request, shift_id:int=0):
+        # History is read-only; require an authenticated V3 session.
+        if get_mst_roster is not None:
+            if not decode_session(request):
+                return RedirectResponse("/v3/login",status_code=303)
+        elif not is_lead_authed(request):
+            return lead_redirect("/v3/history")
+        return templates.TemplateResponse(request,"v3/history.html",{
+            "shift_id":shift_id,
+            "shifts":db.list_past_shifts_with_counts(limit=100),
+        })
+
+    @router.get("/analytics", response_class=HTMLResponse)
+    async def v3_analytics(request:Request, shift_id:int=0):
+        if get_mst_roster is not None:
+            if not decode_session(request):
+                return RedirectResponse("/v3/login",status_code=303)
+        elif not is_lead_authed(request):
+            return lead_redirect("/v3/analytics")
+        return templates.TemplateResponse(request,"v3/analytics.html",{
+            "shift_id":shift_id,
+            "data":db.get_analytics(),
+        })
+
     @router.get("/operations",response_class=HTMLResponse)
     async def v2_operations(request:Request,shift_id:int):
         """All original V2 maintenance/report features, reused, not copied."""
