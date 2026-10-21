@@ -1,0 +1,65 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>IND3 — MST Command Center V3</title><link rel="stylesheet" href="static/v3.css"><script src="static/v3.js" defer></script></head>
+<body>
+<div class="shell">
+<aside class="navy-sidebar" aria-label="Primary navigation">
+  <div class="brand"><img src="static/walmart-logo-white.svg" alt="Walmart"><span class="brand-sub">IND3 <b>PASSDOWN</b></span><span class="vlabel">V3 MST</span></div>
+  <div class="nav-block"><div class="nav-cap">WORKSPACE</div>
+    <a href="/v3?shift_id=1" class="nav-link active">▦ <span>Command Center</span></a>
+    <a href="#happenings" class="nav-link">▤ <span>Shift Happenings</span></a>
+    <a href="#cetaris" class="nav-link">⇧ <span>Cetaris Import</span></a>
+    <a href="/v3/preview?shift_id=1" class="nav-link">▣ <span>Passdown Preview</span></a>
+  </div>
+  <div class="nav-block"><div class="nav-cap">MANAGEMENT</div>
+    <a href="/history" class="nav-link">◷ <span>History</span></a><a href="/analytics" class="nav-link">▥ <span>Analytics</span></a><a href="/admin" class="nav-link">⚙ <span>Admin</span></a>
+  </div><div class="nav-footer"><div class="status-led"></div> Shift system online <div class="nav-caption">V2 remains available at <a href="/lead?shift_id=1">Legacy dashboard ↗</a></div></div>
+</aside>
+<div class="viewport">
+<header class="topbar"><div><span class="crumb">MAINTENANCE / IND3 / </span><strong>MST Command Center</strong><div class="subhead">Centralized shift passdown workspace</div></div><div class="header-right"><span class="shift-pill">● ACTIVE SHIFT</span><a class="outline-light" href="/v3/choose">Switch Shift</a><a class="outline-light" href="/lead/logout">Sign Out</a></div></header>
+<main class="dashboard">
+  <div class="banner success" role="status">✓ Design preview — illustrative data; not connected to a live shift.</div>
+  <div class="page-intro"><div><div class="eyebrow">SHIFT WORKSPACE</div><h1>S2 · 2026-10-20</h1><p>MST: <strong>MST Lead</strong> · Shift #1 · Every imported happening must come from a <b>Closed</b> WO</p></div><div class="header-actions"><a class="button button-lite" href="/v3/preview?shift_id=1">Preview Passdown ↗</a></div></div>
+  <div class="kpis"><div class="kpi"><span class="kpi-caption">SELECTED TECHNICIANS</span><strong>4</strong><small>From Cetaris export</small></div><div class="kpi"><span class="kpi-caption">SHIFT HAPPENINGS</span><strong>4</strong><small>Unique WO / manual events</small></div><div class="kpi"><span class="kpi-caption">COMPLETED PMs</span><strong>8</strong><small>Unique closed PM work orders</small></div><div class="kpi"><span class="kpi-caption">PENDING REVIEW</span><strong>1</strong><small>Changed Cetaris remarks</small></div></div>
+  <section class="card cetaris" id="cetaris"><div class="section-head"><div><div class="eyebrow">DATA COLLECTION</div><h2>Cetaris Desktop Import</h2></div><span class="mini-label">ONE XLSX · MULTIPLE TECHNICIANS</span></div>
+    <div class="loaded-banner"><span class="check-dot">✓</span><span><b>trial.xlsx</b> · Imported Oct 20<br><small>Ssaku, Isaac, Melvin, Douglas, Bawi, Mang, Popoola, Waheed</small></span></div>
+    <form method="post" action="/v3/import" enctype="multipart/form-data" class="upload-form"><input type="hidden" name="shift_id" value="1"><label class="upload-drop">⇧ <span><strong>Replace / Refresh Cetaris Export</strong><small>Use the 106-column Cetaris Desktop report (.xlsx)</small></span><input type="file" name="file" required accept=".xlsx" onchange="this.closest('form').querySelector('.file-selected').textContent=this.files[0]?.name||''"></label><span class="file-selected"></span><button type="submit" class="button button-blue">Read File</button></form>
+    
+  </section>
+  <div class="workspace-grid"><section class="card happenings" id="happenings"><div class="section-head"><div><div class="eyebrow">MAINTENANCE ACTIVITY</div><h2>Shift Happenings <span class="count-label">4</span></h2></div><button class="button button-blue" type="button" onclick="v3OpenManual()">＋ Add Happening</button></div>
+    <div class="section-help">Asset ID · Cause / Reported Issue · Technician Remarks · WO#</div>
+    
+    <div class="happenings-list"><article class="happening ">
+      <div class="happening-top"><div><span class="asset">VOIDFILL1201</span><span class="wo-tag">WO# 28021671</span></div><button class="tiny-action" type="button" onclick="v3OpenHappening(1,1)">View Details ↗</button></div>
+      <div class="item-issue"><span class="field-label">REPORTED ISSUE</span><span>Head position less than MIN.</span></div>
+      <div class="item-remarks"><span class="field-label">TECH REMARKS</span><div><p><b>Ssaku, Isaac:</b> Recalibrated the head and power-cycled the asset; equipment returned to normal operation. RTS.</p></div></div>
+      <div class="item-footer"><span>👤 1 technician record</span><form method="post" action="/v3/happening/1/exclude"><input type="hidden" name="shift_id" value="1"><input type="hidden" name="excluded" value="1"><button type="submit" class="text-button">⊘ Exclude</button></form></div>
+    </article><article class="happening ">
+      <div class="happening-top"><div><span class="asset">VOIDFILL0201</span><span class="wo-tag">WO# 28021625</span></div><button class="tiny-action" type="button" onclick="v3OpenHappening(2,1)">View Details ↗</button></div>
+      <div class="item-issue"><span class="field-label">REPORTED ISSUE</span><span>Equipment issue reported; detailed complaint not provided.</span></div>
+      <div class="item-remarks"><span class="field-label">TECH REMARKS</span><div><p><b>Melvin, Douglas:</b> Reset the engaged E-stop; confirmed normal operation.</p></div></div>
+      <div class="item-footer"><span>👤 1 technician record</span><form method="post" action="/v3/happening/2/exclude"><input type="hidden" name="shift_id" value="1"><input type="hidden" name="excluded" value="1"><button type="submit" class="text-button">⊘ Exclude</button></form></div>
+    </article><article class="happening ">
+      <div class="happening-top"><div><span class="asset">VOIDFILL1101</span><span class="wo-tag">WO# 28021666</span></div><button class="tiny-action" type="button" onclick="v3OpenHappening(3,1)">View Details ↗</button></div>
+      <div class="item-issue"><span class="field-label">REPORTED ISSUE</span><span>Taper fault displayed on screen.</span></div>
+      <div class="item-remarks"><span class="field-label">TECH REMARKS</span><div><p><b>Popoola, Waheed:</b> Performed recalibration.</p></div></div>
+      <div class="item-footer"><span>👤 1 technician record</span><form method="post" action="/v3/happening/3/exclude"><input type="hidden" name="shift_id" value="1"><input type="hidden" name="excluded" value="1"><button type="submit" class="text-button">⊘ Exclude</button></form></div>
+    </article><article class="happening ">
+      <div class="happening-top"><div><span class="asset">VOIDFILL1001</span><span class="wo-tag">WO# 28021472</span><span class="review-tag">Review update</span></div><button class="tiny-action" type="button" onclick="v3OpenHappening(4,1)">View Details ↗</button></div>
+      <div class="item-issue"><span class="field-label">REPORTED ISSUE</span><span>No paper in chute.</span></div>
+      <div class="item-remarks"><span class="field-label">TECH REMARKS</span><div><p><b>Popoola, Waheed:</b> PM.</p></div></div>
+      <div class="item-footer"><span>👤 1 technician record</span><form method="post" action="/v3/happening/4/exclude"><input type="hidden" name="shift_id" value="1"><input type="hidden" name="excluded" value="1"><button type="submit" class="text-button">⊘ Exclude</button></form></div>
+    </article></div>
+    
+  </section>
+  <aside class="tools">
+  <details class="card tool" open><summary>✓ Preventive Maintenance <span class="tool-count">8 closed</span></summary><div class="tool-body"><p>Completed PM count is based on unique closed work orders.</p><div class="pm-list"><div><b>PM work order</b><span>WO# Sample</span></div></div></div></details>
+  <details class="card tool"><summary>🔑 LOTO Verification <span class="tool-count ">Pending</span></summary><form class="tool-body" method="post" action="/v3/loto"><input type="hidden" name="shift_id" value="1"><label class="check-line"><input type="checkbox" name="verified" value="1" >All LOTO keys accounted for</label><label>Missing keys<input name="missing_keys" value="" placeholder="e.g. Key #2"></label><button class="button button-blue" type="submit">Save LOTO</button></form></details>
+  <details class="card tool"><summary>⚙ OOS & RTS <span class="tool-count">0 OOS</span></summary><div class="tool-body"><p>Existing equipment statuses are preserved in V2.</p><a class="text-button" href="/lead?shift_id=1">Manage OOS / RTS ↗</a></div></details>
+  <details class="card tool"><summary>📋 Shift Notes</summary><form class="tool-body" method="post" action="/v3/notes"><input type="hidden" name="shift_id" value="1"><textarea name="notes" rows="5" placeholder="Support given, vendor follow-up, unresolved issues..."></textarea><button type="submit" class="button button-blue">Save Notes</button></form></details>
+  <details class="card tool"><summary>🚚 Vendors & Carry-overs</summary><div class="tool-body"><p>Vendor entries, reliable operations, carry-overs, and the existing sender remain available in the V2 report builder.</p><a href="/lead?shift_id=1" class="text-button">Open existing report tools ↗</a></div></details>
+  <div class="card report-card"><div class="eyebrow">PASSDOWN</div><h3>Ready to Review?</h3><p>Review closed work orders and PMs before handing over to the next shift.</p><a class="button button-blue wide" href="/v3/preview?shift_id=1">Preview Shift Passdown →</a><a class="button button-outline wide" href="/lead?shift_id=1">V2 Send / Export Tools ↗</a><p class="note">V3 preview does not call the AI Writer. Existing V2 report controls remain unchanged.</p></div>
+  </aside></div>
+  <footer class="footer">IND3 Shift Passdown · V3 MST Command Center · Walmart visual identity · <b>AI Writer OFF</b></footer>
+</main></div></div>
+<div id="v3-modal-root" class="modal-shell" hidden></div>
+<dialog id="manual-dialog" class="manual-dialog"><form method="post" action="/v3/manual" class="modal-form"><input type="hidden" name="shift_id" value="1"><div class="modal-title"><div><div class="eyebrow">MST MANUAL ENTRY</div><h2>Add Shift Happening</h2></div><button type="button" onclick="document.getElementById('manual-dialog').close()" aria-label="Close">✕</button></div><label>Asset ID<input required name="unit" placeholder="e.g. VOIDFILL0201"></label><label>Reported Issue<input required name="issue" placeholder="Problem reported"></label><label>WO # (optional)<input name="wo_number"></label><label>Technician Remarks<textarea name="remarks" rows="4" placeholder="Work performed"></textarea></label><div class="modal-actions"><button type="button" class="button button-outline" onclick="document.getElementById('manual-dialog').close()">Cancel</button><button type="submit" class="button button-blue">Add Happening</button></div></form></dialog>
+</body></html>
