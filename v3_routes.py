@@ -278,7 +278,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         if get_mst_roster is not None:
             who=decode_session(request)
             if not who: raise HTTPException(401,"MST login required")
-                _v3_live_shifts()
+            _v3_live_shifts()
             shift=db.get_shift(shift_id or who["shift_id"]) if (shift_id or who["shift_id"]) else None
             if not shift or not shift.get("is_active"): raise HTTPException(404,"Choose your active shift")
             if not shift_owned_by(shift,who) or who["shift_id"] != shift["id"]:
