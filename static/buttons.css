@@ -79,3 +79,18 @@
 .button--secondary:hover svg path {
   fill: #fff;
 }
+
+/* Danger variant: for destructive actions (end shift, delete, etc.) */
+.button--danger {
+  background-color: #b42318;
+  outline-color: #b42318;
+}
+.button--danger:hover {
+  background-color: transparent;
+}
+.button--danger:hover .text {
+  color: #b42318;
+}
+.button--danger:hover svg path {
+  fill: #b42318;
+}
