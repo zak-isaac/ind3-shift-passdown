@@ -19,7 +19,24 @@
 <form method="post" action="/v3/login" class="flex flex-col gap-4"><input type="hidden" name="mode" value="start">
 <div><label class="v3label" for="associate_id">Associate number</label><input class="v3entry" id="associate_id" name="associate_id" inputmode="numeric" autocomplete="off" maxlength="30" required placeholder="Enter your associate number"></div>
 <button type="submit" class="v3btn">Continue &rarr;</button></form>
-<div class="v3line"></div><p class="v3help">Your assigned shift is selected automatically. Use Active Shifts to resume your own shift.</p>
+<div class="v3line"></div><button class="v3btn" type="button" style="background:#001e60" onclick="document.getElementById('master-code-dialog').showModal()">Management Access</button>
+<dialog id="master-code-dialog" style="border:0;border-radius:16px;padding:24px;max-width:430px;width:92%;box-shadow:0 20px 70px #001e6066">
+<h2 class="text-wm-dark text-xl font-black mb-3">Management Access</h2>
+<p class="v3help mb-4">Enter the development master code to continue.</p>
+<form method="post" action="/v3/master/verify"><label class="v3label" for="master_code">Master code</label>
+<input class="v3entry mb-4" id="master_code" type="password" name="master_code" autocomplete="off" required>
+<button type="submit" class="v3btn">Verify code</button></form>
+<button type="button" class="v3help mt-3" onclick="document.getElementById('master-code-dialog').close()">Cancel</button></dialog>
+<dialog id="master-shift-dialog" style="border:0;border-radius:16px;padding:24px;max-width:430px;width:92%;box-shadow:0 20px 70px #001e6066">
+<h2 class="text-wm-dark text-xl font-black mb-3">Select eligible shift</h2>
+<p class="v3help mb-4">Start a new shift or resume an existing eligible shift.</p>
+<form method="post" action="/v3/master/select"><label class="v3label" for="master_shift">Shift</label>
+<select class="v3entry mb-4" name="shift_type" id="master_shift" required>
+<option value="">Choose shift</option>{% for code in eligible_shifts %}<option value="{{ code }}">{{ code }}</option>{% endfor %}</select>
+<button type="submit" class="v3btn">Start or Resume</button></form>
+<button type="button" class="v3help mt-3" onclick="document.getElementById('master-shift-dialog').close()">Cancel</button></dialog>
+{% if master_verified %}<script>document.getElementById('master-shift-dialog').showModal()</script>{% endif %}
+<p class="v3help">Your assigned shift is selected automatically. Use Active Shifts to resume your own shift.</p>
 </section>
 <section class="v3c"><h2 class="text-wm-dark text-2xl font-black mb-1">Active shifts</h2><p class="v3help mb-4">Overlapping shifts stay separate. Enter the associate number of the person who started a shift to resume it.</p>
 {% for sh in shifts %}<div class="border border-blue-100 bg-blue-50 rounded-xl p-4 mb-3"><div class="flex items-center justify-between mb-2"><strong class="text-wm-dark text-2xl">{{ sh.shift_type }}</strong><span class="text-green-700 bg-green-100 rounded-full px-2 py-1 text-xs font-bold">ACTIVE</span></div><p class="text-sm text-gray-600 mb-3">{{ sh.date }} · Started by {{ sh.lead_name }}</p>
