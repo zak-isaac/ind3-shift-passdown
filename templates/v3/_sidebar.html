@@ -10,7 +10,6 @@
   </nav>
   <nav class="nav-block"><div class="nav-cap">SYSTEM</div>
     <a class="nav-link{{ ' active' if active_page=='admin' else '' }}" href="/v3/admin" hx-get="/v3/admin" hx-select="#main-content" hx-target="#main-content" hx-swap="outerHTML" hx-push-url="true"><span>Administration</span></a>
-    <a class="nav-link{{ ' active' if active_page=='operations' else '' }}" href="/v3/operations?shift_id={{ sid }}" hx-get="/v3/operations?shift_id={{ sid }}" hx-select="#main-content" hx-target="#main-content" hx-swap="outerHTML" hx-push-url="true"><span>Maintenance operations</span></a>
   </nav>
   <div class="d2-nav-bottom"><div class="d2-version">IND3 Passdown <span>V3</span></div></div>
 </aside>
