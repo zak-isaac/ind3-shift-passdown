@@ -544,7 +544,13 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         if generate_report is None:
             raise HTTPException(503,"Report generator unavailable")
         # Reuse the established report-generation engine without rendering V2 HTML.
-        await generate_report(request,shift_id=shift_id)
+        # NOTE: lead_generate's other parameters are typed as `= Form(default=[])`,
+        # which only resolves to a real list when FastAPI itself parses the request.
+        # Called directly like this (not as a route), those defaults stay unresolved
+        # Form marker objects -- must pass real empty lists explicitly or it crashes
+        # the moment lead_generate tries to iterate them (e.g. rts_unit).
+        await generate_report(request,shift_id=shift_id,extra_title=[],extra_note=[],
+                              vendor_name=[],ro_item=[],rts_unit=[])
         report=db.get_last_report_for_shift(shift_id)
         if not report:
             raise HTTPException(500,"Report was not saved")
