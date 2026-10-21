@@ -763,6 +763,13 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                       (shift_id,json.dumps(sorted(selected)),batch["filename"],datetime.now().strftime("%Y-%m-%d %H:%M")))
             c.execute("DELETE FROM v3_import_batches WHERE token=?",(token,))
         notice=f"Imported {added} new technician/WO entries; {unchanged} unchanged; {pending} flagged for review. {stats.get('unique_pm_wos',0)} distinct closed PM WOs in this import."
+        skipped_parts=[]
+        if stats.get("not_closed"):
+            skipped_parts.append(f"{stats['not_closed']} not yet closed")
+        if stats.get("outside_shift"):
+            skipped_parts.append(f"{stats['outside_shift']} outside this shift's time window")
+        if skipped_parts:
+            notice += " Skipped " + " and ".join(skipped_parts) + " (not counted as happenings)."
         from urllib.parse import quote
         return RedirectResponse(f"/v3?shift_id={shift_id}&notice={quote(notice)}",status_code=303)
 
