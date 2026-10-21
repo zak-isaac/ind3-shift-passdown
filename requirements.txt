@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+jinja2
+aiofiles
+python-multipart
+python-docx
+reportlab
+httpx
+pandas
+openpyxl
+pyspellchecker
