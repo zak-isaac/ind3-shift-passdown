@@ -23,7 +23,7 @@ from v3_cetaris import parse_excel, select_records, technician_counts, MAX_SIZE
 def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shift,
                      shift_window, lead_redirect, get_mst_roster=None, verify_mst_pin=None,
                      start_eligibility=None, allowed_shift_days=None, now_func=None,
-                     get_v2_cookie_value=None, legacy_lead_page=None):
+                     get_v2_cookie_value=None, legacy_lead_page=None, generate_report=None):
     router = APIRouter(prefix="/v3", tags=["Shift V3"])
 
     # Same signed V3 session can be validated by the original V2 handlers.
@@ -499,13 +499,67 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             "data":db.get_analytics(),
         })
 
-    @router.get("/operations",response_class=HTMLResponse)
-    async def v2_operations(request:Request,shift_id:int):
-        """All original V2 maintenance/report features, reused, not copied."""
+    @router.get("/operations", response_class=HTMLResponse)
+    async def v3_operations(request:Request, shift_id:int):
         shift=secure(request,shift_id)
-        if legacy_lead_page is None:
-            raise HTTPException(503,"V2 maintenance view not connected")
-        return await legacy_lead_page(request,shift_id=shift["id"])
+        return templates.TemplateResponse(request,"v3/operations.html",{
+            "shift":shift,
+            "report":db.get_last_report_for_shift(shift_id),
+            "warning":request.query_params.get("warning",""),
+        })
+
+    @router.post("/generate")
+    async def v3_generate(request:Request,shift_id:int=Form(...)):
+        secure(request,shift_id)
+        if generate_report is None:
+            raise HTTPException(503,"Report generator unavailable")
+        # Reuse the established report-generation engine without rendering V2 HTML.
+        await generate_report(request,shift_id=shift_id)
+        report=db.get_last_report_for_shift(shift_id)
+        if not report:
+            raise HTTPException(500,"Report was not saved")
+        return RedirectResponse(f"/v3/report/{report['id']}?shift_id={shift_id}",status_code=303)
+
+    def report_access(request,report_id):
+        report=db.get_report(report_id)
+        if not report: raise HTTPException(404,"Report not found")
+        shift=db.get_shift(report["shift_id"])
+        if not shift: raise HTTPException(404,"Shift not found")
+        if get_mst_roster is not None:
+            who=decode_session(request)
+            if not who: raise HTTPException(401,"Sign in to view report")
+            if not who["profile"].get("is_manager"):
+                opener=(shift.get("opened_by_assoc") or "").strip()
+                if opener != who["associate"] or who["shift_id"] != shift["id"]:
+                    raise HTTPException(403,"Report belongs to another shift owner")
+        elif not is_lead_authed(request):
+            raise HTTPException(401,"Sign in to view report")
+        return shift,report
+
+    @router.get("/report/{report_id}", response_class=HTMLResponse)
+    async def v3_report(request:Request,report_id:int,shift_id:int=0):
+        shift,report=report_access(request,report_id)
+        return templates.TemplateResponse(request,"v3/report.html",{"shift":shift,"report":report})
+
+    @router.post("/end")
+    async def v3_end(request:Request,shift_id:int=Form(...)):
+        shift=secure(request,shift_id)
+        report=db.get_last_report_for_shift(shift_id)
+        if not report:
+            return RedirectResponse(f"/v3/operations?shift_id={shift_id}&warning=Generate+a+report+before+ending+the+shift",status_code=303)
+        db.close_shift(shift_id)
+        return RedirectResponse(f"/v3/ended?shift_id={shift_id}",status_code=303)
+
+    @router.get("/ended",response_class=HTMLResponse)
+    async def v3_ended(request:Request,shift_id:int):
+        shift=db.get_shift(shift_id)
+        if not shift or shift.get("is_active"):
+            raise HTTPException(404,"Closed shift not found")
+        report=db.get_last_report_for_shift(shift_id)
+        if not report:
+            raise HTTPException(404,"No saved report for shift")
+        report_access(request,report["id"])
+        return templates.TemplateResponse(request,"v3/ended.html",{"shift":shift,"report":report})
 
     @router.get("/technicians",response_class=HTMLResponse)
     async def technicians(request:Request,shift_id:int):
