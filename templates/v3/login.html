@@ -1,97 +1,38 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>IND3 Shift Passdown — Start or Resume Shift</title>
-<link rel="stylesheet" href="/static/tailwind.min.css"><style>
-.v3c{border-radius:16px;border:1px solid #dbe3f1;box-shadow:0 4px 16px #001e6012;background:#fff;padding:24px}.v3entry{width:100%;border:1px solid #cdd6e5;border-radius:10px;padding:11px 12px;font-size:14px;background:#fff}.v3entry:focus{border-color:#0053e2;outline:2px solid #bed7ff}.v3label{font-size:11px;font-weight:800;color:#4f6181;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px}.v3btn{background:#0053e2;color:#fff;border:0;border-radius:10px;padding:13px 16px;font-size:14px;font-weight:800;cursor:pointer;width:100%}.v3btn:hover{background:#003ea8}.v3resume{display:inline-block;width:100%;background:#ffc220;color:#001e60;text-align:center;border-radius:10px;padding:10px;font-weight:800}.v3error{background:#fff0ed;border:1px solid #ffc2b7;color:#992500;padding:10px 14px;border-radius:12px;font-weight:700}.v3help{color:#62738f;font-size:12px;line-height:1.55}.v3line{height:1px;background:#e8edf4;margin:18px 0}
-</style></head>
-<body class="min-h-screen flex flex-col bg-gray-100">
-<!-- ░░ NAVBAR ░░ -->
-<nav class="bg-wm-blue border-b border-blue-700 shrink-0">
-  <div class="max-w-7xl mx-auto px-5 flex items-center justify-between" style="height:72px;">
-    <div class="flex items-center gap-3">
-      <a href="/" class="flex items-center gap-2 hover:opacity-80 transition">
-        <div style="height:56px;overflow:hidden;display:flex;align-items:center;flex-shrink:0;"><img src="/static/walmart-logo-white.svg" alt="Walmart" style="height:224px;width:auto;" /></div>
-        
-      </a>
-      <span class="text-blue-400 mx-1 font-thin">|</span>
-      <span class="text-blue-100 text-sm font-medium tracking-wide">MST Reliability Operations</span>
-    </div>
-    <div class="flex items-center gap-3">
-      <a href="/walkthrough/" target="_blank"
-        class="flex items-center gap-1.5 bg-wm-spark hover:bg-yellow-400 text-gray-900 text-xs font-black px-3.5 py-2 rounded-full transition shadow">
-        &#128064; App Walkthrough
-      </a>
-      <span class="text-wm-spark text-sm font-black font-mono bg-white bg-opacity-10 px-3 py-1 rounded-full border border-wm-spark border-opacity-30">{{ dc_number }}</span>
-    </div>
-  </div>
-</nav>
-
-{% if is_dev_mode %}
-<div class="bg-amber-400 text-amber-950 text-center text-xs font-black py-1.5 tracking-wide">
-  &#129514; DEVELOPER / TEST MODE &mdash; sandboxed data, frozen date {{ today }} &mdash; nothing here touches the live shift &bull;
-  <a href="/dev/exit" class="underline hover:text-amber-800">Exit Test Mode</a>
-</div>
-{% endif %}
-
-<!-- ░░ HERO ░░ -->
-<section class="bg-wm-dark" style="background:linear-gradient(135deg,#001e50 0%,#002d72 55%,#0053e2 100%)">
-  <div class="max-w-7xl mx-auto px-6 py-7 md:py-9 flex flex-col md:flex-row md:items-center gap-8">
-
-    <!-- LEFT: Title only -->
-    <div class="flex-1">
-      <span class="inline-block bg-wm-spark text-gray-900 text-xs font-black px-3 py-1 rounded-full uppercase tracking-widest mb-3">Shift Operations</span>
-      <h1 class="text-white font-black text-4xl md:text-5xl leading-tight tracking-tight">
-        Shift Passdown<br class="hidden md:block" />
-        <span class="text-wm-spark">Generator</span>
-      </h1>
-    </div>
-
-    <!-- RIGHT: Description + pills -->
-    <div class="flex-shrink-0 w-full md:w-80 flex flex-col gap-4">
-      <p class="text-blue-200 text-base leading-relaxed">
-        Digital shift handover for the MST Reliability team.
-        Structured, timestamped, and ready to share in seconds.
-      </p>
-      <div class="flex flex-wrap gap-2">
-        <span class="bg-white bg-opacity-10 border border-white border-opacity-20 text-white text-xs font-semibold px-3 py-1.5 rounded-full">&#9889; Multi-Technician</span>
-        <span class="bg-white bg-opacity-10 border border-white border-opacity-20 text-white text-xs font-semibold px-3 py-1.5 rounded-full">&#128336; Auto-Timestamped</span>
-        <span class="bg-white bg-opacity-10 border border-white border-opacity-20 text-white text-xs font-semibold px-3 py-1.5 rounded-full">&#128203; Instant Report</span>
-        <span class="bg-white bg-opacity-10 border border-white border-opacity-20 text-white text-xs font-semibold px-3 py-1.5 rounded-full">&#9993; Email on Close</span>
-      </div>
-    </div>
-
-  </div>
-</section>
-<main class="flex-1 max-w-7xl w-full mx-auto px-5 py-7"><div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-<section class="v3c"><div class="flex items-center justify-between mb-4"><h2 class="text-wm-dark text-2xl font-black">Welcome back</h2><span class="rounded-full bg-blue-50 text-wm-blue px-3 py-1 text-xs font-black">V3</span></div>
-<p class="v3help mb-4">Enter your associate number to access your assigned shift.</p>
-{% if error %}<div class="v3error mb-4" role="alert">{{ error }}</div>{% endif %}
-<form method="post" action="/v3/login" class="flex flex-col gap-4"><input type="hidden" name="mode" value="start">
-<div><label class="v3label" for="associate_id">Associate number</label><input class="v3entry" id="associate_id" name="associate_id" inputmode="numeric" autocomplete="off" maxlength="30" required placeholder="Enter your associate number"></div>
-<button type="submit" class="v3btn">Continue &rarr;</button></form>
-<div class="v3line"></div><button class="v3btn" type="button" style="background:#001e60" onclick="document.getElementById('master-code-dialog').showModal()">Management Access</button>
-<dialog id="master-code-dialog" style="border:0;border-radius:16px;padding:24px;max-width:430px;width:92%;box-shadow:0 20px 70px #001e6066">
-<h2 class="text-wm-dark text-xl font-black mb-3">Management Access</h2>
-<p class="v3help mb-4">Enter the development master code to continue.</p>
-<form method="post" action="/v3/master/verify"><label class="v3label" for="master_code">Master code</label>
-<input class="v3entry mb-4" id="master_code" type="password" name="master_code" autocomplete="off" required>
-<button type="submit" class="v3btn">Verify code</button></form>
-<button type="button" class="v3help mt-3" onclick="document.getElementById('master-code-dialog').close()">Cancel</button></dialog>
-<dialog id="master-shift-dialog" style="border:0;border-radius:16px;padding:24px;max-width:430px;width:92%;box-shadow:0 20px 70px #001e6066">
-<h2 class="text-wm-dark text-xl font-black mb-3">Select eligible shift</h2>
-<p class="v3help mb-4">Start a new shift or resume an existing eligible shift.</p>
-<form method="post" action="/v3/master/select"><label class="v3label" for="master_shift">Shift</label>
-<select class="v3entry mb-4" name="shift_type" id="master_shift" required>
-<option value="">Choose shift</option>{% for code in eligible_shifts %}<option value="{{ code }}">{{ code }}</option>{% endfor %}</select>
-<button type="submit" class="v3btn">Start or Resume</button></form>
-<button type="button" class="v3help mt-3" onclick="document.getElementById('master-shift-dialog').close()">Cancel</button></dialog>
-{% if master_verified %}<script>document.getElementById('master-shift-dialog').showModal()</script>{% endif %}
-<p class="v3help">Your assigned shift is selected automatically. Use Active Shifts to resume your own shift.</p>
-</section>
-<section class="v3c"><h2 class="text-wm-dark text-2xl font-black mb-1">Active shifts</h2><p class="v3help mb-4">Overlapping shifts stay separate. Enter the associate number of the person who started a shift to resume it.</p>
-{% for sh in shifts %}<div class="border border-blue-100 bg-blue-50 rounded-xl p-4 mb-3"><div class="flex items-center justify-between mb-2"><strong class="text-wm-dark text-2xl">{{ sh.shift_type }}</strong><span class="text-green-700 bg-green-100 rounded-full px-2 py-1 text-xs font-bold">ACTIVE</span></div><p class="text-sm text-gray-600 mb-3">{{ sh.date }} · Started by {{ sh.lead_name }}</p>
-<form method="post" action="/v3/login" class="flex flex-col gap-2"><input type="hidden" name="mode" value="resume"><input type="hidden" name="shift_id" value="{{ sh.id }}"><label class="v3label">Associate number<input class="v3entry mt-1" name="associate_id" inputmode="numeric" autocomplete="off" required placeholder="Enter to resume"></label><button class="v3resume" type="submit">Resume {{ sh.shift_type }}</button></form></div>{% else %}<div class="rounded-xl bg-gray-50 border border-gray-200 p-6 text-center text-gray-600 text-sm">No active shifts. Start a shift from the form.</div>{% endfor %}
-<p class="v3help mt-4">A shift can only be opened by its eligible associate, and cannot be started twice. At most two different shifts can overlap, following the existing V2 rules.</p>
-</section></div></main>
-<footer class="bg-wm-dark text-blue-200 text-xs py-3 text-center">IND3 Shift Passdown · Maintenance Reliability · Walmart · V3</footer>
+<style>
+:root{font-family:Arial,Helvetica,sans-serif;color:#001e50;background:#f4f7fb}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;flex-direction:column}button,input,select{font:inherit}
+.nav{background:#0071ce;min-height:100px;padding:18px max(20px,calc((100vw - 1160px)/2));display:flex;align-items:center;justify-content:space-between;gap:15px}.brand{display:flex;align-items:center;gap:20px;min-width:0}.wordmark{width:210px;height:auto;display:block;flex-shrink:0}.navlabel{border-left:2px solid #a4d5f8;padding-left:19px;color:#fff;font-size:17px;font-weight:700;line-height:1.35}.site{border:1px solid #ffffff55;border-radius:12px;background:#ffffff1c;padding:12px 17px;color:#ffc220;font-size:19px;font-weight:900;white-space:nowrap}
+.hero{background:#001e50;color:#fff;border-bottom:4px solid #ffc220}.hero-inner{max-width:1160px;margin:auto;padding:40px 20px;display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:center}.pill{display:inline-block;background:#ffc220;color:#001e50;border-radius:30px;padding:8px 14px;font-size:10px;letter-spacing:1px;font-weight:900}.hero h1{font-size:clamp(32px,4vw,52px);line-height:1.1;font-weight:900;letter-spacing:-1px;margin:16px 0 0;color:#fff}.hero h1 span{color:#ffc220}.desc{color:#e2eeff;font-size:14px;line-height:1.8;margin:0 0 18px}.features{display:grid;grid-template-columns:1fr 1fr;gap:10px}.feature{background:#173866;border:1px solid #355780;border-radius:9px;padding:12px 10px;display:flex;align-items:center;gap:8px;color:#fff;font-size:11px;font-weight:700;white-space:nowrap}.feature svg{width:18px;height:18px;stroke:#ffc220;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.main{max-width:1160px;width:100%;margin:0 auto;padding:30px 20px;display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start;flex:1}.card{background:#fff;border:1px solid #dce5ef;border-radius:14px;padding:30px;box-shadow:0 5px 20px #001e500a}.card h2{font-size:25px;font-weight:850;letter-spacing:-.4px;margin:0 0 8px;color:#001e50}.muted{font-size:13px;color:#667891;line-height:1.65;margin:0}.label{display:block;margin:28px 0 9px;font-size:11px;letter-spacing:.6px;font-weight:800;color:#344963}.field{width:100%;height:49px;border:1px solid #c8d5e4;border-radius:9px;padding:0 14px;font-size:15px;background:#fff;color:#001e50;outline:none}.field:focus{border-color:#0071ce;box-shadow:0 0 0 3px #0071ce20}.btn{width:100%;min-height:48px;border:0;border-radius:9px;background:#0071ce;color:#fff;font-weight:800;font-size:14px;cursor:pointer;margin-top:17px}.btn:hover{background:#005cab}.btn.secondary{background:#fff;border:1px solid #b2cee9;color:#0068bd}.shift{border:1px solid #dbe6f3;background:#f7faff;border-radius:11px;padding:18px;margin-top:20px}.status{background:#e0f6e9;color:#177547;border-radius:30px;font-size:10px;font-weight:850;padding:7px 11px}.error{background:#fff0ed;border:1px solid #ffc2b7;color:#992500;padding:12px 14px;border-radius:9px;margin-top:17px;font-size:13px;font-weight:700}.footer{margin-top:auto;text-align:center;padding:18px;font-size:11px;color:#8a99ad;border-top:1px solid #e0e7f0}
+dialog{border:0;border-radius:15px;padding:27px;width:min(92vw,440px);box-shadow:0 24px 75px #0005;color:#001e50}dialog::backdrop{background:#00162fd4}dialog h2{font-size:22px;margin:0 0 15px}.close{float:right;border:0;border-radius:50%;width:32px;height:32px;background:#edf2f8;cursor:pointer;font-size:21px}.choice{display:block;border:1px solid #d8e2ee;border-radius:9px;padding:13px 15px;margin-top:8px;font-size:14px;font-weight:800;cursor:pointer}.choice:has(input:checked){border-color:#0071ce;background:#eaf4ff}.choice input{float:right}.testbanner{background:#ffc220;color:#001e50;text-align:center;font-size:12px;font-weight:800;padding:7px}
+@media(max-width:690px){.nav{min-height:85px;padding:13px 12px;gap:8px}.brand{gap:10px}.wordmark{width:145px}.navlabel{font-size:12px;padding-left:10px}.site{font-size:13px;padding:9px 10px}.hero-inner{grid-template-columns:1fr;gap:23px;padding:31px 20px}.main{grid-template-columns:1fr;padding:20px 12px;gap:17px}.card{padding:25px}.feature{font-size:10px;padding:10px 7px;gap:6px}.feature svg{width:16px;height:16px}}
+@media(max-width:390px){.wordmark{width:118px}.navlabel{font-size:10px}.site{font-size:11px;padding:8px}}
+</style></head><body>
+<header class="nav"><div class="brand"><a href="/" aria-label="Walmart home"><img class="wordmark" src="/static/walmart-wordmark-cropped.svg" alt="Walmart"></a><span class="navlabel">MST Reliability Operations</span></div><span class="site">IND3</span></header>
+{% if is_dev_mode %}<div class="testbanner">DEVELOPER / TEST MODE — sandboxed data — <a href="/dev/exit">Exit Test Mode</a></div>{% endif %}
+<section class="hero"><div class="hero-inner"><div><span class="pill">SHIFT OPERATIONS</span><h1>Shift Passdown<br><span>Generator</span></h1></div><div><p class="desc">Digital shift handover for the MST Reliability team. Structured, timestamped, and ready to share in seconds.</p><div class="features">
+<div class="feature"><svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M17 4a3 3 0 0 1 0 6M18 14a5 5 0 0 1 3 5v1"/></svg>Multi-Technician</div>
+<div class="feature"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Auto-Timestamped</div>
+<div class="feature"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 15l3 3 5-6"/></svg>Instant Report</div>
+<div class="feature"><svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 7 10-7M16 17l2 2 4-4"/></svg>Email on Close</div>
+</div></div></div></section>
+<main class="main">
+<section class="card"><h2>Start Your Shift</h2><p class="muted">Your shift. Your workspace. Your passdown.</p>
+{% if error %}<div class="error" role="alert">{{ error }}</div>{% endif %}
+<form method="post" action="/v3/login"><input type="hidden" name="mode" value="start"><label class="label" for="associate_id">ASSOCIATE NUMBER</label><input class="field" id="associate_id" name="associate_id" inputmode="numeric" autocomplete="off" maxlength="30" required placeholder="Enter your associate number"><button class="btn" type="submit">Continue →</button></form></section>
+<section class="card"><h2>Active Shifts</h2><p class="muted">Resume a shift currently in progress.</p>
+{% for sh in shifts %}<div class="shift"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><strong style="font-size:27px">{{ sh.shift_type }}</strong><span class="status">● ACTIVE</span></div><p class="muted" style="margin-top:12px">{{ sh.date }} · Started by {{ sh.lead_name }}</p><button class="btn secondary" type="button" onclick="openResume('{{ sh.id }}','{{ sh.shift_type }}')">Resume Shift →</button></div>
+{% else %}<div class="shift"><p class="muted">No active shifts. Start your shift using your associate number.</p></div>{% endfor %}
+</section></main>
+<footer class="footer">IND3 · MST Reliability Operations · Shift Passdown Generator</footer>
+<dialog id="resume-dialog"><button class="close" type="button" onclick="document.getElementById('resume-dialog').close()" aria-label="Close">×</button><h2>Resume Active Shift</h2><p class="muted">Enter your associate number to verify shift ownership.</p><form method="post" action="/v3/login"><input type="hidden" name="mode" value="resume"><input type="hidden" name="shift_id" id="resume-shift-id"><label class="label" for="resume-associate">ASSOCIATE NUMBER</label><input class="field" id="resume-associate" name="associate_id" inputmode="numeric" autocomplete="off" required placeholder="Enter your associate number"><button class="btn" type="submit">Verify &amp; Resume →</button></form></dialog>
+<dialog id="master-shift-dialog"><button class="close" type="button" onclick="document.getElementById('master-shift-dialog').close()" aria-label="Close">×</button><h2>Management Shift Selection</h2><p class="muted">Choose an eligible shift to start or resume.</p><form method="post" action="/v3/master/select">
+{% for code in eligible_shifts %}<label class="choice">{{ code }}<input type="radio" name="shift_type" value="{{ code }}" {% if loop.first %}checked{% endif %} required></label>{% else %}<p class="muted" style="margin-top:20px">No shifts are currently within their scheduled windows.</p>{% endfor %}
+<button class="btn" type="submit" {% if not eligible_shifts %}disabled{% endif %}>Start or Resume →</button></form></dialog>
+<script>
+function openResume(id,code){document.getElementById('resume-shift-id').value=id;document.getElementById('resume-dialog').querySelector('h2').textContent='Resume '+code+' Shift';document.getElementById('resume-dialog').showModal()}
+{% if master_verified %}document.getElementById('master-shift-dialog').showModal();{% endif %}
+</script>
 </body></html>
