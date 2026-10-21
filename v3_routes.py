@@ -499,6 +499,36 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             "data":db.get_analytics(),
         })
 
+    @router.get("/admin", response_class=HTMLResponse)
+    async def v3_admin(request:Request):
+        who=decode_session(request)
+        if not who or not who["profile"].get("is_manager"):
+            raise HTTPException(403,"Management access required")
+        return templates.TemplateResponse(request,"v3/admin.html",{
+            "dc_number":db.get_setting("dc_number","IND3"),
+            "email_to":db.get_setting("email_to",""),
+            "email_from_name":db.get_setting("email_from_name","IND3 Shift Passdown"),
+            "ms_client_id":db.get_setting("ms_client_id",""),
+            "roster_count":len(get_mst_roster() if get_mst_roster else {}),
+            "notice":request.query_params.get("notice",""),
+        })
+
+    @router.post("/admin/settings")
+    async def v3_admin_settings(request:Request,dc_number:str=Form(...),
+                                email_to:str=Form(""),email_from_name:str=Form(""),
+                                ms_client_id:str=Form("")):
+        who=decode_session(request)
+        if not who or not who["profile"].get("is_manager"):
+            raise HTTPException(403,"Management access required")
+        dc_number=dc_number.strip().upper()
+        if not dc_number or len(dc_number)>20:
+            raise HTTPException(400,"Invalid distribution center")
+        db.set_setting("dc_number",dc_number)
+        db.set_setting("email_to",email_to.strip()[:2000])
+        db.set_setting("email_from_name",email_from_name.strip()[:160] or "IND3 Shift Passdown")
+        db.set_setting("ms_client_id",ms_client_id.strip()[:300])
+        return RedirectResponse("/v3/admin?notice=Configuration+saved",status_code=303)
+
     @router.get("/operations", response_class=HTMLResponse)
     async def v3_operations(request:Request, shift_id:int):
         shift=secure(request,shift_id)
