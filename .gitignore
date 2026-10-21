@@ -1,0 +1,14 @@
+.env*
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.db
+*.sqlite*
+dbs/
+happenings_uploads/
+pm_uploads/
+*.log
+Drax*Associates*.xlsx
+trial.xlsx
+*.csv
