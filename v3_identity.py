@@ -20,12 +20,13 @@ def read(request, roster):
         if not (0 <= time.time()-int(issued) < 12*3600): return None
         person=roster.get(assoc)
         # 8972 / synthetic manager must not become an associate-number sign-in.
-        if not person or person.get("is_manager"): return None
+        if not person: return None
         return {"associate":assoc,"shift_id":int(sid),"profile":person}
     except (ValueError,TypeError,KeyError,UnicodeDecodeError): return None
 
 def owns(shift, session):
     if not shift or not session or not shift.get("is_active"): return False
+    if session["profile"].get("is_manager"): return True
     opener=(shift.get("opened_by_assoc") or "").strip()
     if opener: return opener == session["associate"]
     # Older V2 records sometimes have no opening associate ID.
