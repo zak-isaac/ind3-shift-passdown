@@ -210,33 +210,10 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         return response
 
     @router.post("/start")
-    async def start_shift_v3(request:Request, shift_date:str=Form(...), shift_type:str=Form(...)):
-        who=decode_session(request)
-        if not who: return RedirectResponse("/v3/login",status_code=303)
-        today=(now_func() if now_func else datetime.now()).date()
-        try: parsed_date=date.fromisoformat(shift_date)
-        except ValueError: raise HTTPException(400,"Invalid shift date")
-        if parsed_date>today or (today-parsed_date).days>1:
-            raise HTTPException(400,"Shift start date must be today or yesterday")
-        if shift_type not in ("S1","S2","S3","S4","S5"):
-            raise HTTPException(400,"Invalid shift code")
-        if allowed_shift_days and parsed_date.weekday() not in allowed_shift_days.get(shift_type,()):
-            raise HTTPException(400,"Shift code is not scheduled for this date")
-        if any(s["shift_type"]==shift_type for s in db.get_active_shifts()):
-            raise HTTPException(409,"This shift code is already active")
-        if start_eligibility:
-            allowed,is_ot,message=start_eligibility(who["profile"],shift_type,now_func() if now_func else datetime.now())
-            if not allowed: raise HTTPException(403,message or "Outside authorized shift window")
-        else: is_ot=False
-        display=who["profile"].get("display_name") or who["profile"].get("full_name") or "MST"
-        try:
-            sid=db.start_shift(shift_date,shift_type,display,opened_by_role="mst" if who["profile"].get("is_mst") else "tech",is_ot=is_ot if who["profile"].get("is_mst") else False,opened_by_assoc=who["associate"])
-        except ValueError:
-            raise HTTPException(409,"Two active shifts already exist")
-        response=RedirectResponse(f"/v3?shift_id={sid}",status_code=303)
-        set_session_cookies(response,who,sid)
-        return response
-
+    async def start_shift_v3(request:Request):
+        # The old free-form shift selector is retired in V3.
+        # Only the verified master-selection flow can override roster assignment.
+        raise HTTPException(403, "Use V3 login or verified management access.")
 
     def ensure_tables():
         # V3 metadata is *sidecar* data so V2 schemas and records are not rewritten.
