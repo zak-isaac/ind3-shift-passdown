@@ -12,7 +12,7 @@
 <main class="dashboard d2-dashboard" id="main-content">
  {% if notice %}<div class="banner success" role="status">{{ notice }}</div>{% endif %}
  {% if warning %}<div class="banner warn" role="alert">{{ warning }}</div>{% endif %}
- <div class="d2-toolbar-row"><button class="button button-blue" type="button" onclick="v3OpenImport()">Upload file</button></div>
+ <div class="d2-toolbar-row"><button class="button button-blue" type="button" onclick="v3OpenImport()">Upload Cetaris File</button></div>
 
  <section class="d2-import-flow card" id="cetaris" aria-label="Cetaris extraction steps">
    <div class="d2-flow-step {{ 'is-complete' if imported_filename or staged else '' }}"><span class="d2-step-number">1</span><div><strong>Upload Cetaris File</strong><small>{{ staged.filename if staged else (imported_filename if imported_filename else 'One Cetaris Desktop XLSX') }}</small><span class="d2-step-status">{{ 'File ready' if staged else ('Uploaded' if imported_filename else 'Awaiting upload') }}</span></div></div>
@@ -20,7 +20,7 @@
    <div class="d2-flow-step {{ 'is-complete' if selected_techs else '' }}"><span class="d2-step-number">2</span><div><strong>Select Technicians</strong><small>{{ selected_techs|length }} technician{{ 's' if selected_techs|length != 1 else '' }} selected</small><span class="d2-step-status">{{ 'Review new selection below' if staged else ('Confirmed' if selected_techs else 'After upload') }}</span></div></div>
    <span class="d2-flow-arrow">—</span>
    <div class="d2-flow-step {{ 'is-complete' if imported_filename else '' }}"><span class="d2-step-number">3</span><div><strong>Extraction</strong><small>{{ happenings|length }} happenings · {{ pm_count }} PMs</small><span class="d2-step-status">{{ 'Extracted successfully' if imported_filename else 'Ready to review' }}</span></div></div>
-   <button class="button button-blue d2-reupload" onclick="v3OpenImport()" type="button">{{ 'Replace file' if imported_filename else 'Upload file' }}</button>
+   <button class="button button-blue d2-reupload" onclick="v3OpenImport()" type="button">{{ 'Replace file' if imported_filename else 'Upload Cetaris File' }}</button>
  </section>
 
  <section class="d2-kpis" aria-label="Shift overview">
