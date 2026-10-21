@@ -5,13 +5,63 @@
 .v3c{border-radius:16px;border:1px solid #dbe3f1;box-shadow:0 4px 16px #001e6012;background:#fff;padding:24px}.v3entry{width:100%;border:1px solid #cdd6e5;border-radius:10px;padding:11px 12px;font-size:14px;background:#fff}.v3entry:focus{border-color:#0053e2;outline:2px solid #bed7ff}.v3label{font-size:11px;font-weight:800;color:#4f6181;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px}.v3btn{background:#0053e2;color:#fff;border:0;border-radius:10px;padding:13px 16px;font-size:14px;font-weight:800;cursor:pointer;width:100%}.v3btn:hover{background:#003ea8}.v3resume{display:inline-block;width:100%;background:#ffc220;color:#001e60;text-align:center;border-radius:10px;padding:10px;font-weight:800}.v3error{background:#fff0ed;border:1px solid #ffc2b7;color:#992500;padding:10px 14px;border-radius:12px;font-weight:700}.v3help{color:#62738f;font-size:12px;line-height:1.55}.v3line{height:1px;background:#e8edf4;margin:18px 0}
 </style></head>
 <body class="min-h-screen flex flex-col bg-gray-100">
-<nav class="bg-wm-blue border-b border-blue-700"><div class="max-w-7xl mx-auto px-5 flex items-center justify-between" style="height:72px">
-<a href="/v3/login" style="height:56px;overflow:hidden;display:flex;align-items:center"><img src="/static/walmart-logo-white.svg" alt="Walmart" style="height:224px;width:auto"></a>
-<div class="text-blue-100 text-sm font-semibold">MST Reliability Operations <span class="mx-2 text-yellow-300">|</span> IND3</div></div></nav>
-<section class="bg-wm-dark" style="background:linear-gradient(135deg,#001e50 0%,#002d72 55%,#0053e2 100%)"><div class="max-w-7xl mx-auto px-6 py-8 md:py-10 flex flex-col md:flex-row md:items-center gap-8">
-<div class="flex-1"><span class="inline-block bg-wm-spark text-gray-900 text-xs font-black px-3 py-1 rounded-full uppercase tracking-widest mb-3">Shift Operations</span><h1 class="text-white font-black text-4xl md:text-5xl leading-tight tracking-tight">Shift Passdown<br><span class="text-wm-spark">Generator</span></h1></div>
-<div class="w-full md:w-80"><p class="text-blue-100 text-base leading-relaxed">Start or resume your own shift. Import the single Cetaris report, review work orders, and use the existing maintenance passdown tools.</p></div>
-</div></section>
+<!-- ░░ NAVBAR ░░ -->
+<nav class="bg-wm-blue border-b border-blue-700 shrink-0">
+  <div class="max-w-7xl mx-auto px-5 flex items-center justify-between" style="height:72px;">
+    <div class="flex items-center gap-3">
+      <a href="/" class="flex items-center gap-2 hover:opacity-80 transition">
+        <div style="height:56px;overflow:hidden;display:flex;align-items:center;flex-shrink:0;"><img src="/static/walmart-logo-white.svg" alt="Walmart" style="height:224px;width:auto;" /></div>
+        
+      </a>
+      <span class="text-blue-400 mx-1 font-thin">|</span>
+      <span class="text-blue-100 text-sm font-medium tracking-wide">MST Reliability Operations</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="/walkthrough/" target="_blank"
+        class="flex items-center gap-1.5 bg-wm-spark hover:bg-yellow-400 text-gray-900 text-xs font-black px-3.5 py-2 rounded-full transition shadow">
+        &#128064; App Walkthrough
+      </a>
+      <span class="text-wm-spark text-sm font-black font-mono bg-white bg-opacity-10 px-3 py-1 rounded-full border border-wm-spark border-opacity-30">{{ dc_number }}</span>
+    </div>
+  </div>
+</nav>
+
+{% if is_dev_mode %}
+<div class="bg-amber-400 text-amber-950 text-center text-xs font-black py-1.5 tracking-wide">
+  &#129514; DEVELOPER / TEST MODE &mdash; sandboxed data, frozen date {{ today }} &mdash; nothing here touches the live shift &bull;
+  <a href="/dev/exit" class="underline hover:text-amber-800">Exit Test Mode</a>
+</div>
+{% endif %}
+
+<!-- ░░ HERO ░░ -->
+<section class="bg-wm-dark" style="background:linear-gradient(135deg,#001e50 0%,#002d72 55%,#0053e2 100%)">
+  <div class="max-w-7xl mx-auto px-6 py-7 md:py-9 flex flex-col md:flex-row md:items-center gap-8">
+
+    <!-- LEFT: Title only -->
+    <div class="flex-1">
+      <span class="inline-block bg-wm-spark text-gray-900 text-xs font-black px-3 py-1 rounded-full uppercase tracking-widest mb-3">Shift Operations</span>
+      <h1 class="text-white font-black text-4xl md:text-5xl leading-tight tracking-tight">
+        Shift Passdown<br class="hidden md:block" />
+        <span class="text-wm-spark">Generator</span>
+      </h1>
+    </div>
+
+    <!-- RIGHT: Description + pills -->
+    <div class="flex-shrink-0 w-full md:w-80 flex flex-col gap-4">
+      <p class="text-blue-200 text-base leading-relaxed">
+        Digital shift handover for the MST Reliability team.
+        Structured, timestamped, and ready to share in seconds.
+      </p>
+      <div class="flex flex-wrap gap-2">
+        <span class="bg-white bg-opacity-10 border border-white border-opacity-20 text-white text-xs font-semibold px-3 py-1.5 rounded-full">&#9889; Multi-Technician</span>
+        <span class="bg-white bg-opacity-10 border border-white border-opacity-20 text-white text-xs font-semibold px-3 py-1.5 rounded-full">&#128336; Auto-Timestamped</span>
+        <span class="bg-white bg-opacity-10 border border-white border-opacity-20 text-white text-xs font-semibold px-3 py-1.5 rounded-full">&#128203; Instant Report</span>
+        <span class="bg-white bg-opacity-10 border border-white border-opacity-20 text-white text-xs font-semibold px-3 py-1.5 rounded-full">&#9993; Email on Close</span>
+      </div>
+    </div>
+
+  </div>
+</section>
 <main class="flex-1 max-w-7xl w-full mx-auto px-5 py-7"><div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
 <section class="v3c"><div class="flex items-center justify-between mb-4"><h2 class="text-wm-dark text-2xl font-black">Welcome back</h2><span class="rounded-full bg-blue-50 text-wm-blue px-3 py-1 text-xs font-black">V3</span></div>
 <p class="v3help mb-4">Enter your associate number to access your assigned shift.</p>
