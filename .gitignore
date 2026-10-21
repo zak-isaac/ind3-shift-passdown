@@ -1,14 +1,65 @@
-.env*
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*secret*
+
+# Python environments and caches
 .venv/
+venv/
 __pycache__/
+*.py[cod]
 .pytest_cache/
-*.pyc
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# Local databases and backups
 *.db
-*.sqlite*
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.db.bak
+*.bak
 dbs/
+backups/
+
+# Operational records and exports
 happenings_uploads/
 pm_uploads/
-*.log
-Drax*Associates*.xlsx
+passdowns/
+reports/
+exports/
+uploads/
 trial.xlsx
 *.csv
+*.xlsx
+*.xls
+*.xlsm
+*.pdf
+*.docx
+
+# Personal/employee reference data
+associates*.json
+associates*.xlsx
+associates*.csv
+Drax*Associates*.xlsx
+
+# Local logs and generated artifacts
+*.log
+logs/
+server.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# Git archives and ZIPs
+*.zip
+
+# Note: assets.json, screenshots, branding files, source code and
+# Git history still require a confidentiality/permission review.
