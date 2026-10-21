@@ -103,8 +103,16 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             return lead_redirect("/v3")
         associate=associate_id.strip()
         profile=get_mst_roster().get(associate)
-        if not profile or profile.get("is_manager"):
+        if not profile:
             return entry_page(request,"Associate number not found in the current roster.")
+        # The existing test manager uses the same associate-number field.
+        # This does not grant access to any other manager profile.
+        if profile.get("is_manager"):
+            if associate != "8972":
+                return entry_page(request,"This management profile cannot use the test shift selector.")
+            response = entry_page(request, master_verified=True)
+            set_session_cookies(response, {"associate":associate,"profile":profile}, 0)
+            return response
         who={"associate":associate,"profile":profile}
         owned=[sh for sh in _v3_live_shifts() if shift_owned_by(sh,who)]
         if mode=="resume":
