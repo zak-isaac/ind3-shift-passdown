@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Shift Report – {{ shift.shift_type }} {{ shift.date }} – Print</title>
+  <link rel="stylesheet" href="/static/tailwind.min.css">
+  <style>
+    @media print {
+      .no-print { display: none !important; }
+      body { background: white !important; }
+      .page-break { page-break-before: always; }
+    }
+
+    :root { --wm-blue: #0053e2; --wm-dark: #001e50; --wm-spark: #ffc220; }
+
+    .priority-down     { background: #fee2e2; color: #b91c1c; }
+    .priority-degraded { background: #fef9c3; color: #854d0e; }
+    .priority-monitor  { background: #dcfce7; color: #166534; }
+  </style>
+</head>
+<body class="bg-white text-gray-900 font-sans">
+
+  <!-- Print button — hidden in actual print -->
+  <div class="no-print bg-wm-blue text-white px-6 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <img src="/static/walmart-logo-white.svg" alt="Walmart" style="height:44px;width:auto;filter:brightness(0) invert(1);" />
+      <span class="text-blue-200 text-sm">IND3 Reliability &bull; Shift Report</span>
+    </div>
+    <div class="flex gap-3">
+      <button onclick="window.print()"
+        class="bg-wm-spark text-gray-900 font-black px-4 py-2 rounded-lg hover:bg-yellow-400 transition text-sm">
+        &#128438; Save as PDF / Print
+      </button>
+      <a href="/" class="text-blue-100 hover:text-white text-sm font-medium transition">&#127968; Home</a>
+      <a href="/lead" class="text-blue-200 hover:text-white text-sm font-medium transition">&#8592; Back to Dashboard</a>
+    </div>
+  </div>
+
+  <div class="max-w-3xl mx-auto px-8 py-10">
+
+    <!-- Header block -->
+    <div class="flex items-start justify-between mb-8 border-b-4 pb-6" style="border-color:#0053e2;">
+      <div>
+        <div class="flex items-center gap-3 mb-2">
+          <!-- Spark SVG -->
+          <svg width="28" height="28" viewBox="0 0 40 40" fill="none">
+            <path d="M20 2 L22.4 14.8 L32.7 7.3 L25.2 17.6 L38 20 L25.2 22.4 L32.7 32.7 L22.4 25.2 L20 38 L17.6 25.2 L7.3 32.7 L14.8 22.4 L2 20 L14.8 17.6 L7.3 7.3 L17.6 14.8 Z" fill="#ffc220"/>
+          </svg>
+          <span class="font-black text-2xl tracking-tight" style="color:#001e50;">Walmart</span>
+        </div>
+        <h1 class="text-3xl font-black tracking-tight" style="color:#0053e2;">Shift Passdown Report</h1>
+        <p class="text-gray-600 mt-1 text-sm">{{ shift.shift_type }} Shift &bull; {{ shift.date }} &bull; MST: <strong>{{ shift.lead_name }}</strong></p>
+      </div>
+      <div class="text-right">
+        <p class="font-black text-lg" style="color:#001e50;">{{ dc_number }}</p>
+        <p class="text-gray-500 text-xs mt-1">Generated: {{ shift.created_at }}</p>
+        <p class="text-gray-500 text-xs">IND3 Reliability Dept.</p>
+      </div>
+    </div>
+
+    <!-- Carry-overs from previous shift -->
+    {% if carry_overs %}
+    <div class="mb-8 bg-orange-50 border-2 border-orange-300 rounded-xl p-5">
+      <h2 class="font-black text-base text-orange-700 mb-3 flex items-center gap-2">
+        &#128198; Carried Over from Previous Shift
+      </h2>
+      <table class="w-full text-sm border-collapse">
+        <thead>
+          <tr class="text-xs font-black text-orange-600 uppercase border-b border-orange-200">
+            <th class="text-left py-1 pr-4">Unit</th>
+            <th class="text-left py-1 pr-4">Issue</th>
+            <th class="text-left py-1">From</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in carry_overs %}
+          <tr class="border-b border-orange-100">
+            <td class="py-1.5 pr-4 font-bold">{{ e.unit }}</td>
+            <td class="py-1.5 pr-4 text-gray-700">{{ e.issue }}</td>
+            <td class="py-1.5 text-gray-500 text-xs">{{ e.shift_type }} {{ e.date }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    <!-- Technician Entries -->
+    <h2 class="font-black text-lg mb-4" style="color:#001e50;">Technician Entries ({{ entries | length }})</h2>
+
+    {% if entries %}
+    <table class="w-full text-sm border-collapse mb-8">
+      <thead>
+        <tr class="text-xs font-black text-white uppercase" style="background:#0053e2;">
+          <th class="text-left py-2 px-3">Time</th>
+          <th class="text-left py-2 px-3">Tech</th>
+          <th class="text-left py-2 px-3">Unit</th>
+          <th class="text-left py-2 px-3">Status</th>
+          <th class="text-left py-2 px-3">Summary</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in entries %}
+        <tr class="{{ 'bg-gray-50' if loop.index is odd else 'bg-white' }} border-b border-gray-200">
+          <td class="py-2 px-3 text-xs text-gray-500 whitespace-nowrap">{{ e.created_at | fmt_time }}</td>
+          <td class="py-2 px-3 font-semibold whitespace-nowrap">{{ e.tech_name }}</td>
+          <td class="py-2 px-3 font-bold" style="color:#0053e2;">{{ e.unit }}</td>
+          <td class="py-2 px-3">
+            {% if e.priority == 'down' %}
+            <span class="text-xs font-bold px-2 py-0.5 rounded-full priority-down">🔴 Down</span>
+            {% elif e.priority == 'degraded' %}
+            <span class="text-xs font-bold px-2 py-0.5 rounded-full priority-degraded">🟡 Degraded</span>
+            {% else %}
+            <span class="text-xs font-bold px-2 py-0.5 rounded-full priority-monitor">🟢 Monitor</span>
+            {% endif %}
+            {% if e.carry_over %}
+            <span class="text-xs font-bold text-orange-600 ml-1">&#128198;</span>
+            {% endif %}
+          </td>
+          <td class="py-2 px-3 text-gray-700">{{ e.issue }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-gray-400 italic text-sm mb-8">No entries logged this shift.</p>
+    {% endif %}
+
+    <!-- MST Notes -->
+    {% if shift_notes %}
+    <div class="mb-8 bg-blue-50 border border-blue-200 rounded-xl p-5">
+      <h2 class="font-black text-base mb-2" style="color:#001e50;">&#128221; MST Notes</h2>
+      <p class="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{{ shift_notes }}</p>
+    </div>
+    {% endif %}
+
+    <!-- Summary stats -->
+    <div class="grid grid-cols-3 gap-4 mb-8">
+      <div class="bg-gray-50 rounded-xl p-4 text-center border border-gray-200">
+        <p class="text-2xl font-black" style="color:#0053e2;">{{ entries | length }}</p>
+        <p class="text-xs text-gray-500 font-semibold mt-1">Total Entries</p>
+      </div>
+      <div class="bg-gray-50 rounded-xl p-4 text-center border border-gray-200">
+        <p class="text-2xl font-black" style="color:#0053e2;">{{ entries | map(attribute='tech_name') | list | unique | list | length }}</p>
+        <p class="text-xs text-gray-500 font-semibold mt-1">Techs Active</p>
+      </div>
+      <div class="bg-gray-50 rounded-xl p-4 text-center border border-gray-200">
+        <p class="text-2xl font-black text-red-600">{{ entries | selectattr('priority', 'equalto', 'down') | list | length }}</p>
+        <p class="text-xs text-gray-500 font-semibold mt-1">🔴 Down Events</p>
+      </div>
+    </div>
+
+    <!-- Footer signature line -->
+    <div class="border-t border-gray-300 pt-6 mt-6 flex justify-between text-xs text-gray-400">
+      <span>IND3 Reliability &bull; Walmart &bull; {{ dc_number }}</span>
+      <span>MST Lead: {{ shift.lead_name }}</span>
+      <span>Shift Passdown Generator &copy; 2026</span>
+    </div>
+
+  </div>
+</body>
+</html>

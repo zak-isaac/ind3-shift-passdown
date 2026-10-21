@@ -1,0 +1,41 @@
+<!-- partials/my_entries.html — shows only the logged-in tech's entries -->
+{% set my = entries | selectattr('tech_name', 'equalto', tech_name) | list %}
+
+{% if my %}
+  <ul class="flex flex-col gap-3">
+    {% for e in my %}
+
+    {% if e.priority == 'down' %}
+      {% set pbg = 'bg-red-100' %}{% set ptxt = 'text-red-700' %}{% set plabel = '🔴 Down' %}
+    {% elif e.priority == 'degraded' %}
+      {% set pbg = 'bg-yellow-100' %}{% set ptxt = 'text-yellow-800' %}{% set plabel = '🟡 Degraded' %}
+    {% else %}
+      {% set pbg = 'bg-green-50' %}{% set ptxt = 'text-green-700' %}{% set plabel = '🟢 Monitor' %}
+    {% endif %}
+
+    <li id="entry-{{ e.id }}"
+        class="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+      <!-- Status badges -->
+      <div class="flex items-center gap-2 flex-wrap mb-1">
+        <span class="text-xs font-bold px-2 py-0.5 rounded-full {{ pbg }} {{ ptxt }}">{{ plabel }}</span>
+        {% if e.source == 'cmms' %}
+        <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-wm-blue">&#128203; CMMS</span>
+        {% endif %}
+      </div>
+      <!-- Entry text: UNIT: description (WO #number). -->
+      <p class="text-sm font-bold text-wm-dark leading-snug">
+        {{ e.unit }}: {{ e.issue | strip_wo_prefix }}{% if e.wo_number %} (WO #{{ e.wo_number }}){% endif %}.
+      </p>
+      <p class="text-xs text-blue-400 font-semibold mt-1">
+        &#128336; <span class="rel-time" data-iso="{{ e.created_at }}">{{ e.created_at | fmt_time }}</span>
+      </p>
+    </li>
+
+    {% endfor %}
+  </ul>
+  <p class="text-xs text-gray-400 mt-2 text-center">
+    {{ my | length }} happening{{ 's' if my | length != 1 else '' }} logged this shift.
+  </p>
+{% else %}
+  <p class="text-gray-400 text-sm italic text-center py-4">No happenings logged yet this shift.</p>
+{% endif %}

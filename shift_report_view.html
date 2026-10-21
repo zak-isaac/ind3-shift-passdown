@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Shift {{ shift.shift_type }} · {{ shift.date }} – Passdown</title>
+  <link rel="stylesheet" href="/static/tailwind.min.css">
+  <link rel="stylesheet" href="/static/dark.css" id="dark-css" disabled>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+
+<header class="bg-wm-blue sticky top-0 shadow-md" style="z-index:9999; height:72px;">
+  <div class="max-w-4xl mx-auto px-5 flex items-center justify-between" style="height:72px;">
+    <div class="flex items-center gap-3">
+      <a href="/" class="flex items-center gap-2 hover:opacity-80 transition">
+        <div style="height:56px;overflow:hidden;display:flex;align-items:center;flex-shrink:0;"><img src="/static/walmart-logo-white.svg" alt="Walmart" style="height:224px;width:auto;" /></div>
+        
+      </a>
+      <div class="h-8 w-px bg-blue-400 mx-1"></div>
+      <div>
+        <p class="text-white font-black text-base leading-tight">Shift {{ shift.shift_type }}</p>
+        <p class="text-blue-200 text-sm">{{ shift.date }} &bull; {{ shift.lead_name }}</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="/" class="text-blue-100 hover:text-white text-sm font-medium transition">&#127968; Home</a>
+      <a href="/history" class="text-blue-100 hover:text-white text-sm transition">&#8592; History</a>
+      <button onclick="toggleDark()" class="text-blue-100 hover:text-white text-lg transition" title="Toggle dark mode">&#9790;</button>
+    </div>
+  </div>
+</header>
+
+<main class="flex-1 max-w-4xl mx-auto w-full px-4 py-6 flex flex-col gap-4">
+
+  <!-- Summary strip -->
+  <div class="flex flex-wrap gap-3">
+    <div class="bg-wm-blue text-white rounded-xl px-5 py-3 text-center shadow-sm">
+      <p class="text-2xl font-black">{{ entries | length }}</p>
+      <p class="text-blue-200 text-xs mt-0.5">Entries</p>
+    </div>
+    {% set downs     = entries | selectattr('priority','equalto','down')     | list %}
+    {% set degradeds = entries | selectattr('priority','equalto','degraded') | list %}
+    {% if downs %}
+    <div class="bg-red-600 text-white rounded-xl px-5 py-3 text-center shadow-sm">
+      <p class="text-2xl font-black">{{ downs | length }}</p>
+      <p class="text-red-200 text-xs mt-0.5">Down</p>
+    </div>
+    {% endif %}
+    {% if degradeds %}
+    <div class="bg-yellow-400 text-gray-900 rounded-xl px-5 py-3 text-center shadow-sm">
+      <p class="text-2xl font-black">{{ degradeds | length }}</p>
+      <p class="text-yellow-800 text-xs mt-0.5">Degraded</p>
+    </div>
+    {% endif %}
+    <div class="bg-white rounded-xl border border-gray-200 px-5 py-3 text-center shadow-sm">
+      <p class="text-2xl font-black text-wm-dark">{{ stats | length }}</p>
+      <p class="text-gray-400 text-xs mt-0.5">Assets</p>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="flex gap-1 bg-gray-200 rounded-xl p-1 self-start">
+    <button onclick="switchTab('entries')" id="tab-entries"
+      class="tab-btn px-4 py-1.5 rounded-lg text-sm font-bold transition bg-white text-wm-blue shadow-sm">
+      📋 Entries
+    </button>
+    <button onclick="switchTab('report')" id="tab-report"
+      class="tab-btn px-4 py-1.5 rounded-lg text-sm font-bold transition text-gray-500 hover:text-gray-700">
+      📄 Report
+    </button>
+    <button onclick="switchTab('assets')" id="tab-assets"
+      class="tab-btn px-4 py-1.5 rounded-lg text-sm font-bold transition text-gray-500 hover:text-gray-700">
+      📊 Assets
+    </button>
+  </div>
+
+  <!-- ── ENTRIES TAB ─────────────────────────────────────────────────────── -->
+  <div id="pane-entries" class="tab-pane flex flex-col gap-2">
+    {% if entries %}
+    {% for e in entries %}
+    {% set is_down = e.priority == 'down' %}
+    {% set is_deg  = e.priority == 'degraded' %}
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm flex items-stretch overflow-hidden">
+      <div class="w-1 shrink-0 {{ 'bg-red-500' if is_down else ('bg-yellow-400' if is_deg else 'bg-green-500') }}"></div>
+      <div class="flex-1 min-w-0 px-4 py-3">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="w-6 h-6 rounded-full bg-wm-blue flex items-center justify-center text-wm-spark text-xs font-black shrink-0">
+            {{ e.tech_name[0] | upper }}
+          </span>
+          <span class="text-sm font-bold text-gray-800">{{ e.tech_name }}</span>
+          <span class="text-gray-300 text-xs">·</span>
+          <span class="text-xs font-mono font-black text-gray-500">{{ e.unit }}</span>
+          <span class="ml-auto text-xs font-bold px-2 py-0.5 rounded-full
+            {{ 'bg-red-100 text-red-700' if is_down else ('bg-yellow-100 text-yellow-800' if is_deg else 'bg-green-50 text-green-700') }}">
+            {{ 'Down' if is_down else ('Degraded' if is_deg else 'Monitor') }}
+          </span>
+        </div>
+        <p class="text-sm text-gray-700 mt-1.5 leading-snug">{{ e.issue }}</p>
+      </div>
+      <div class="shrink-0 px-3 flex items-center">
+        <span class="text-xs text-gray-400 font-mono">{{ e.created_at | fmt_time }}</span>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="bg-white rounded-xl border border-dashed border-gray-300 p-10 text-center">
+      <p class="text-gray-400 text-sm">No entries for this shift.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ── REPORT TAB ──────────────────────────────────────────────────────── -->
+  <div id="pane-report" class="tab-pane hidden">
+    {% if report %}
+    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div class="bg-wm-dark px-5 py-3 flex items-center justify-between">
+        <span class="text-white font-bold text-sm">&#128203; Passdown Report</span>
+        <span class="text-blue-300 text-xs">Generated {{ report.generated_at }}</span>
+      </div>
+      <pre class="p-5 text-xs text-gray-800 leading-relaxed whitespace-pre-wrap font-mono max-h-[70vh] overflow-y-auto">{{ report.content }}</pre>
+    </div>
+    {% else %}
+    <div class="bg-white rounded-2xl border border-dashed border-gray-300 p-12 text-center">
+      <p class="text-gray-400 text-sm">No report was generated for this shift.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ── ASSETS TAB ──────────────────────────────────────────────────────── -->
+  <div id="pane-assets" class="tab-pane hidden">
+    {% if stats %}
+    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-200">
+          <tr>
+            <th class="px-4 py-2 text-left text-xs font-bold text-gray-500 uppercase">Asset</th>
+            <th class="px-4 py-2 text-center text-xs font-bold text-gray-500 uppercase">Total</th>
+            <th class="px-4 py-2 text-center text-xs font-bold text-red-400 uppercase">Down</th>
+            <th class="px-4 py-2 text-center text-xs font-bold text-yellow-500 uppercase">Degraded</th>
+            <th class="px-4 py-2 text-left text-xs font-bold text-gray-500 uppercase">History</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for s in stats %}
+          <tr class="hover:bg-gray-50 transition">
+            <td class="px-4 py-3 font-black font-mono text-gray-800">{{ s.unit }}</td>
+            <td class="px-4 py-3 text-center">
+              <span class="font-black text-lg
+                {{ 'text-red-600' if s.hits >= 3 else ('text-orange-500' if s.hits == 2 else 'text-yellow-600') }}">
+                {{ s.hits }}
+              </span>
+            </td>
+            <td class="px-4 py-3 text-center text-red-600 font-bold">{{ s.down_count if s.down_count is defined and s.down_count else '—' }}</td>
+            <td class="px-4 py-3 text-center text-yellow-600 font-bold">{{ s.degraded_count if s.degraded_count is defined and s.degraded_count else '—' }}</td>
+            <td class="px-4 py-3">
+              <a href="/asset/{{ s.unit | urlencode }}/history"
+                 class="text-xs text-wm-blue font-semibold hover:underline">View &#8594;</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="bg-white rounded-xl border border-dashed border-gray-300 p-10 text-center">
+      <p class="text-gray-400 text-sm">No asset data for this shift.</p>
+    </div>
+    {% endif %}
+  </div>
+
+</main>
+
+<footer class="bg-wm-dark text-blue-300 text-center text-xs py-3">
+  Shift Passdown Generator &bull; Walmart &copy; 2026
+</footer>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.add('hidden'));
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.remove('bg-white', 'text-wm-blue', 'shadow-sm');
+    b.classList.add('text-gray-500');
+  });
+  document.getElementById('pane-' + name).classList.remove('hidden');
+  const btn = document.getElementById('tab-' + name);
+  btn.classList.add('bg-white', 'text-wm-blue', 'shadow-sm');
+  btn.classList.remove('text-gray-500');
+}
+
+function toggleDark() {
+  const on = document.body.classList.toggle('dark-mode');
+  document.getElementById('dark-css').disabled = !on;
+  localStorage.setItem('dark', on ? '1' : '');
+}
+if (localStorage.getItem('dark')) {
+  document.body.classList.add('dark-mode');
+  document.getElementById('dark-css').disabled = false;
+}
+</script>
+</body>
+</html>

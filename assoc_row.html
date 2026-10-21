@@ -1,0 +1,50 @@
+<!-- partials/assoc_row.html — single roster row (display mode) -->
+<tr id="assoc-row-{{ a.assoc_num }}"
+    class="hover:bg-gray-50 border-b border-gray-100
+           {% if a.is_manager %}opacity-50 italic{% endif %}">
+  <td class="px-3 py-2 font-mono text-gray-500">{{ a.assoc_num }}</td>
+  <td class="px-3 py-2 font-semibold">{{ a.full_name | title }}</td>
+  <td class="px-3 py-2 text-gray-500">{{ a.shift or '&mdash;' }}</td>
+  <td class="px-3 py-2">
+    <span class="text-xs px-2 py-0.5 rounded-full font-semibold
+                 {% if a.status == 'Active' %}bg-green-100 text-green-700
+                 {% else %}bg-gray-100 text-gray-500{% endif %}">
+      {{ a.status }}
+    </span>
+  </td>
+  <td class="px-3 py-2 text-center">
+    {% if not a.is_manager %}
+    <button
+      hx-post="/admin/associates/{{ a.assoc_num }}/toggle-mst"
+      hx-target="#assoc-table"
+      hx-swap="innerHTML"
+      title="Toggle MST status"
+      class="text-xs font-bold px-2 py-0.5 rounded-full transition
+             {% if a.is_mst %}bg-blue-100 text-blue-700 hover:bg-blue-200
+             {% else %}bg-gray-100 text-gray-400 hover:bg-gray-200{% endif %}">
+      {% if a.is_mst %}&#128202; MST{% else %}&#128295; Tech{% endif %}
+    </button>
+    {% else %}
+    <span class="text-xs text-gray-300">mgr</span>
+    {% endif %}
+  </td>
+  <td class="px-3 py-2 whitespace-nowrap">
+    {% if not a.is_manager %}
+    <button
+      hx-get="/admin/associates/{{ a.assoc_num }}/edit-form"
+      hx-target="#assoc-row-{{ a.assoc_num }}"
+      hx-swap="outerHTML"
+      class="text-xs text-wm-blue hover:text-blue-800 font-bold transition mr-3"
+      title="Edit">&#9998; Edit</button>
+    <button
+      hx-delete="/admin/associates/{{ a.assoc_num }}"
+      hx-target="#assoc-table"
+      hx-swap="innerHTML"
+      hx-confirm="Remove {{ a.display_name }} from the roster?"
+      class="text-xs text-red-400 hover:text-red-700 font-bold transition"
+      title="Delete">&#10005;</button>
+    {% else %}
+    <span class="text-xs text-gray-300">bypass</span>
+    {% endif %}
+  </td>
+</tr>

@@ -1,0 +1,56 @@
+{% if carry_overs %}
+<div id="carry-overs-panel" class="lg:col-span-5 bg-orange-50 border-2 border-orange-400 rounded-2xl p-5">
+  <h2 class="text-orange-700 font-black text-base flex items-center gap-2 mb-3">
+    &#128198; Carried Over from Previous Shift
+    <span class="bg-orange-400 text-white text-xs font-black px-2 py-0.5 rounded-full">{{ carry_overs | length }}</span>
+    <span class="ml-auto text-xs text-orange-500 font-normal">Mark done or add to this shift&#8217;s happenings</span>
+  </h2>
+  <ul class="flex flex-col gap-3">
+    {% for e in carry_overs %}
+    {% if e.priority == 'down' %}{% set pbadge = '🔴' %}{% set pbg = 'bg-red-100 text-red-700' %}
+    {% elif e.priority == 'degraded' %}{% set pbadge = '🟡' %}{% set pbg = 'bg-yellow-100 text-yellow-800' %}
+    {% else %}{% set pbadge = '🟢' %}{% set pbg = 'bg-green-100 text-green-700' %}{% endif %}
+
+    <li id="co-{{ e.id }}" class="bg-white rounded-xl border border-orange-200 px-4 py-3">
+      <div class="flex items-start justify-between gap-3 flex-wrap">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap mb-1">
+            <span class="text-xs font-bold px-2 py-0.5 rounded-full {{ pbg }}">{{ pbadge }} {{ e.priority | title }}</span>
+            <span class="text-sm font-black text-gray-900">{{ e.unit }}</span>
+            <span class="text-gray-400 font-normal text-xs">&bull; from {{ e.shift_type }} &bull; {{ e.date }} &bull; MST: {{ e.lead_name }}</span>
+          </div>
+          <p class="text-xs text-gray-600 leading-snug">{{ e.issue | strip_wo_prefix | truncate(120, true, '…') }}</p>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="flex gap-2 shrink-0 flex-wrap">
+          <!-- Dismiss: clears the flag, removes from future carry-overs -->
+          <form hx-post="/lead/carry-over/{{ e.id }}/dismiss"
+                hx-target="#carry-overs-panel"
+                hx-swap="outerHTML"
+                hx-vals='{"shift_id": {{ shift_id }}}'>
+            <button type="submit"
+              class="flex items-center gap-1 bg-green-500 hover:opacity-80 text-white text-xs font-black px-3 py-1.5 rounded-lg transition"
+              title="Mark as resolved — removes this item from carry-overs">
+              &#10003; Done
+            </button>
+          </form>
+
+          <!-- Adopt: copies entry into this shift so MST can track + re-flag it -->
+          <form hx-post="/lead/carry-over/{{ e.id }}/adopt"
+                hx-target="#carry-overs-panel"
+                hx-swap="outerHTML"
+                hx-vals='{"shift_id": {{ shift_id }}}'>
+            <button type="submit"
+              class="flex items-center gap-1 bg-wm-blue hover:bg-blue-700 text-white text-xs font-black px-3 py-1.5 rounded-lg transition"
+              title="Add to this shift&#8217;s happenings so you can manage it">
+              &#43; Add to Shift
+            </button>
+          </form>
+        </div>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}

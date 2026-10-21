@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Share – Shift Passdown</title>
+  <link rel="stylesheet" href="/static/tailwind.min.css">
+  <script src="/static/qrcode.min.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+
+<header class="bg-wm-blue sticky top-0 shadow-md" style="z-index:9999; height:72px;">
+  <div class="max-w-3xl mx-auto px-6 flex items-center justify-between" style="height:72px;">
+    <div class="flex items-center gap-3">
+      <a href="/" class="flex items-center gap-2 hover:opacity-80 transition shrink-0">
+        <div style="height:56px;overflow:hidden;display:flex;align-items:center;flex-shrink:0;"><img src="/static/walmart-logo-white.svg" alt="Walmart" style="height:224px;width:auto;" /></div>
+        
+      </a>
+      <div class="h-7 w-px bg-blue-400 mx-1"></div>
+      <div>
+        <p class="text-white font-black text-base leading-tight">Share with Technicians</p>
+        <p class="text-blue-100 text-sm">Scan or copy the link below</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="text-wm-spark text-sm font-black font-mono bg-white bg-opacity-10 px-3 py-1 rounded-full border border-wm-spark border-opacity-30">{{ dc_number }}</span>
+      <a href="/" class="text-blue-300 hover:text-white text-xs">&#8592; Home</a>
+    </div>
+  </div>
+</header>
+
+<main class="flex-1 max-w-3xl mx-auto w-full px-4 py-10 flex flex-col gap-8">
+
+  <!-- SHIFT STATUS -->
+  {% if shift %}
+  <div class="bg-wm-blue text-white rounded-2xl px-6 py-4 flex items-center justify-between">
+    <div>
+      <p class="text-sm font-semibold text-blue-200">Active Shift</p>
+      <p class="text-lg font-bold">{{ shift.shift_type }} &bull; {{ shift.date }} &bull; MST: {{ shift.lead_name }}</p>
+    </div>
+    <span class="bg-green-400 text-green-900 text-xs font-bold px-3 py-1 rounded-full animate-pulse">LIVE</span>
+  </div>
+  {% else %}
+  <div class="bg-yellow-50 border border-yellow-300 text-yellow-800 rounded-2xl px-6 py-4 text-sm">
+    &#9888; No active shift. Ask your MST to start one first.
+  </div>
+  {% endif %}
+
+  <!-- QR CARDS -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+
+    <!-- TECHNICIAN -->
+    <div class="bg-white rounded-2xl border-2 border-wm-spark shadow-md p-6 flex flex-col items-center gap-4">
+      <div class="bg-wm-spark text-gray-900 font-black text-sm px-4 py-1 rounded-full">&#128295; TECHNICIAN</div>
+      <div id="qr-tech" class="rounded-xl overflow-hidden shadow"></div>
+      <p class="text-xs text-gray-500 text-center break-all font-mono" id="tech-url"></p>
+      <button onclick="copyLink('tech-url')"
+        class="w-full bg-wm-spark hover:bg-yellow-400 text-gray-900 font-bold py-2 rounded-xl text-sm transition">
+        &#128203; Copy Tech Link
+      </button>
+    </div>
+
+    <!-- LEAD -->
+    <div class="bg-white rounded-2xl border-2 border-wm-blue shadow-md p-6 flex flex-col items-center gap-4">
+      <div class="bg-wm-blue text-white font-black text-sm px-4 py-1 rounded-full">&#128202; MST</div>
+      <div id="qr-lead" class="rounded-xl overflow-hidden shadow"></div>
+      <p class="text-xs text-gray-500 text-center break-all font-mono" id="lead-url"></p>
+      <button onclick="copyLink('lead-url')"
+        class="w-full bg-wm-blue hover:bg-blue-700 text-white font-bold py-2 rounded-xl text-sm transition">
+        &#128203; Copy MST Link
+      </button>
+    </div>
+
+  </div>
+
+  <p class="text-center text-gray-400 text-xs">
+    Anyone on the <strong>same Walmart Wi-Fi network</strong> can scan or visit these links — no install needed.
+  </p>
+
+</main>
+
+<footer class="bg-wm-dark text-blue-300 text-center text-xs py-3">
+  Shift Passdown Generator &bull; Walmart &copy; 2026
+</footer>
+
+<script>
+  const host   = '{{ host }}';
+  const techUrl = 'http://' + host + '/tech';
+  const leadUrl = 'http://' + host + '/lead/login';
+
+  document.getElementById('tech-url').textContent = techUrl;
+  document.getElementById('lead-url').textContent = leadUrl;
+
+  new QRCode(document.getElementById('qr-tech'), {
+    text: techUrl, width: 180, height: 180,
+    colorDark: '#001e50', colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.H
+  });
+
+  new QRCode(document.getElementById('qr-lead'), {
+    text: leadUrl, width: 180, height: 180,
+    colorDark: '#0053e2', colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.H
+  });
+
+  function copyLink(id) {
+    const url = document.getElementById(id).textContent;
+    navigator.clipboard.writeText(url).then(() => {
+      alert('Copied: ' + url);
+    });
+  }
+</script>
+</body>
+</html>

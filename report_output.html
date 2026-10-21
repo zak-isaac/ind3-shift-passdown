@@ -1,0 +1,109 @@
+<!-- partials/report_output.html -->
+<div class="flex flex-col gap-3">
+
+  <!-- Report Ready Card -->
+  <div class="rounded-2xl overflow-hidden shadow-lg border border-green-200">
+
+    <!-- Top stripe -->
+    <div class="bg-green-600 px-5 py-2 flex items-center gap-2">
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="#fff">
+        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+      </svg>
+      <span class="text-white font-black text-xs uppercase tracking-widest">Report Ready</span>
+    </div>
+
+    {% if no_happenings %}
+    <div class="bg-amber-50 border-b border-amber-200 px-5 py-3 flex items-center gap-2">
+      <span class="text-amber-600 text-base">&#9888;</span>
+      <p class="text-amber-800 text-xs font-semibold">
+        No shift happenings logged yet — the email will have empty sections.
+        Consider adding entries before sending.
+      </p>
+    </div>
+    {% endif %}
+
+    <!-- Body -->
+    <div class="bg-wm-dark px-5 py-5 flex flex-col gap-4">
+
+      <div class="flex items-start gap-4">
+        <div class="shrink-0 bg-green-500 bg-opacity-20 rounded-xl p-3">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4ade80"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+            <polyline points="22,6 12,13 2,6"/>
+          </svg>
+        </div>
+        <div>
+          <p class="text-white font-black text-base leading-tight">Passdown Report Generated</p>
+          <p class="text-blue-200 text-xs mt-1 leading-relaxed">
+            Opens directly in your Outlook compose window.
+          </p>
+        </div>
+      </div>
+
+      <!-- ONE-CLICK: downloads .eml -> opens in desktop Outlook compose -->
+      <a id="compose-btn-{{ report_id }}"
+        href="/report/{{ report_id }}/compose-outlook"
+        download
+        onclick="onEmlClick(this, {{ report_id }})"
+        class="w-full flex items-center justify-center gap-3 py-4 px-6
+               bg-wm-blue hover:bg-blue-700 active:bg-blue-800
+               text-white font-black text-base rounded-xl
+               shadow-lg border-b-4 border-blue-800
+               transition focus:outline-none focus:ring-4 focus:ring-blue-300
+               cursor-pointer no-underline">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+          <polyline points="22,6 12,13 2,6"/>
+        </svg>
+        <span id="compose-btn-label-{{ report_id }}">Open &amp; Compose in Outlook</span>
+      </a>
+
+      <!-- Status feedback -->
+      <div id="compose-status-{{ report_id }}" class="text-center text-xs min-h-[16px]"></div>
+
+      <!-- Secondary: preview/edit first -->
+      <div class="text-center">
+        <button
+          hx-get="/report/{{ report_id }}/email-preview"
+          hx-target="#email-modal-wrap-{{ report_id }}"
+          hx-swap="innerHTML"
+          class="text-blue-300 hover:text-white text-xs underline underline-offset-2 transition">
+          Preview &amp; edit before sending
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Modal mount -->
+  <div id="email-modal-wrap-{{ report_id }}"></div>
+
+</div>
+
+<script>
+function onEmlClick(el, reportId) {
+  const label  = document.getElementById('compose-btn-label-' + reportId);
+  const status = document.getElementById('compose-status-' + reportId);
+
+  label.textContent = 'Downloading...';
+  status.innerHTML  =
+    '<span class="text-yellow-300 font-semibold">' +
+    '&#128229; Click the downloaded file in your browser bar to open in Outlook' +
+    '</span>';
+
+  setTimeout(() => {
+    label.textContent = '\u2713 File downloaded!';
+    el.style.background   = '#2a8703';
+    el.style.borderColor  = '#1a5c02';
+  }, 800);
+
+  setTimeout(() => {
+    label.textContent    = 'Open & Compose in Outlook';
+    el.style.background  = '';
+    el.style.borderColor = '';
+    status.innerHTML     = '';
+  }, 10000);
+}
+</script>

@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Shift Passdown &ndash; Home</title>
+  <link rel="stylesheet" href="/static/tailwind.min.css">
+</head>
+<body class="min-h-screen flex flex-col bg-gray-100">
+
+<!-- ░░ NAVBAR ░░ -->
+<nav class="bg-wm-blue border-b border-blue-700 shrink-0">
+  <div class="max-w-7xl mx-auto px-5 flex items-center justify-between" style="height:72px;">
+    <div class="flex items-center gap-3">
+      <a href="/" class="flex items-center gap-2 hover:opacity-80 transition">
+        <div style="height:56px;overflow:hidden;display:flex;align-items:center;flex-shrink:0;"><img src="/static/walmart-logo-white.svg" alt="Walmart" style="height:224px;width:auto;" /></div>
+        
+      </a>
+      <span class="text-blue-400 mx-1 font-thin">|</span>
+      <span class="text-blue-100 text-sm font-medium tracking-wide">MST Reliability Operations</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="/walkthrough/" target="_blank"
+        class="flex items-center gap-1.5 bg-wm-spark hover:bg-yellow-400 text-gray-900 text-xs font-black px-3.5 py-2 rounded-full transition shadow">
+        &#128064; App Walkthrough
+      </a>
+      <span class="text-wm-spark text-sm font-black font-mono bg-white bg-opacity-10 px-3 py-1 rounded-full border border-wm-spark border-opacity-30">{{ dc_number }}</span>
+    </div>
+  </div>
+</nav>
+
+{% if is_dev_mode %}
+<div class="bg-amber-400 text-amber-950 text-center text-xs font-black py-1.5 tracking-wide">
+  &#129514; DEVELOPER / TEST MODE &mdash; sandboxed data, frozen date {{ today }} &mdash; nothing here touches the live shift &bull;
+  <a href="/dev/exit" class="underline hover:text-amber-800">Exit Test Mode</a>
+</div>
+{% endif %}
+
+<!-- ░░ HERO ░░ -->
+<section class="bg-wm-dark" style="background:linear-gradient(135deg,#001e50 0%,#002d72 55%,#0053e2 100%)">
+  <div class="max-w-7xl mx-auto px-6 py-7 md:py-9 flex flex-col md:flex-row md:items-center gap-8">
+
+    <!-- LEFT: Title only -->
+    <div class="flex-1">
+      <span class="inline-block bg-wm-spark text-gray-900 text-xs font-black px-3 py-1 rounded-full uppercase tracking-widest mb-3">Shift Operations</span>
+      <h1 class="text-white font-black text-4xl md:text-5xl leading-tight tracking-tight">
+        Shift Passdown<br class="hidden md:block" />
+        <span class="text-wm-spark">Generator</span>
+      </h1>
+    </div>
+
+    <!-- RIGHT: Description + pills -->
+    <div class="flex-shrink-0 w-full md:w-80 flex flex-col gap-4">
+      <p class="text-blue-200 text-base leading-relaxed">
+        Digital shift handover for the MST Reliability team.
+        Structured, timestamped, and ready to share in seconds.
+      </p>
+      <div class="flex flex-wrap gap-2">
+        <span class="bg-white bg-opacity-10 border border-white border-opacity-20 text-white text-xs font-semibold px-3 py-1.5 rounded-full">&#9889; Multi-Technician</span>
+        <span class="bg-white bg-opacity-10 border border-white border-opacity-20 text-white text-xs font-semibold px-3 py-1.5 rounded-full">&#128336; Auto-Timestamped</span>
+        <span class="bg-white bg-opacity-10 border border-white border-opacity-20 text-white text-xs font-semibold px-3 py-1.5 rounded-full">&#128203; Instant Report</span>
+        <span class="bg-white bg-opacity-10 border border-white border-opacity-20 text-white text-xs font-semibold px-3 py-1.5 rounded-full">&#9993; Email on Close</span>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<div class="h-1 bg-wm-spark shrink-0"></div>
+
+<!-- ░░ MAIN ░░ -->
+<main class="flex-1">
+  <div class="max-w-7xl mx-auto px-4 py-5 flex flex-col gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+      <!-- ── START SHIFT CARD ── -->
+      <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 flex flex-col">
+        <h2 class="text-wm-dark font-black text-sm mb-2">&#128197; Open a Shift</h2>
+
+        <!-- Live clock widget -->
+        <div class="bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 mb-3 flex items-center justify-between gap-2">
+          <div>
+            <p class="text-xs font-bold text-blue-700">{{ day_name }}, {{ today }}</p>
+            <p class="text-xs text-blue-500" id="active-shift-line">Detecting&hellip;</p>
+          </div>
+          <p class="text-lg font-black text-blue-700 font-mono" id="live-clock">--:-- --</p>
+        </div>
+
+        {% if error %}
+        <div class="bg-red-50 border border-red-300 text-red-700 text-xs font-semibold rounded-xl px-3 py-2 mb-2">
+          &#9888; {{ error | replace('+', ' ') }}
+        </div>
+        {% endif %}
+
+        <form method="POST" action="/shift/start" id="shift-start-form" class="flex flex-col gap-3 flex-1">
+          <input type="hidden" name="lead_name" id="hidden_lead_name" value="" />
+          <input type="hidden" name="assoc_num" id="hidden_assoc_num" value="" />
+          <input type="hidden" name="ot_code"   id="hidden_ot_code"   value="" />
+          <input type="hidden" name="confirm_dup" id="hidden_confirm_dup" value="0" />
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1">Date</label>
+              <input id="shift_date" name="shift_date" type="date" value="{{ today }}" max="{{ today }}" required
+                onchange="onDateOrShiftChange()"
+                class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-wm-blue focus:ring-2 focus:ring-blue-200 outline-none transition" />
+            </div>
+            <div>
+              <label class="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1">Shift</label>
+              <select id="shift_type" name="shift_type" required
+                onchange="onDateOrShiftChange()"
+                class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-wm-blue focus:ring-2 focus:ring-blue-200 outline-none transition">
+                <option value="S1">S1 &mdash; 5:30 AM &ndash; 4:00 PM</option>
+                <option value="S2">S2 &mdash; 12:00 PM &ndash; 10:30 PM</option>
+                <option value="S3">S3 &mdash; 8:30 PM &ndash; 7:00 AM</option>
+                <option value="S4">S4 &mdash; 5:30 AM &ndash; 6:00 PM</option>
+                <option value="S5">S5 &mdash; 5:30 PM &ndash; 6:00 AM</option>
+              </select>
+              <p id="shift-warn" class="hidden text-xs text-red-600 font-semibold mt-1"></p>
+            </div>
+          </div>
+
+          <button type="button" id="open-modal-btn" onclick="openMstModal()"
+            class="mt-auto bg-wm-blue hover:bg-blue-700 text-white font-black py-2.5 rounded-xl transition text-sm shadow">
+            &#9889; Start Shift
+          </button>
+          <p id="start-btn-lock-msg" class="hidden text-xs text-amber-600 font-semibold text-center -mt-1"></p>
+        </form>
+      </div>
+
+      <!-- ── ACTIVE SHIFT CARD(S) ── 0, 1, or 2 active simultaneously during overlap windows -->
+      <div class="flex flex-col gap-4">
+
+        {% if shifts %}
+          {% for s in shifts %}
+          <div class="bg-white rounded-2xl border-2 border-wm-blue shadow-sm p-5 flex flex-col gap-3">
+            <div class="flex items-center justify-between gap-2">
+              <span class="bg-green-400 text-green-900 text-xs font-black px-2.5 py-1 rounded-full animate-pulse">&#9679; ACTIVE SHIFT</span>
+              <div class="flex items-center gap-1.5">
+                {% if s.is_ot %}
+                <span class="bg-amber-400 text-amber-950 text-xs font-black px-2 py-0.5 rounded-full">MST ON OT</span>
+                {% endif %}
+                {% if shifts | length > 1 %}
+                <span class="bg-blue-50 border border-blue-200 text-wm-blue text-xs font-bold px-2 py-0.5 rounded-full">{{ loop.index }}/{{ shifts | length }}</span>
+                {% endif %}
+              </div>
+            </div>
+            <div>
+              <p class="text-wm-dark font-black text-3xl leading-none">{{ s.shift_type }}</p>
+              {% if s.opened_by_role == 'tech' %}
+              <p class="text-gray-500 text-sm mt-1">{{ s.date }} &bull; <span class="text-amber-600 font-bold">No MST yet</span></p>
+              {% else %}
+              <p class="text-gray-500 text-sm mt-1">{{ s.date }} &bull; MST: <strong class="text-gray-700">{{ s.lead_name }}</strong></p>
+              {% endif %}
+            </div>
+            <div class="flex flex-col gap-2 mt-auto">
+              <a href="/tech/login?shift_id={{ s.id }}"
+                 class="block text-center bg-wm-spark hover:bg-yellow-400 text-gray-900 font-black py-2.5 rounded-xl transition text-sm shadow">&#128295; Technician View</a>
+              <a href="#" onclick="openLeadModal({{ s.id }}); return false;"
+                 class="block text-center bg-wm-blue hover:bg-blue-700 text-white font-black py-2.5 rounded-xl transition text-sm shadow">&#128202; MST Dashboard</a>
+              <a href="/share"
+                 class="block text-center border-2 border-gray-200 hover:border-wm-blue text-wm-blue font-bold py-2.5 rounded-xl transition text-sm">&#128279; Share Links &amp; QR Code</a>
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 flex flex-col items-center justify-center gap-2 text-center h-full">
+          <p class="text-5xl">&#128274;</p>
+          <p class="text-wm-dark font-black text-base">No Active Shift</p>
+          <p class="text-gray-400 text-sm">Open a shift using the form on the left to get started.</p>
+        </div>
+        {% endif %}
+
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<footer class="bg-wm-dark border-t border-blue-900 text-blue-400 text-center text-xs py-2">
+  Shift Passdown Generator &bull; MST Reliability &bull; Walmart &copy; 2026 &bull;
+  <a href="/walkthrough/" target="_blank" class="underline hover:text-gray-300 font-bold">&#128064; App Walkthrough</a>
+</footer>
+
+<!-- ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ -->
+<!-- MST IDENTITY MODAL                                                         -->
+<!-- ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ -->
+<div id="mst-modal" class="fixed inset-0 z-50 hidden items-center justify-center"
+     style="background:rgba(0,0,0,0.55);" onclick="modalBackdropClick(event)">
+
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+
+    <!-- Modal header -->
+    <div class="bg-wm-blue px-5 py-4 flex items-center justify-between">
+      <div>
+        <p class="text-white font-black text-base leading-tight">Confirm Your Identity</p>
+        <p class="text-blue-200 text-xs mt-0.5" id="modal-shift-label">Loading&hellip;</p>
+      </div>
+      <button onclick="closeMstModal()" class="text-blue-200 hover:text-white text-xl font-black leading-none">&times;</button>
+    </div>
+
+    <!-- Modal body -->
+    <div class="px-5 py-5 flex flex-col gap-4">
+
+      <!-- Associate ID input -->
+      <div>
+        <label class="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1">Associate Number</label>
+        <div class="relative">
+          <input id="modal_assoc_id" type="text" inputmode="numeric" maxlength="10" autocomplete="off"
+            placeholder="Enter your associate number&hellip;"
+            oninput="onModalAssocInput(this.value)"
+            class="w-full rounded-xl border-2 border-gray-200 px-4 py-2.5 text-sm
+                   focus:border-wm-blue focus:ring-2 focus:ring-blue-100 outline-none transition pr-24" />
+          <span id="modal-mst-badge"
+            class="hidden absolute right-2 top-1/2 -translate-y-1/2 bg-wm-spark text-gray-900
+                   text-xs font-black px-2 py-0.5 rounded-full whitespace-nowrap">&#128202; MST</span>
+        </div>
+        <p id="modal-hint" class="text-xs text-gray-400 mt-1">Enter your number to auto-fill your name.</p>
+      </div>
+
+      <!-- Name field (auto-filled, still editable) -->
+      <div>
+        <label class="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1">Your Name</label>
+        <input id="modal_lead_name" type="text" placeholder="Auto-filled or type your name&hellip;"
+          class="w-full rounded-xl border-2 border-gray-200 px-4 py-2.5 text-sm
+                 focus:border-wm-blue focus:ring-2 focus:ring-blue-100 outline-none transition" />
+      </div>
+
+      <!-- OT prompt (shift mismatch) — simplified: Yes = proceed, No = back to home -->
+      <div id="modal-ot-prompt" class="hidden bg-amber-50 border border-amber-300 rounded-xl p-3 flex flex-col gap-2">
+        <p id="modal-ot-msg" class="text-amber-800 text-xs font-bold"></p>
+        <div class="flex gap-2">
+          <button type="button" onclick="confirmOt()"
+            class="text-white font-black text-xs px-4 py-1.5 rounded-lg transition"
+            style="background-color:#2a8703;"
+            onmouseover="this.style.backgroundColor='#1f6502'"
+            onmouseout="this.style.backgroundColor='#2a8703'">
+            &#10003; Yes, Overtime
+          </button>
+          <button type="button" onclick="cancelOt()"
+            class="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-4 py-1.5 rounded-lg transition">
+            &#10007; No, Cancel
+          </button>
+        </div>
+      </div>
+
+      {# FUTURE USE: OT code entry (re-enable with the requestOtCode/verifyOtCode flow) #}
+
+    </div>
+
+    <!-- Modal footer -->
+    <div class="px-5 pb-5 flex gap-3">
+      <button onclick="closeMstModal()"
+        class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-2.5 rounded-xl text-sm transition">
+        Cancel
+      </button>
+      <button id="modal-confirm-btn" onclick="confirmAndStart()" disabled
+        class="flex-1 bg-wm-blue text-white font-black py-2.5 rounded-xl text-sm transition
+               opacity-50 cursor-not-allowed">
+        &#9889; Start Shift
+      </button>
+    </div>
+
+  </div>
+</div>
+<!-- /MST IDENTITY MODAL -->
+
+<script>
+  // -- Constants --
+  const SHIFT_DAYS = {
+    S1: [0,1,2,3], S2: [0,1,2,3], S3: [0,1,2,3],
+    S4: [4,5,6],   S5: [4,5,6],
+  };
+  const SHIFT_LABELS = {
+    S1: 'Mon\u2013Thu', S2: 'Mon\u2013Thu', S3: 'Mon\u2013Thu',
+    S4: 'Fri\u2013Sun', S5: 'Fri\u2013Sun',
+  };
+  const HAS_ACTIVE_SHIFT = {{ 'true' if shifts else 'false' }};
+  const IS_DEV_MODE = {{ 'true' if is_dev_mode else 'false' }};
+  const SERVER_TODAY = {{ today | tojson }};  // frozen test date in dev mode, real today otherwise
+
+  // Each shift: { id, startDays (0=Mon), startMin, endMin (may exceed 1440 = next day) }
+  const SHIFT_WINDOWS = [
+    { id: 'S1', startDays:[0,1,2,3], startMin: 330,  endMin: 960  },  // 5:30–16:00 same day
+    { id: 'S2', startDays:[0,1,2,3], startMin: 720,  endMin: 1350 },  // 12:00–22:30 same day
+    { id: 'S3', startDays:[0,1,2,3], startMin: 1230, endMin: 1860 },  // 20:30–7:00 next
+    { id: 'S4', startDays:[4,5,6],   startMin: 330,  endMin: 1080 },  // 5:30–18:00 same day
+    { id: 'S5', startDays:[4,5,6],   startMin: 1050, endMin: 1800 },  // 17:30–6:00 next
+  ];
+  // Mirrors _SHIFT_EARLY_UNLOCK / _SHIFT_GRACE on the server: a shift is
+  // considered "live" starting 1hr before its scheduled start (handover
+  // overlap) and stays live/open until 1hr after its scheduled end
+  // (same grace window the server uses before auto-terminating it).
+  const SHIFT_GRACE_MIN = 60;
+
+  // ── State ───────────────────────────────────────────────────────────────────
+  let _curAssoc    = null;
+  let _otVerified  = false;
+  let _lookupTimer = null;
+
+  // ── Live clock ──────────────────────────────────────────────────────────────
+  function tickClock() {
+    const now = new Date();
+    const h = now.getHours(), m = now.getMinutes(), s = now.getSeconds();
+    const per = h < 12 ? 'AM' : 'PM', h12 = (h % 12) || 12;
+    const pad = n => String(n).padStart(2,'0');
+    document.getElementById('live-clock').textContent =
+      h12 + ':' + pad(m) + ':' + pad(s) + ' ' + per;
+  }
+  tickClock(); setInterval(tickClock, 1000);
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+  function dow(iso) {
+    const [y,mo,d] = iso.split('-').map(Number);
+    return new Date(y, mo-1, d).getDay();
+  }
+  function toPy(j) { return (j+6)%7; }
+  function selShift() { return document.getElementById('shift_type').value; }
+  function selDate()  { return document.getElementById('shift_date').value; }
+
+  function todayISO() {
+    if (IS_DEV_MODE) return SERVER_TODAY;  // frozen test date -- never drifts to the real "today"
+    const n = new Date();
+    return n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0') + '-' + String(n.getDate()).padStart(2,'0');
+  }
+
+  // Defensive clamp -- some browsers/keyboards can still type a future date
+  // into a date input despite the max attribute. Snap back to today.
+  function clampFutureDate() {
+    const input = document.getElementById('shift_date');
+    if (input.value && input.value > todayISO()) input.value = todayISO();
+  }
+
+  // Mirrors the server's _is_within_shift_window() -- real-time freeze with
+  // the same 1hr early-unlock allowance before start AND the same 1hr
+  // grace period after the scheduled end (handover overlap on both ends).
+  // In dev mode the day-of-week is pinned to the frozen test date (real
+  // time-of-day still flows through so windows open/close live).
+  function isShiftLiveOrEarly(shiftId) {
+    const now    = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const pyDay  = IS_DEV_MODE ? toPy(dow(SERVER_TODAY)) : toPy(now.getDay());
+    const prevPy = (pyDay + 6) % 7;
+    const s = SHIFT_WINDOWS.find(w => w.id === shiftId);
+    if (!s) return false;
+    const overnight  = s.endMin > 1440;
+    const earlyStart = s.startMin - SHIFT_GRACE_MIN;
+    const lateEnd     = s.endMin + SHIFT_GRACE_MIN;
+    if (!overnight) {
+      return s.startDays.includes(pyDay) && nowMin >= earlyStart && nowMin < lateEnd;
+    }
+    if (s.startDays.includes(pyDay) && nowMin >= earlyStart) return true;
+    if (s.startDays.includes(prevPy) && nowMin < (lateEnd - 1440)) return true;
+    return false;
+  }
+
+  // ── Card: date/shift change ──────────────────────────────────────────────────
+  // Real hard freeze -- an option is only pickable if it's actually in its
+  // live window right now (plus the 1hr early-unlock allowance and the 1hr
+  // closing grace, both for handover). Past dates skip the live-window check (day-of-week only,
+  // since there's no "now" for a historical backfill). Future dates can't
+  // even be selected (input has a max="today" attribute + JS clamp below).
+  function onDateOrShiftChange() {
+    clampFutureDate();
+    const ds  = selDate();
+    const sel = document.getElementById('shift_type');
+
+    if (ds) {
+      const py      = toPy(dow(ds));
+      const isToday = ds === todayISO();
+      let first = null;
+      for (const o of sel.options) {
+        const dayOk  = IS_DEV_MODE || (SHIFT_DAYS[o.value]||[]).includes(py);
+        const timeOk = !isToday || isShiftLiveOrEarly(o.value);
+        const ok = dayOk && timeOk;
+        o.disabled = !ok; o.style.color = ok ? '' : '#ccc';
+        if (ok && !first) first = o.value;
+      }
+      const cur = sel.options[sel.selectedIndex];
+      if (cur && cur.disabled && first) sel.value = first;
+    }
+    checkDowWarn();
+  }
+
+  function checkDowWarn() {
+    const warn = document.getElementById('shift-warn');
+    const btn  = document.getElementById('open-modal-btn');
+    const ds = selDate(), st = selShift();
+    if (!ds || !st) { warn.classList.add('hidden'); return; }
+    const py      = toPy(dow(ds));
+    const isToday = ds === todayISO();
+    const dayOk   = IS_DEV_MODE || (SHIFT_DAYS[st]||[]).includes(py);
+    const timeOk  = !isToday || isShiftLiveOrEarly(st);
+
+    if (!dayOk) {
+      const pts = ds.split('-').map(Number);
+      const dn  = new Date(pts[0],pts[1]-1,pts[2]).toLocaleDateString('en-US',{weekday:'long'});
+      warn.textContent = '\u26a0\ufe0f ' + st + ' is only available '
+        + SHIFT_LABELS[st] + '. ' + dn + ' is not valid.';
+      warn.classList.remove('hidden');
+      btn.disabled = true; btn.classList.add('opacity-50','cursor-not-allowed');
+    } else if (!timeOk) {
+      warn.textContent = '\u26a0\ufe0f ' + st + ' is not in its scheduled window right now. Frozen until it opens.';
+      warn.classList.remove('hidden');
+      btn.disabled = true; btn.classList.add('opacity-50','cursor-not-allowed');
+    } else {
+      warn.classList.add('hidden');
+      btn.disabled = false; btn.classList.remove('opacity-50','cursor-not-allowed');
+    }
+  }
+
+  // ── Modal open/close ────────────────────────────────────────────────────────
+  function openMstModal() {
+    // Reset modal state
+    _curAssoc   = null; _otVerified = false;
+    document.getElementById('modal_assoc_id').value  = '';
+    document.getElementById('modal_lead_name').value = '';
+    document.getElementById('modal-mst-badge').classList.add('hidden');
+    document.getElementById('modal-hint').textContent = 'Enter your number to auto-fill your name.';
+    document.getElementById('modal-hint').className   = 'text-xs text-gray-400 mt-1';
+    document.getElementById('modal-ot-prompt').classList.add('hidden');
+    document.getElementById('hidden_ot_code').value  = '';
+
+    // Populate the subtitle
+    const st = selShift(), ds = selDate();
+    document.getElementById('modal-shift-label').textContent = st + ' \u2014 ' + ds;
+
+    updateModalConfirmBtn();
+
+    const modal = document.getElementById('mst-modal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    setTimeout(() => document.getElementById('modal_assoc_id').focus(), 80);
+  }
+
+  function closeMstModal() {
+    const modal = document.getElementById('mst-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+
+  function modalBackdropClick(e) {
+    if (e.target === document.getElementById('mst-modal')) closeMstModal();
+  }
+
+  // ── Modal: associate ID lookup ──────────────────────────────────────────────
+  function onModalAssocInput(val) {
+    clearTimeout(_lookupTimer);
+    const badge = document.getElementById('modal-mst-badge');
+    const name  = document.getElementById('modal_lead_name');
+    const hint  = document.getElementById('modal-hint');
+    _curAssoc   = null;
+    document.getElementById('hidden_assoc_num').value = '';
+    resetOtState();
+    badge.classList.add('hidden');
+
+    if (!val || val.length < 4) {
+      hint.textContent = 'Enter your number to auto-fill your name.';
+      hint.className   = 'text-xs text-gray-400 mt-1';
+      updateModalConfirmBtn(); return;
+    }
+
+    _lookupTimer = setTimeout(async () => {
+      try {
+        const r = await fetch('/api/associate-lookup?code=' + encodeURIComponent(val));
+        const d = await r.json();
+        if (!d.found) {
+          hint.textContent = '\u274c Associate number not found in roster.';
+          hint.className   = 'text-xs text-red-600 font-semibold mt-1';
+          updateModalConfirmBtn(); return;
+        }
+        name.value = d.display_name;
+        _curAssoc  = { assoc_num: val, display_name: d.display_name,
+                       assigned_shift: d.shift || '', is_mst: d.is_mst, is_manager: d.is_manager };
+        document.getElementById('hidden_assoc_num').value = val;
+        if (d.is_mst) {
+          badge.textContent = '\ud83d\udcca MST';
+          badge.classList.remove('hidden');
+          hint.textContent  = '\u2713 MST identified.';
+          hint.className    = 'text-xs text-green-600 font-semibold mt-1';
+        } else {
+          hint.textContent  = '\u2713 Associate found.';
+          hint.className    = 'text-xs text-gray-500 mt-1';
+        }
+        evaluateAssocShift();
+      } catch(e) {
+        hint.textContent = 'Lookup failed \u2014 type your name manually.';
+        hint.className   = 'text-xs text-gray-400 mt-1';
+      }
+      updateModalConfirmBtn();
+    }, 350);
+  }
+
+  // ── Shift assignment check ──────────────────────────────────────────────────
+  function evaluateAssocShift() {
+    if (!_curAssoc || !_curAssoc.is_mst) { hideOtPrompt(); return; }
+    const assigned = _curAssoc.assigned_shift;
+    const selected = selShift();
+    if (assigned && assigned !== selected) showOtPrompt(assigned, selected);
+    else hideOtPrompt();
+  }
+
+  // ── OT flow ─────────────────────────────────────────────────────────────────
+  function showOtPrompt(assigned, selected) {
+    document.getElementById('modal-ot-msg').textContent =
+      '\u26a0\ufe0f You are assigned to ' + assigned + ', but '
+      + selected + ' is selected. Are you working overtime?';
+    document.getElementById('modal-ot-prompt').classList.remove('hidden');
+    updateModalConfirmBtn();
+  }
+
+  function hideOtPrompt() {
+    document.getElementById('modal-ot-prompt').classList.add('hidden');
+    _otVerified = false;
+    document.getElementById('hidden_ot_code').value = '';
+    updateModalConfirmBtn();
+  }
+
+  // Yes, Overtime — just confirm and let them proceed
+  function confirmOt() {
+    _otVerified = true;
+    document.getElementById('modal-ot-prompt').classList.add('hidden');
+    updateModalConfirmBtn();
+  }
+
+  // No, Cancel — close modal and return to home
+  function cancelOt() {
+    closeMstModal();
+    window.location.href = '/';
+  }
+
+  function resetOtState() {
+    _otVerified = false;
+    document.getElementById('hidden_ot_code').value = '';
+    const p = document.getElementById('modal-ot-prompt');
+    if (p) p.classList.add('hidden');
+  }
+
+  /* FUTURE USE — OT code request/verify flow (disabled, routes still exist in main.py)
+  async function requestOtCode() { ... }
+  async function verifyOtCode()  { ... }
+  function clearOtErr()          { ... }
+  */
+
+  // ── Modal confirm button gating ─────────────────────────────────────────────
+  function updateModalConfirmBtn() {
+    const btn      = document.getElementById('modal-confirm-btn');
+    const otPrompt = document.getElementById('modal-ot-prompt');
+    const nameVal  = (document.getElementById('modal_lead_name').value || '').trim();
+
+    // Need a name to proceed
+    if (!nameVal) {
+      btn.disabled = true; btn.classList.add('opacity-50','cursor-not-allowed'); return;
+    }
+    // OT prompt open but not verified
+    if (!otPrompt.classList.contains('hidden') && !_otVerified) {
+      btn.disabled = true; btn.classList.add('opacity-50','cursor-not-allowed'); return;
+    }
+    btn.disabled = false; btn.classList.remove('opacity-50','cursor-not-allowed');
+  }
+
+  // -- Final submit --
+  function confirmAndStart() {
+    const nameVal = (document.getElementById('modal_lead_name').value || '').trim();
+    if (!nameVal) { alert('Please enter your name.'); return; }
+
+    // Non-MST tech + a shift is already running -- confirm before joining it.
+    const isMst = _curAssoc && (_curAssoc.is_mst || _curAssoc.is_manager);
+    if (HAS_ACTIVE_SHIFT && _curAssoc && !isMst) {
+      const ok = window.confirm(
+        'A shift is already running. This will log you into that existing ' +
+        'shift instead of starting a new one. Continue?'
+      );
+      if (!ok) return;
+      document.getElementById('hidden_confirm_dup').value = '1';
+    }
+
+    document.getElementById('hidden_lead_name').value = nameVal;
+    closeMstModal();
+    document.getElementById('shift-start-form').submit();
+  }
+
+  // ── Allow Enter key inside modal to trigger confirm ──────────────────────────
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeMstModal();
+    if (e.key === 'Enter') {
+      const modal = document.getElementById('mst-modal');
+      if (!modal.classList.contains('hidden')) {
+        e.preventDefault();
+        const btn = document.getElementById('modal-confirm-btn');
+        if (!btn.disabled) confirmAndStart();
+      }
+    }
+  });
+
+  // ── Listen for name edits to re-gate confirm btn ────────────────────────────
+  document.getElementById('modal_lead_name')
+    .addEventListener('input', updateModalConfirmBtn);
+
+  // ── Lead modal (navigates to full login page) ──────────────────────────────
+  function openLeadModal(shiftId) {
+    const dest = shiftId ? '/lead?shift_id=' + shiftId : '/lead';
+    window.location.href = '/lead/login?next=' + encodeURIComponent(dest);
+  }
+
+  // ── Active-shift detection (time + day aware) ────────────────────────────────
+  // In dev mode the day-of-week is pinned to the frozen test date so this
+  // matches the same reality the server + dropdown are using. Includes the
+  // same 1hr closing grace as isShiftLiveOrEarly()/the server, so this line
+  // doesn't claim "no shift active" during the hour a shift is still open.
+  function getActiveShiftsNow() {
+    const now    = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const pyDay  = IS_DEV_MODE ? toPy(dow(SERVER_TODAY)) : toPy(now.getDay());
+    const prevPy = (pyDay + 6) % 7;
+    const active = [];
+
+    for (const s of SHIFT_WINDOWS) {
+      const overnight = s.endMin > 1440;
+      const lateEnd   = s.endMin + SHIFT_GRACE_MIN;
+      if (!overnight) {
+        // Same-day shift
+        if (s.startDays.includes(pyDay) && nowMin >= s.startMin && nowMin < lateEnd)
+          active.push(s.id);
+      } else {
+        // Started today, still running
+        if (s.startDays.includes(pyDay) && nowMin >= s.startMin)
+          active.push(s.id);
+        // OR started yesterday (prevPy), now in the overnight tail (plus grace)
+        else if (s.startDays.includes(prevPy) && nowMin < (lateEnd - 1440))
+          active.push(s.id);
+      }
+    }
+    return active;
+  }
+
+  function fmtMin(m) {
+    const h = Math.floor(m / 60) % 24;
+    const mn = m % 60;
+    const per = h < 12 ? 'AM' : 'PM';
+    return ((h % 12) || 12) + (mn ? ':' + String(mn).padStart(2,'0') : '') + ' ' + per;
+  }
+
+  function updateActiveShiftLine() {
+    const line   = document.getElementById('active-shift-line');
+    const active = getActiveShiftsNow();
+    if (active.length === 0) {
+      // Find the next shift starting today
+      const now    = new Date();
+      const nowMin = now.getHours() * 60 + now.getMinutes();
+      const pyDay  = IS_DEV_MODE ? toPy(dow(SERVER_TODAY)) : toPy(now.getDay());
+      let nextLabel = null;
+      let nextStart = Infinity;
+      for (const s of SHIFT_WINDOWS) {
+        if (s.startDays.includes(pyDay) && s.startMin > nowMin && s.startMin < nextStart) {
+          nextStart = s.startMin; nextLabel = s.id;
+        }
+      }
+      line.innerHTML = nextLabel
+        ? 'No shift active &mdash; <strong>' + nextLabel + '</strong> starts at ' + fmtMin(nextStart)
+        : 'No shifts scheduled for this time.';
+    } else if (active.length === 1) {
+      line.innerHTML = 'Active now: <strong class="text-wm-blue">' + active[0] + '</strong>';
+    } else {
+      // Overlap
+      const names = active.map(s => '<strong class="text-amber-600">' + s + '</strong>').join(' &amp; ');
+      line.innerHTML = 'Overlap window &mdash; active: ' + names;
+    }
+  }
+
+  function getNextShiftStart(from) {
+    let best = null;
+    for (let d = 0; d <= 7; d++) {
+      const day = new Date(from);
+      day.setDate(day.getDate() + d);
+      day.setHours(0, 0, 0, 0);
+      const pyDay = toPy(day.getDay());
+      for (const s of SHIFT_WINDOWS) {
+        if (!s.startDays.includes(pyDay)) continue;
+        const candidate = new Date(day.getTime() + s.startMin * 60000);
+        if (candidate > from && (!best || candidate < best.at)) {
+          best = { at: candidate, id: s.id };
+        }
+      }
+    }
+    return best;
+  }
+
+  async function updateStartButtonLock() {
+    const btn = document.getElementById('open-modal-btn');
+    const msg = document.getElementById('start-btn-lock-msg');
+    let activeTypes = [];
+    try {
+      const res = await fetch('/api/active-shifts');
+      const data = await res.json();
+      activeTypes = data.active_types || [];
+    } catch (e) { return; }
+
+    if (activeTypes.length === 0) {
+      btn.disabled = false;
+      btn.classList.remove('opacity-50', 'cursor-not-allowed');
+      msg.classList.add('hidden');
+      return;
+    }
+
+    const now  = new Date();
+    const next = getNextShiftStart(now);
+    const oneHourOut = next ? (next.at.getTime() - now.getTime()) <= 3600000 : false;
+
+    if (oneHourOut) {
+      btn.disabled = false;
+      btn.classList.remove('opacity-50', 'cursor-not-allowed');
+      msg.textContent = next.id + ' starts soon -- you can start it now for handover.';
+      msg.classList.remove('hidden');
+    } else {
+      btn.disabled = true;
+      btn.classList.add('opacity-50', 'cursor-not-allowed');
+      const nextLabel = next
+        ? ('Unlocks 1hr before ' + next.id + ' (' + fmtMin(next.at.getHours()*60 + next.at.getMinutes()) + ').')
+        : 'a shift is already running.';
+      msg.textContent = 'Locked -- ' + activeTypes.join(' & ') + ' running. ' + nextLabel;
+      msg.classList.remove('hidden');
+    }
+  }
+
+  function autoSelectCurrentShift() {
+    // Only auto-select if the form date is today
+    const formDate = selDate();
+    if (formDate !== todayISO()) return;
+
+    const active = getActiveShiftsNow();
+    if (active.length === 0) return;
+
+    const sel = document.getElementById('shift_type');
+    // Prefer currently selected if it's already active
+    if (active.includes(sel.value)) return;
+    // Otherwise pick the first active shift that isn't disabled
+    for (const s of active) {
+      const opt = sel.querySelector('option[value="' + s + '"]');
+      if (opt && !opt.disabled) { sel.value = s; break; }
+    }
+  }
+
+  // -- Init --
+  updateActiveShiftLine();
+  setInterval(updateActiveShiftLine, 60000); // refresh every minute
+  updateStartButtonLock();
+  setInterval(updateStartButtonLock, 30000); // refresh every 30s
+  onDateOrShiftChange();
+  autoSelectCurrentShift();
+</script>
+</body>
+</html>

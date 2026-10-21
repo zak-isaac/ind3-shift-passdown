@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>IND3 Shift Passdown — Start or Resume Shift</title>
+<link rel="stylesheet" href="/static/tailwind.min.css"><style>
+.v3c{border-radius:16px;border:1px solid #dbe3f1;box-shadow:0 4px 16px #001e6012;background:#fff;padding:24px}.v3entry{width:100%;border:1px solid #cdd6e5;border-radius:10px;padding:11px 12px;font-size:14px;background:#fff}.v3entry:focus{border-color:#0053e2;outline:2px solid #bed7ff}.v3label{font-size:11px;font-weight:800;color:#4f6181;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px}.v3btn{background:#0053e2;color:#fff;border:0;border-radius:10px;padding:13px 16px;font-size:14px;font-weight:800;cursor:pointer;width:100%}.v3btn:hover{background:#003ea8}.v3resume{display:inline-block;width:100%;background:#ffc220;color:#001e60;text-align:center;border-radius:10px;padding:10px;font-weight:800}.v3error{background:#fff0ed;border:1px solid #ffc2b7;color:#992500;padding:10px 14px;border-radius:12px;font-weight:700}.v3help{color:#62738f;font-size:12px;line-height:1.55}.v3line{height:1px;background:#e8edf4;margin:18px 0}
+</style></head>
+<body class="min-h-screen flex flex-col bg-gray-100">
+<nav class="bg-wm-blue border-b border-blue-700"><div class="max-w-7xl mx-auto px-5 flex items-center justify-between" style="height:72px">
+<a href="/v3/login" style="height:56px;overflow:hidden;display:flex;align-items:center"><img src="/static/walmart-logo-white.svg" alt="Walmart" style="height:224px;width:auto"></a>
+<div class="text-blue-100 text-sm font-semibold">MST Reliability Operations <span class="mx-2 text-yellow-300">|</span> IND3</div></div></nav>
+<section class="bg-wm-dark" style="background:linear-gradient(135deg,#001e50 0%,#002d72 55%,#0053e2 100%)"><div class="max-w-7xl mx-auto px-6 py-8 md:py-10 flex flex-col md:flex-row md:items-center gap-8">
+<div class="flex-1"><span class="inline-block bg-wm-spark text-gray-900 text-xs font-black px-3 py-1 rounded-full uppercase tracking-widest mb-3">Shift Operations</span><h1 class="text-white font-black text-4xl md:text-5xl leading-tight tracking-tight">Shift Passdown<br><span class="text-wm-spark">Generator</span></h1></div>
+<div class="w-full md:w-80"><p class="text-blue-100 text-base leading-relaxed">Start or resume your own shift. Import the single Cetaris report, review work orders, and use the existing maintenance passdown tools.</p></div>
+</div></section>
+<main class="flex-1 max-w-7xl w-full mx-auto px-5 py-7"><div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+<section class="v3c"><div class="flex items-center justify-between mb-4"><h2 class="text-wm-dark text-2xl font-black">Start your shift</h2><span class="rounded-full bg-blue-50 text-wm-blue px-3 py-1 text-xs font-black">V3</span></div>
+<p class="v3help mb-4">Enter your associate number and choose the shift you are starting. MST leads and other rostered technicians can start a shift when eligible.</p>
+{% if error %}<div class="v3error mb-4" role="alert">{{ error }}</div>{% endif %}
+<form method="post" action="/v3/login" class="flex flex-col gap-4"><input type="hidden" name="mode" value="start">
+<div><label class="v3label" for="associate_id">Your associate number</label><input class="v3entry" id="associate_id" name="associate_id" inputmode="numeric" autocomplete="off" maxlength="30" required placeholder="Enter your associate number"></div>
+<div class="grid grid-cols-2 gap-3"><div><label class="v3label" for="shift_date">Date</label><input class="v3entry" id="shift_date" name="shift_date" type="date" value="{{ today }}" max="{{ today }}" required></div><div><label class="v3label" for="shift_type">Shift</label><select class="v3entry" id="shift_type" name="shift_type" required><option value="">Select shift</option>{% for code in ('S1','S2','S3','S4','S5') %}<option value="{{ code }}">{{ code }}</option>{% endfor %}</select></div></div>
+<button type="submit" class="v3btn">Start Shift</button></form>
+<div class="v3line"></div><p class="v3help">Already started a shift? Use Resume below. The application ties the session to the shift starter's associate number and its own shift ID.</p>
+</section>
+<section class="v3c"><h2 class="text-wm-dark text-2xl font-black mb-1">Active shifts</h2><p class="v3help mb-4">Overlapping shifts stay separate. Enter the associate number of the person who started a shift to resume it.</p>
+{% for sh in shifts %}<div class="border border-blue-100 bg-blue-50 rounded-xl p-4 mb-3"><div class="flex items-center justify-between mb-2"><strong class="text-wm-dark text-2xl">{{ sh.shift_type }}</strong><span class="text-green-700 bg-green-100 rounded-full px-2 py-1 text-xs font-bold">ACTIVE</span></div><p class="text-sm text-gray-600 mb-3">{{ sh.date }} · Started by {{ sh.lead_name }}</p>
+<form method="post" action="/v3/login" class="flex flex-col gap-2"><input type="hidden" name="mode" value="resume"><input type="hidden" name="shift_id" value="{{ sh.id }}"><label class="v3label">Your associate number<input class="v3entry mt-1" name="associate_id" inputmode="numeric" autocomplete="off" required placeholder="Enter to resume"></label><button class="v3resume" type="submit">Resume {{ sh.shift_type }}</button></form></div>{% else %}<div class="rounded-xl bg-gray-50 border border-gray-200 p-6 text-center text-gray-600 text-sm">No active shifts. Start a shift from the form.</div>{% endfor %}
+<p class="v3help mt-4">A shift can only be opened by its eligible associate, and cannot be started twice. At most two different shifts can overlap, following the existing V2 rules.</p>
+</section></div></main>
+<footer class="bg-wm-dark text-blue-200 text-xs py-3 text-center">IND3 Shift Passdown · Maintenance Reliability · Walmart · V3</footer>
+</body></html>

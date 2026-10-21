@@ -1,0 +1,590 @@
+<!-- email_preview_modal.html — loaded via HTMX into #email-modal-wrap -->
+
+<!--
+  Email body is stored in a hidden textarea — much more robust than
+  embedding HTML inside a JSON string inside a script tag (which can
+  break silently if the HTML contains quote characters).
+-->
+<textarea id="_email-body-store" style="display:none;" aria-hidden="true"
+>{{ html_body | e }}</textarea>
+
+<!-- Backdrop -->
+<div id="email-backdrop" onclick="closeEmailModal()"
+  style="position:fixed;inset:0;background:rgba(0,0,0,.2);z-index:9998;"></div>
+
+<!-- Modal -->
+<div id="email-modal"
+  style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+         width:min(880px,96vw);height:93vh;
+         z-index:9999;border-radius:16px;overflow:hidden;
+         background:#fff;box-shadow:0 24px 72px rgba(0,0,0,.32);
+         display:flex;flex-direction:column;">
+
+  <!-- ── HEADER ──────────────────────────────────────────────── -->
+  <div style="background:#0053e2;color:#fff;padding:14px 22px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:space-between;gap:12px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff"
+        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+        <polyline points="22,6 12,13 2,6"/>
+      </svg>
+      <div>
+        <p style="margin:0;font-weight:800;font-size:15px;">IND3 Shift Passdown</p>
+        <p style="margin:2px 0 0;font-size:11px;opacity:.75;">{{ email_to }}</p>
+      </div>
+    </div>
+    <button onclick="closeEmailModal()" title="Close"
+      style="background:rgba(255,255,255,.18);border:none;color:#fff;
+             width:32px;height:32px;border-radius:50%;cursor:pointer;
+             font-size:18px;line-height:32px;text-align:center;">&#10005;</button>
+  </div>
+
+  <!-- ── SUBJECT BAR ──────────────────────────────────────────── -->
+  <div style="padding:9px 22px;background:#f8faff;border-bottom:1px solid #e5e7eb;
+    flex-shrink:0;display:flex;align-items:center;gap:10px;">
+    <span style="font-size:11px;font-weight:700;color:#9ca3af;
+                 text-transform:uppercase;white-space:nowrap;">Subject</span>
+    <input id="email-subject" value="{{ subject | e }}"
+      style="flex:1;padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;
+             font-size:13px;background:#fff;outline:none;" />
+  </div>
+
+  <!-- ── ACTION BAR ───────────────────────────────────────────── -->
+  <div style="padding:10px 22px;background:#fff;border-bottom:1px solid #e5e7eb;
+    flex-shrink:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+
+    <!-- Download dropdown -->
+    <div style="position:relative;" id="dl-wrap">
+      <button onclick="toggleDlMenu(event)" id="dl-btn"
+        style="display:flex;align-items:center;gap:6px;padding:7px 13px;
+               border:1.5px solid #d1d5db;border-radius:9px;background:#fff;
+               font-size:12px;font-weight:700;color:#374151;cursor:pointer;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Download
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+      <div id="dl-menu"
+        style="display:none;position:absolute;top:calc(100% + 6px);left:0;
+               background:#fff;border:1px solid #e5e7eb;border-radius:10px;
+               box-shadow:0 8px 24px rgba(0,0,0,.12);min-width:172px;z-index:20;">
+        <a href="/report/{{ report_id }}/print" target="_blank"
+          style="display:flex;align-items:center;gap:9px;padding:10px 14px;color:#374151;
+                 text-decoration:none;font-size:13px;font-weight:600;
+                 border-bottom:1px solid #f3f4f6;border-radius:10px 10px 0 0;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ea1100"
+            stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 6 2 18 2 18 9"/>
+            <path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/>
+            <rect x="6" y="14" width="12" height="8"/>
+          </svg>
+          Save as PDF
+        </a>
+        <a href="/report/{{ report_id }}/docx" download
+          style="display:flex;align-items:center;gap:9px;padding:10px 14px;color:#374151;
+                 text-decoration:none;font-size:13px;font-weight:600;
+                 border-radius:0 0 10px 10px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0053e2"
+            stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+          </svg>
+          Word Document
+        </a>
+      </div>
+    </div>
+
+    <!-- Copy Email -->
+    <button id="copy-btn" onclick="copyEmailContent()"
+      style="display:flex;align-items:center;gap:6px;padding:7px 13px;
+             border:1.5px solid #d1d5db;border-radius:9px;background:#fff;
+             font-size:12px;font-weight:700;color:#374151;cursor:pointer;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="9" width="13" height="13" rx="2"/>
+        <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+      </svg>
+      Copy Email
+    </button>
+
+    <!-- Edit Email / Save -->
+    <button id="edit-btn" onclick="toggleEditMode()"
+      style="display:flex;align-items:center;gap:6px;padding:7px 13px;
+             border:1.5px solid #d1d5db;border-radius:9px;background:#fff;
+             font-size:12px;font-weight:700;color:#374151;cursor:pointer;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+      <span id="edit-btn-label">Edit Email</span>
+    </button>
+
+    <div style="flex:1;"></div>
+    <div id="email-send-result" style="font-size:12px;"></div>
+
+    <!-- Open in Outlook -->
+    <button id="outlook-btn" onclick="composeOutlook({{ report_id }})"
+      style="display:flex;align-items:center;gap:7px;padding:8px 20px;
+             border:none;border-radius:9px;border-bottom:3px solid #003db5;
+             background:#0053e2;color:#fff;font-weight:800;font-size:13px;cursor:pointer;
+             white-space:nowrap;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff"
+        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+        <polyline points="22,6 12,13 2,6"/>
+      </svg>
+      Open in Outlook
+    </button>
+  </div>
+
+  <!-- ── WORD-STYLE FORMATTING TOOLBAR ─────────────────────────────────────── -->
+  <div id="format-toolbar"
+    style="display:none;background:#f3f4f6;border-bottom:2px solid #e5e7eb;
+           flex-shrink:0;user-select:none;">
+
+    <!-- Row 1: font controls + style buttons -->
+    <div style="display:flex;align-items:center;gap:2px;padding:5px 14px;flex-wrap:wrap;">
+
+      <!-- Undo / Redo -->
+      <button onclick="fmt('undo')" title="Undo" class="rb">&#8630;</button>
+      <button onclick="fmt('redo')" title="Redo" class="rb">&#8631;</button>
+      <div class="sep"></div>
+
+      <!-- Font family -->
+      <select onchange="applyFont(this.value)" title="Font" id="sel-font"
+        style="padding:3px 6px;border:1px solid #d1d5db;border-radius:5px;
+               font-size:12px;background:#fff;cursor:pointer;max-width:120px;">
+        <option value="Calibri,Arial,sans-serif">Calibri</option>
+        <option value="Arial,sans-serif">Arial</option>
+        <option value="Times New Roman,Times,serif">Times New Roman</option>
+        <option value="Georgia,serif">Georgia</option>
+        <option value="Courier New,monospace">Courier New</option>
+        <option value="Verdana,sans-serif">Verdana</option>
+        <option value="Tahoma,sans-serif">Tahoma</option>
+      </select>
+
+      <!-- Font size (pt numbers) -->
+      <select onchange="applyFontSize(this.value)" title="Font Size" id="sel-size"
+        style="padding:3px 6px;border:1px solid #d1d5db;border-radius:5px;
+               font-size:12px;background:#fff;cursor:pointer;width:64px;">
+        <option value="">Pt</option>
+        <option>8</option><option>9</option><option>10</option>
+        <option>11</option><option>12</option><option>14</option>
+        <option>16</option><option>18</option><option>20</option>
+        <option>22</option><option>24</option><option>28</option>
+        <option>32</option><option>36</option><option>48</option>
+      </select>
+      <div class="sep"></div>
+
+      <!-- B / I / U / S -->
+      <button onclick="fmt('bold')"          id="btn-bold"        title="Bold"          class="rb" style="font-weight:900;">B</button>
+      <button onclick="fmt('italic')"        id="btn-italic"      title="Italic"        class="rb" style="font-style:italic;">I</button>
+      <button onclick="fmt('underline')"     id="btn-underline"   title="Underline"     class="rb" style="text-decoration:underline;">U</button>
+      <button onclick="fmt('strikeThrough')" id="btn-strike"      title="Strikethrough" class="rb" style="text-decoration:line-through;">S</button>
+      <div class="sep"></div>
+
+      <!-- Alignment -->
+      <button onclick="fmt('justifyLeft')"   title="Align Left"   class="rb">&#8676;</button>
+      <button onclick="fmt('justifyCenter')" title="Center"       class="rb">&#8801;</button>
+      <button onclick="fmt('justifyRight')"  title="Align Right"  class="rb">&#8677;</button>
+      <div class="sep"></div>
+
+      <!-- Lists -->
+      <button onclick="fmt('insertUnorderedList')" title="Bullet List"   class="rb">&#8226;&#8212;</button>
+      <button onclick="fmt('insertOrderedList')"   title="Numbered List" class="rb">1&#8212;</button>
+      <div class="sep"></div>
+
+      <!-- Indent / Outdent -->
+      <button onclick="fmt('indent')"  title="Indent"  class="rb">&#8677;&#8677;</button>
+      <button onclick="fmt('outdent')" title="Outdent" class="rb">&#8676;&#8676;</button>
+      <div class="sep"></div>
+
+      <!-- Text Color button + swatch indicator -->
+      <div style="position:relative;">
+        <button id="btn-txt-color" onclick="togglePalette('txt')" title="Text Color"
+          class="rb" style="display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 8px;">
+          <span style="font-weight:900;font-size:12px;color:#111;">A</span>
+          <span id="txt-swatch" style="display:block;width:18px;height:4px;background:#111;border-radius:2px;"></span>
+        </button>
+        <!-- Text color palette -->
+        <div id="pal-txt" style="display:none;position:absolute;top:110%;left:0;z-index:50;
+          background:#fff;border:1px solid #e5e7eb;border-radius:10px;
+          box-shadow:0 8px 24px rgba(0,0,0,.14);padding:10px;width:176px;">
+          <p style="margin:0 0 6px;font-size:10px;font-weight:700;color:#9ca3af;
+                    text-transform:uppercase;">Text Color</p>
+          <div id="grid-txt" style="display:grid;grid-template-columns:repeat(8,1fr);gap:4px;"></div>
+          <div style="margin-top:8px;display:flex;align-items:center;gap:6px;">
+            <label style="font-size:11px;color:#6b7280;font-weight:600;">Custom:</label>
+            <input type="color" id="custom-txt" value="#111827"
+              style="width:28px;height:22px;border:1px solid #d1d5db;border-radius:4px;
+                     cursor:pointer;padding:0;">
+            <button onclick="applyCustomColor('txt')" class="pal-ok">OK</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Highlight Color button + swatch -->
+      <div style="position:relative;">
+        <button id="btn-hl-color" onclick="togglePalette('hl')" title="Highlight"
+          class="rb" style="display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 8px;">
+          <span style="font-size:13px;">&#9998;</span>
+          <span id="hl-swatch"  style="display:block;width:18px;height:4px;background:#ffc220;border-radius:2px;"></span>
+        </button>
+        <!-- Highlight palette -->
+        <div id="pal-hl" style="display:none;position:absolute;top:110%;left:0;z-index:50;
+          background:#fff;border:1px solid #e5e7eb;border-radius:10px;
+          box-shadow:0 8px 24px rgba(0,0,0,.14);padding:10px;width:176px;">
+          <p style="margin:0 0 6px;font-size:10px;font-weight:700;color:#9ca3af;
+                    text-transform:uppercase;">Highlight Color</p>
+          <div id="grid-hl" style="display:grid;grid-template-columns:repeat(8,1fr);gap:4px;"></div>
+          <div style="margin-top:8px;display:flex;align-items:center;gap:6px;">
+            <label style="font-size:11px;color:#6b7280;font-weight:600;">Custom:</label>
+            <input type="color" id="custom-hl" value="#ffc220"
+              style="width:28px;height:22px;border:1px solid #d1d5db;border-radius:4px;
+                     cursor:pointer;padding:0;">
+            <button onclick="applyCustomColor('hl')" class="pal-ok">OK</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sep"></div>
+      <!-- Clear formatting -->
+      <button onclick="fmt('removeFormat')" title="Clear Formatting" class="rb"
+        style="font-size:11px;color:#6b7280;">&#10006; Clear</button>
+    </div>
+  </div>
+
+  <style>
+    .rb {
+      padding:5px 9px;border:1px solid transparent;border-radius:5px;
+      background:#f3f4f6;cursor:pointer;font-size:13px;color:#374151;
+      transition:background .12s,border-color .12s;
+      white-space:nowrap;
+    }
+    .rb:hover { background:#e5e7eb;border-color:#d1d5db; }
+    .rb.active { background:#dbeafe;border-color:#93c5fd;color:#1d4ed8; }
+    .sep { width:1px;height:24px;background:#d1d5db;margin:0 4px; }
+    .pal-ok {
+      padding:3px 10px;background:#0053e2;color:#fff;border:none;
+      border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;
+    }
+    .pal-ok:hover { background:#003db5; }
+  </style>
+
+  <!-- ── PREVIEW PANE ─────────────────────────────────────────── -->
+  <div id="pane-preview" style="flex:1 1 0;min-height:0;">
+    <iframe id="email-iframe"
+      style="width:100%;height:100%;border:none;display:block;"
+      sandbox="allow-same-origin"></iframe>
+  </div>
+
+  <!-- ── EDIT PANE (contenteditable) ──────────────────────────── -->
+  <div id="pane-edit"
+    style="flex:1 1 0;min-height:0;overflow-y:auto;display:none;
+           padding:24px 32px;background:#f1f5f9;">
+    <div id="email-editable"
+      contenteditable="true"
+      onmouseup="updateToolbar()" onkeyup="updateToolbar()"
+      style="max-width:700px;margin:0 auto;background:#fff;
+             font-family:Calibri,Arial,sans-serif;font-size:14px;color:#111;
+             line-height:1.6;padding:32px 36px;border-radius:10px;
+             border:1px solid #e5e7eb;box-shadow:0 2px 12px rgba(0,0,0,.07);
+             outline:none;min-height:420px;"></div>
+    <p style="text-align:center;margin-top:10px;font-size:11px;color:#9ca3af;">
+      Click any text to edit &bull; Select text then use the toolbar above to format it
+    </p>
+  </div>
+
+</div>
+
+<script>
+// ── COLOUR PALETTES ────────────────────────────────────────────────────
+
+const COLORS = [
+  '#000000','#222222','#444444','#666666','#888888','#aaaaaa','#dddddd','#ffffff',
+  '#c00000','#e03030','#ea1100','#ff6600','#ff9900','#ffc220','#ffff00','#ccff00',
+  '#00b050','#2a8703','#00b0f0','#0053e2','#003db5','#6600cc','#cc00cc','#ff69b4',
+  '#ffe4b5','#ffd7e8','#d6f0ff','#d9ffd9','#fff8dc','#ffe4c4','#e8e8ff','#fce4ec',
+];
+
+const HIGHLIGHT_COLORS = [
+  '#ffff00','#ffc220','#ff9900','#ff6699','#ff0000','#00ff00','#00ffff','#0000ff',
+  '#ff99cc','#99ccff','#ccffcc','#ffcc99','#cc99ff','#ffccff','#ccffff','#ffffff',
+  '#fef08a','#fed7aa','#fecaca','#bbf7d0','#bfdbfe','#e9d5ff','#fde68a','#d1fae5',
+  '#f0fdf4','#eff6ff','#fdf4ff','#fff7ed','#fefce8','#f0f9ff','#fdf2f8','#f9fafb',
+];
+
+function buildPalette(gridId, colors, mode) {
+  const grid = document.getElementById(gridId);
+  if (!grid || grid.childElementCount > 0) return;
+  colors.forEach(c => {
+    const b = document.createElement('button');
+    b.style.cssText = `width:18px;height:18px;border-radius:3px;border:1px solid #ccc;
+      background:${c};cursor:pointer;padding:0;`;
+    b.title = c;
+    b.onclick = (e) => { e.stopPropagation(); applyColor(mode, c); };
+    grid.appendChild(b);
+  });
+}
+
+function togglePalette(mode) {
+  const palTxt = document.getElementById('pal-txt');
+  const palHl  = document.getElementById('pal-hl');
+  if (mode === 'txt') {
+    buildPalette('grid-txt', COLORS, 'txt');
+    const show = palTxt.style.display === 'none';
+    palTxt.style.display = show ? 'block' : 'none';
+    palHl.style.display  = 'none';
+  } else {
+    buildPalette('grid-hl', HIGHLIGHT_COLORS, 'hl');
+    const show = palHl.style.display === 'none';
+    palHl.style.display  = show ? 'block' : 'none';
+    palTxt.style.display = 'none';
+  }
+}
+
+function applyColor(mode, color) {
+  document.getElementById('email-editable').focus();
+  if (mode === 'txt') {
+    document.execCommand('foreColor', false, color);
+    document.getElementById('txt-swatch').style.background = color;
+  } else {
+    document.execCommand('hiliteColor', false, color);
+    document.getElementById('hl-swatch').style.background = color;
+  }
+  // close palettes
+  document.getElementById('pal-txt').style.display = 'none';
+  document.getElementById('pal-hl').style.display  = 'none';
+}
+
+function applyCustomColor(mode) {
+  const input = document.getElementById(mode === 'txt' ? 'custom-txt' : 'custom-hl');
+  applyColor(mode, input.value);
+}
+
+// Close palettes on outside click
+document.addEventListener('click', (e) => {
+  ['pal-txt','pal-hl'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el.parentElement.contains(e.target)) el.style.display = 'none';
+  });
+});
+
+// ── FONT + SIZE ────────────────────────────────────────────────────
+
+function applyFont(family) {
+  document.getElementById('email-editable').focus();
+  document.execCommand('fontName', false, family);
+}
+
+function applyFontSize(pt) {
+  if (!pt) return;
+  document.getElementById('email-editable').focus();
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed) return;
+  const range = sel.getRangeAt(0);
+  const span  = document.createElement('span');
+  span.style.fontSize = pt + 'pt';
+  try {
+    range.surroundContents(span);
+  } catch (_) {
+    // surroundContents fails on partial selections across elements
+    span.appendChild(range.extractContents());
+    range.insertNode(span);
+  }
+  sel.removeAllRanges();
+  document.getElementById('sel-size').value = '';
+}
+
+// ── GENERIC EXECCOMMAND ──────────────────────────────────────────────
+
+function fmt(cmd, val) {
+  document.getElementById('email-editable').focus();
+  document.execCommand(cmd, false, val !== undefined ? val : null);
+  updateToolbar();
+}
+
+function updateToolbar() {
+  [['bold','btn-bold'],['italic','btn-italic'],
+   ['underline','btn-underline'],['strikeThrough','btn-strike']].forEach(([cmd,id]) => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    const on = document.queryCommandState(cmd);
+    btn.classList.toggle('active', on);
+  });
+}
+
+// ── EMAIL INIT ────────────────────────────────────────────────────
+
+(function () {
+  // Read from textarea — immune to script-tag injection issues
+  const raw = document.getElementById('_email-body-store').value;
+  window._emailRaw = raw;
+
+  // Populate iframe via Blob URL — more reliable than srcdoc on all browsers
+  function loadIframe(html) {
+    const blob = new Blob([html], { type: 'text/html' });
+    const url  = URL.createObjectURL(blob);
+    const iframe = document.getElementById('email-iframe');
+    iframe.onload = () => URL.revokeObjectURL(url);
+    iframe.src = url;
+  }
+  window._loadIframe = loadIframe;
+  loadIframe(raw);
+
+  // Pre-load editable pane (strip outer html/body wrappers)
+  const bodyMatch = raw.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  document.getElementById('email-editable').innerHTML = bodyMatch ? bodyMatch[1] : raw;
+})();
+
+// ── DOWNLOAD DROPDOWN ───────────────────────────────────────────────
+
+function toggleDlMenu(e) {
+  e.stopPropagation();
+  const m = document.getElementById('dl-menu');
+  m.style.display = m.style.display === 'none' ? 'block' : 'none';
+}
+document.addEventListener('click', () => {
+  const m = document.getElementById('dl-menu');
+  if (m) m.style.display = 'none';
+});
+
+// ── COPY EMAIL ────────────────────────────────────────────────────
+
+function copyEmailContent() {
+  const btn = document.getElementById('copy-btn');
+  const isEdit = document.getElementById('pane-edit').style.display !== 'none';
+  const html = isEdit
+    ? '<html><body style="font-family:Calibri,Arial,sans-serif;font-size:14px;color:#111;max-width:700px;line-height:1.6;">'
+      + document.getElementById('email-editable').innerHTML + '</body></html>'
+    : window._emailRaw;
+  const flash = () => {
+    btn.style.background='#f0fdf4';btn.style.color='#16a34a';btn.style.borderColor='#16a34a';
+    setTimeout(()=>{btn.style.background='';btn.style.color='';btn.style.borderColor='';},2200);
+  };
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(html).then(flash).catch(()=>legacyCopy(html,flash));
+  } else { legacyCopy(html, flash); }
+}
+
+function legacyCopy(text, cb) {
+  const ta=document.createElement('textarea');
+  ta.value=text;ta.style.cssText='position:fixed;top:-9999px;opacity:0;';
+  document.body.appendChild(ta);ta.select();document.execCommand('copy');
+  document.body.removeChild(ta);if(cb)cb();
+}
+
+// ── EDIT / SAVE TOGGLE ──────────────────────────────────────────────
+
+let _editMode = false;
+function toggleEditMode() {
+  _editMode = !_editMode;
+  const label   = document.getElementById('edit-btn-label');
+  const btn     = document.getElementById('edit-btn');
+  const toolbar = document.getElementById('format-toolbar');
+  const prev    = document.getElementById('pane-preview');
+  const edit    = document.getElementById('pane-edit');
+
+  if (_editMode) {
+    prev.style.display    = 'none';
+    edit.style.display    = '';
+    toolbar.style.display = 'flex';
+    label.textContent     = 'Save';
+    btn.style.background  = '#eff6ff';
+    btn.style.color       = '#0053e2';
+    btn.style.borderColor = '#0053e2';
+    document.getElementById('email-editable').focus();
+  } else {
+    const edited = document.getElementById('email-editable').innerHTML;
+    const fullHtml = '<html><body style="font-family:Calibri,Arial,sans-serif;font-size:14px;'
+      +'color:#111;max-width:700px;line-height:1.6;padding:24px;">'
+      +edited+'</body></html>';
+    window._loadIframe(fullHtml);
+    prev.style.display    = '';
+    edit.style.display    = 'none';
+    toolbar.style.display = 'none';
+    label.textContent     = 'Edit Email';
+    btn.style.background  = '';
+    btn.style.color       = '';
+    btn.style.borderColor = '';
+  }
+}
+
+// ── CLOSE ────────────────────────────────────────────────────────
+
+function closeEmailModal() {
+  ['email-modal','email-backdrop'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.remove();
+  });
+  // Clear whichever mount point was used
+  document.querySelectorAll('[id^="email-modal-wrap"]').forEach(el => el.innerHTML = '');
+}
+
+// ── COMPOSE IN OUTLOOK ───────────────────────────────────────────────
+//
+// POSTs the current email content to the server. Server decides:
+//   - If Azure client ID configured → starts per-user OAuth in a new tab
+//     On callback, Graph API creates a real draft in their mailbox →
+//     browser opens the draft compose window in OWA (full HTML, their
+//     own account, their own saved Outlook signature underneath)
+//   - No client ID → opens OWA compose URL in a new tab (plain text fallback)
+
+function composeOutlook(reportId) {
+  const btn    = document.getElementById('outlook-btn');
+  const result = document.getElementById('email-send-result');
+  const subj   = document.getElementById('email-subject').value;
+  const isEdit = document.getElementById('pane-edit').style.display !== 'none';
+
+  const body = isEdit
+    ? '<html><body style="font-family:Calibri,Arial,sans-serif;font-size:14px;'
+      + 'color:#111;max-width:700px;line-height:1.6;">'
+      + document.getElementById('email-editable').innerHTML
+      + '</body></html>'
+    : window._emailRaw;
+
+  btn.disabled  = true;
+  btn.innerHTML = '⏳ Opening…';
+  result.innerHTML = '<span style="color:#6b7280;">Connecting to Outlook…</span>';
+
+  const fd = new FormData();
+  fd.append('subject',   subj);
+  fd.append('html_body', body);
+
+  fetch(`/report/${reportId}/compose-outlook`, { method: 'POST', body: fd })
+    .then(r => r.blob())
+    .then(blob => {
+      const a   = document.createElement('a');
+      a.href    = URL.createObjectURL(blob);
+      a.download = 'passdown.eml';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      result.innerHTML     = '<span style="color:#2a8703;font-weight:700;">&#9989; Downloaded! Double-click the .eml file to open in Outlook.</span>';
+      btn.innerHTML        = '&#10003; Downloaded';
+      btn.style.background = '#2a8703';
+      btn.style.borderColor= '#1a5c02';
+      btn.disabled         = false;
+      setTimeout(() => {
+        btn.innerHTML         = 'Open in Outlook';
+        btn.style.background  = '#0053e2';
+        btn.style.borderColor = '#003db5';
+        result.innerHTML      = '';
+      }, 8000);
+    })
+    .catch(err => {
+      result.innerHTML  = `<span style="color:#c00;">&#10060; ${err}</span>`;
+      btn.innerHTML     = 'Open in Outlook';
+      btn.style.background  = '#0053e2';
+      btn.style.borderColor = '#003db5';
+      btn.disabled      = false;
+    });
+}
+</script>

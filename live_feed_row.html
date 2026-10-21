@@ -1,0 +1,89 @@
+{% set is_down = e.priority == 'down' %}
+{% set is_deg  = e.priority == 'degraded' %}
+
+<div id="feed-entry-{{ e.id }}"
+     class="log-row flex items-stretch transition-colors {{ 'bg-gray-50 opacity-60' if e.excluded else 'bg-white hover:bg-gray-50' }}"
+     data-entry
+     data-unit="{{ e.unit | lower }}"
+     data-tech="{{ e.tech_name | lower }}"
+     data-iso="{{ e.created_at }}">
+
+  <!-- Priority stripe -->
+  <div class="w-1 shrink-0 {{ 'bg-red-500' if is_down else ('bg-yellow-400' if is_deg else 'bg-green-500') }}"></div>
+
+  <!-- Main content -->
+  <div class="flex-1 min-w-0 px-4 py-3">
+
+    <!-- Row 1: avatar · tech · time · unit pill -->
+    <div class="flex items-center gap-2 flex-wrap">
+      <span class="w-7 h-7 rounded-full bg-wm-blue flex items-center justify-center text-wm-spark text-xs font-black shrink-0">
+        {{ e.tech_name[0] | upper }}
+      </span>
+      <span class="text-sm font-bold text-gray-800 feed-tech-name">{{ e.tech_name }}</span>
+      <span class="text-gray-300 text-xs select-none">·</span>
+      <span class="text-xs text-gray-400 rel-time" data-iso="{{ e.created_at }}"></span>
+      <span class="text-gray-300 text-xs select-none">·</span>
+      <span class="text-xs font-black text-gray-400 font-mono">{{ e.created_at | fmt_time }}</span>
+      <span class="ml-auto bg-gray-100 text-gray-700 text-xs font-black px-2.5 py-0.5 rounded-lg font-mono feed-unit shrink-0">
+        {{ e.unit }}
+      </span>
+    </div>
+
+    <!-- Row 2: issue text -->
+    <p class="text-sm mt-1.5 leading-snug {{ 'text-gray-400 line-through' if e.excluded else 'text-gray-700' }}">
+      {{ e.unit }}: {{ e.issue | strip_wo_prefix }}{% if e.wo_number %} (WO #{{ e.wo_number }}){% endif %}.
+    </p>
+    {% if e.excluded %}
+    <p class="text-xs text-red-400 font-semibold mt-0.5">&#128683; Excluded from report</p>
+    {% endif %}
+
+  </div>
+
+  <!-- Right: MST controls (compact icon buttons) -->
+  <div class="shrink-0 flex flex-col items-end justify-between px-2 py-2 gap-1.5">
+
+    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap
+      {{ 'bg-red-100 text-red-700' if is_down else ('bg-yellow-100 text-yellow-800' if is_deg else 'bg-green-50 text-green-700') }}">
+      {{ 'Down' if is_down else ('Degraded' if is_deg else 'Monitor') }}
+    </span>
+
+    <!-- Exclude -->
+    <button
+      hx-post="/lead/entry/{{ e.id }}/exclude"
+      hx-vals='{"excluded": {{ 0 if e.excluded else 1 }}}'
+      hx-target="#feed-entry-{{ e.id }}"
+      hx-swap="outerHTML"
+      hx-confirm="{{ 'Re-include this entry?' if e.excluded else 'Exclude from report?' }}"
+      title="{{ 'Re-include' if e.excluded else 'Exclude from report' }}"
+      class="text-[10px] px-1.5 py-0.5 rounded border transition
+             {{ 'bg-red-50 border-red-300 text-red-600' if e.excluded
+                else 'border-gray-200 text-gray-400 hover:border-red-300 hover:text-red-500' }}">
+      &#128683;
+    </button>
+
+    <!-- Carry-over -->
+    <button
+      hx-post="/lead/entry/{{ e.id }}/carry-over"
+      hx-vals='{"state": {{ 0 if e.carry_over else 1 }}}'
+      hx-swap="none"
+      onclick="this.classList.toggle('co-on'); this.title = this.classList.contains('co-on') ? 'Carry-over ON' : 'Carry-over OFF';"
+      title="{{ 'Carry-over ON' if e.carry_over else 'Carry-over OFF' }}"
+      class="carry-over-btn text-[10px] px-1.5 py-0.5 rounded border transition
+             {{ 'bg-orange-100 border-orange-300 text-orange-600 co-on' if e.carry_over
+                else 'border-gray-200 text-gray-400 hover:border-orange-300 hover:text-orange-500' }}">
+      &#128204;
+    </button>
+
+    <!-- Delete -->
+    <button
+      hx-delete="/lead/entry/{{ e.id }}"
+      hx-target="#feed-entry-{{ e.id }}"
+      hx-swap="outerHTML"
+      hx-confirm="Permanently delete this entry?"
+      title="Delete permanently"
+      class="text-[10px] px-1.5 py-0.5 rounded border border-gray-200 text-gray-300 hover:border-red-400 hover:text-red-500 transition">
+      &#128465;
+    </button>
+
+  </div>
+</div>

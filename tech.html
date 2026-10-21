@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Technician – Shift Passdown</title>
+  <link rel="stylesheet" href="/static/tailwind.min.css">
+  <link rel="stylesheet" href="/static/dark.css" id="dark-css" disabled>
+  <script src="/static/htmx.min.js"></script>
+  <style>
+    .htmx-indicator{display:none}.htmx-request .htmx-indicator{display:inline-flex}
+    /* hide the idle Upload label while the CMMS form request is running */
+    #cmms-form.htmx-request .btn-idle-text { display:none; }
+    /* Visible scrollbar for the entries panel */
+    .entries-scroll::-webkit-scrollbar { width: 6px; }
+    .entries-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+    .entries-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    .entries-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    .prio-btn {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      padding: 10px 6px; border-radius: 12px; border: 2px solid #e5e7eb;
+      background: white; cursor: pointer; width: 100%;
+      transition: border-color .15s, background .15s, transform .1s;
+      outline: none; user-select: none;
+    }
+    .prio-btn:hover  { transform: translateY(-1px); border-color: #d1d5db; }
+    .prio-btn:active { transform: translateY(0); }
+    .prio-btn.selected { box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+    .prio-label { color: #374151; transition: color .15s; }
+  </style>
+</head>
+<body class="bg-gray-50 h-screen overflow-hidden flex flex-col">
+
+<!-- HEADER -->
+<header class="bg-wm-blue sticky top-0 shadow-md" style="z-index:9999; height:72px;">
+  <div class="max-w-screen-2xl mx-auto px-5 flex items-center justify-between" style="height:72px;">
+    <div class="flex items-center gap-3 min-w-0">
+      <a href="/" class="hover:opacity-80 transition shrink-0">
+        <div style="height:56px;overflow:hidden;display:flex;align-items:center;flex-shrink:0;"><img src="/static/walmart-logo-white.svg" alt="Walmart" style="height:224px;width:auto;" /></div>
+      </a>
+      <div class="w-px bg-blue-500 self-stretch my-2"></div>
+      <div class="min-w-0">
+        <p class="text-white font-black text-base leading-tight tracking-wide">Technician View</p>
+        <p class="text-blue-200 text-sm truncate">
+          <span class="text-wm-spark font-bold">{{ shift.shift_type }}</span>
+          &nbsp;&bull;&nbsp;{{ shift.date }}
+          {% if shift.opened_by_role == 'tech' %}
+          &nbsp;&bull;&nbsp;<span class="bg-amber-400 text-amber-950 text-xs font-black px-2 py-0.5 rounded-full">NO MST YET</span>
+          {% else %}
+          &nbsp;&bull;&nbsp;MST: <span class="font-semibold text-white">{{ shift.lead_name }}</span>
+          {% endif %}
+          &nbsp;&bull;&nbsp;Logged in as: <span class="text-wm-spark font-black">{{ tech_name }}</span>
+          &nbsp;&bull;&nbsp;<span class="text-wm-spark">Signed on <span id="signon-time"></span></span>
+        </p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 shrink-0">
+      <a href="/walkthrough/" target="_blank"
+        class="flex items-center gap-1.5 bg-wm-spark hover:bg-yellow-400 text-gray-900 text-xs font-black px-3 py-1.5 rounded-full transition shadow">
+        &#128064; Walkthrough
+      </a>
+      <span class="text-wm-spark font-black font-mono bg-white bg-opacity-10 px-2.5 py-1 rounded-full border border-wm-spark border-opacity-40 text-xs">{{ dc_number }}</span>
+      <a href="/" class="text-blue-200 hover:text-white text-xs font-medium transition px-2 py-1 rounded">&#127968; Home</a>
+      <button onclick="toggleDark()" class="text-blue-200 hover:text-white text-sm transition px-2 py-1 rounded" title="Toggle dark mode">&#9790;</button>
+      <a href="/tech/logout" class="text-blue-200 hover:text-white text-xs font-bold border border-blue-500 px-2.5 py-1 rounded-lg transition">&#128275; Sign Out</a>
+    </div>
+  </div>
+</header>
+<script>
+  (function () {
+    const now = new Date();
+    const h = now.getHours(), m = now.getMinutes();
+    const period = h < 12 ? 'AM' : 'PM';
+    const h12 = h % 12 || 12;
+    const el = document.getElementById('signon-time');
+    if (el) el.textContent = h12 + ':' + String(m).padStart(2, '0') + ' ' + period;
+  })();
+</script>
+
+{% if oos_units %}
+<!-- OOS BANNER -->
+<div class="shrink-0" style="background:linear-gradient(135deg,#1a0505 0%,#3b0a0a 50%,#1a0505 100%);
+     border-bottom:2px solid #ef4444; box-shadow:0 4px 24px rgba(239,68,68,0.18);
+     font-family:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <div class="max-w-screen-2xl mx-auto px-5 flex items-center gap-3 flex-wrap" style="min-height:40px;">
+
+    <!-- Icon + label -->
+    <div class="flex items-center gap-2 shrink-0">
+      <span class="relative flex h-2.5 w-2.5">
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+      </span>
+      <span style="color:#fca5a5;font-size:0.7rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;">Out of Service</span>
+      <span style="color:#7f1d1d;font-size:0.7rem;">&#8226;</span>
+      <span style="color:#f87171;font-size:0.7rem;font-weight:500;">{{ oos_units | length }} unit{{ 's' if oos_units | length != 1 }}</span>
+    </div>
+
+    <!-- Divider -->
+    <div class="w-px bg-red-800 self-stretch my-1.5 shrink-0"></div>
+
+    <!-- Asset chips -->
+    <div class="flex flex-wrap items-center gap-1.5">
+      {% for u in oos_units %}
+      <span style="display:inline-flex;align-items:center;gap:0.3rem;
+                   background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4);
+                   color:#fecaca;font-size:0.72rem;font-weight:500;letter-spacing:0.03em;
+                   padding:0.2rem 0.6rem;border-radius:0.375rem;">
+        <span style="color:#f87171;font-size:0.65rem;">&#9940;</span> {{ u }}
+      </span>
+      {% endfor %}
+    </div>
+
+  </div>
+</div>
+{% endif %}
+
+<main class="flex-1 min-h-0 flex flex-row gap-3 px-4 py-3 max-w-7xl mx-auto w-full">
+
+  <!-- LEFT: CMMS import (fixed narrow width, scrollable) -->
+  <div class="w-72 shrink-0 flex flex-col gap-3 overflow-y-auto pr-1" style="max-height:calc(100vh - 80px);">
+    <style>
+      /* Scrollbar styling for left CMMS panel */
+      .w-72::-webkit-scrollbar { width: 5px; }
+      .w-72::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+      .w-72::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+      .w-72::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+  <!-- LOG SHIFT HAPPENING FORM — hidden, re-enable by removing 'hidden' -->
+  <div class="hidden bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex flex-col flex-1">
+    <h2 class="text-wm-dark font-bold text-sm mb-3 flex items-center gap-2">
+      <span class="text-wm-blue">&#9889;</span> Log Shift Happening
+    </h2>
+
+    <form
+      hx-post="/tech/entry"
+      hx-target="#my-entries"
+      hx-swap="innerHTML"
+      hx-indicator="#save-spinner"
+      hx-on::after-request="this.reset(); document.getElementById('hidden-tech-name').value='{{ tech_name }}'; initPriority();"
+      class="flex flex-col gap-4"
+    >
+      <input type="hidden" id="hidden-tech-name" name="tech_name" value="{{ tech_name }}" />
+      <input type="hidden" name="shift_id" value="{{ shift.id }}" />
+
+      <!-- Asset ID -->
+      <div class="flex flex-col gap-1">
+        <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">Asset ID</label>
+        <input id="f_unit" name="unit" type="text" list="asset-list"
+          placeholder="Type or select asset..." required autocomplete="off"
+          class="rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-wm-blue focus:ring-2 focus:ring-blue-200 outline-none transition" />
+        <datalist id="asset-list">
+          {% for a in assets %}<option value="{{ a }}">{% endfor %}
+        </datalist>
+      </div>
+
+      <!-- Summary -->
+      <div class="flex flex-col gap-1">
+        <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">Summary</label>
+        <textarea id="f_summary" name="summary" rows="3" required
+          placeholder="What you worked on, what was wrong, what you did..."
+          class="rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-wm-blue focus:ring-2 focus:ring-blue-200 outline-none transition resize-none"></textarea>
+      </div>
+
+      <!-- PRIORITY SELECTOR -->
+      <div class="flex flex-col gap-1">
+        <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">Status / Priority</label>
+        <input type="hidden" name="priority" id="priority-input" value="monitor" />
+        <div class="prio-group grid grid-cols-3 gap-2">
+          <button type="button" class="prio-btn" data-priority="down" data-border="#ef4444" data-bg="#fef2f2"
+            onclick="setPriority(this)">
+            <span class="text-2xl">🔴</span>
+            <span class="prio-label font-black text-sm">Down</span>
+            <span class="text-xs text-gray-500 leading-tight">Machine stopped</span>
+          </button>
+          <button type="button" class="prio-btn" data-priority="degraded" data-border="#eab308" data-bg="#fefce8"
+            onclick="setPriority(this)">
+            <span class="text-2xl">🟡</span>
+            <span class="prio-label font-black text-sm">Degraded</span>
+            <span class="text-xs text-gray-500 leading-tight">Running slow/rough</span>
+          </button>
+          <button type="button" class="prio-btn" data-priority="monitor" data-border="#22c55e" data-bg="#f0fdf4"
+            onclick="setPriority(this)">
+            <span class="text-2xl">🟢</span>
+            <span class="prio-label font-black text-sm">Monitor</span>
+            <span class="text-xs text-gray-500 leading-tight">Observed / FYI</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- LIVE PREVIEW -->
+      <div id="preview-box" class="hidden bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+        <p class="text-xs font-bold text-wm-blue uppercase tracking-wide mb-1">&#128065; Entry Preview</p>
+        <p id="preview-text" class="text-sm text-gray-700 leading-relaxed italic"></p>
+      </div>
+
+      <button type="submit"
+        class="flex items-center justify-center gap-2 bg-wm-blue hover:bg-blue-700 active:bg-blue-800
+               text-white font-bold py-2.5 rounded-xl transition shadow focus:outline-none focus:ring-4 focus:ring-blue-300 text-sm mt-auto">
+        <span id="save-spinner" class="htmx-indicator items-center gap-2 text-sm">
+          <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+          </svg>Saving...
+        </span>
+        &#128190; Save Happening
+      </button>
+    </form>
+  </div>
+
+  <!-- CMMS IMPORT CARD -->
+  <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+    <h2 class="text-wm-dark font-bold text-sm mb-3 flex items-center gap-2">
+      <span class="text-wm-blue">&#128196;</span> Import from Cetaris
+    </h2>
+    <form
+      id="cmms-form"
+      hx-post="/tech/cmms-upload"
+      hx-target="#cmms-result"
+      hx-swap="innerHTML"
+      hx-encoding="multipart/form-data"
+      hx-indicator="#cmms-spinner"
+      hx-push-url="false"
+      hx-on::before-request="_cmmsUploadStart()"
+      hx-on::after-request="_cmmsUploadDone()"
+      class="flex flex-col gap-3"
+    >
+      <input type="hidden" name="shift_id" value="{{ shift.id }}" />
+      <label class="flex flex-col gap-1">
+        <span class="text-xs font-bold text-gray-600 uppercase tracking-wide">Select Cetaris CSV (one or more files)</span>
+        <input
+          id="cmms-file-input"
+          type="file"
+          name="files"
+          accept=".csv,.xlsx,.xls"
+          multiple
+          required
+          class="text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0
+                 file:text-xs file:font-bold file:bg-wm-blue file:text-white hover:file:bg-blue-700
+                 file:cursor-pointer cursor-pointer"
+        />
+      </label>
+
+      <!-- Upload button: idle / uploading / importing states -->
+      <button id="cmms-btn" type="submit"
+        class="flex items-center justify-center gap-2 bg-wm-blue hover:bg-blue-700
+               text-white font-bold py-2 rounded-xl transition text-sm">
+        <!-- idle label — hidden while request is in flight -->
+        <span class="btn-idle-text flex items-center gap-1.5">&#128228; Upload &amp; Import</span>
+        <!-- spinner — only visible during htmx request -->
+        <span id="cmms-spinner" class="htmx-indicator items-center gap-1.5 text-sm">
+          <svg class="animate-spin h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+          </svg>
+          <span id="cmms-spinner-text">Uploading…</span>
+        </span>
+      </button>
+    </form>
+
+    <!-- Upload status banner — hidden until upload starts -->
+    <div id="upload-status" class="hidden mt-3 rounded-xl border px-4 py-3 flex items-center gap-3">
+      <svg id="upload-status-spin" class="animate-spin h-5 w-5 text-wm-blue shrink-0" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+      </svg>
+      <span id="upload-status-text" class="text-sm font-bold text-wm-blue">Uploading file&hellip;</span>
+    </div>
+
+    <div id="cmms-result" class="mt-3 overflow-hidden"></div>
+  </div>
+
+  </div><!-- /left col -->
+
+  <!-- RIGHT: Entries + Done (scrolls independently) -->
+  <div class="entries-scroll flex-1 min-h-0 flex flex-col gap-3 overflow-y-auto pr-2">
+
+  <!-- MY ENTRIES -->
+  <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+    <h2 class="text-wm-dark font-bold text-sm mb-3 flex items-center gap-2">
+      <span class="text-wm-spark">&#9998;</span> My Shift Happenings
+      {% if pm_count %}
+      <span class="ml-auto bg-green-100 text-green-800 text-xs font-black px-2.5 py-0.5 rounded-full">
+        &#128295; {{ pm_count }} PM{{ 's' if pm_count != 1 else '' }} completed
+      </span>
+      {% endif %}
+    </h2>
+    <div
+      id="my-entries"
+      hx-get="/tech/my-entries?shift_id={{ shift.id }}&tech_name={{ tech_name | urlencode }}"
+      hx-trigger="refresh"
+      hx-swap="innerHTML"
+      style="max-height:calc(100vh - 260px);overflow-y:auto;padding-right:4px;"
+    >
+      {% include 'partials/my_entries.html' %}
+    </div>
+  </div>
+
+  <!-- DONE FOR THE SHIFT -->
+  <form id="done-form"
+    hx-post="/tech/done"
+    hx-target="#done-btn-wrap"
+    hx-swap="innerHTML">
+    <input type="hidden" name="shift_id"  value="{{ shift.id }}"/>
+    <input type="hidden" name="tech_name" value="{{ tech_name }}"/>
+    <div id="done-btn-wrap">
+      <button type="submit"
+        class="w-full flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200
+               text-gray-700 border-2 border-gray-300 font-bold py-2.5 rounded-xl transition text-sm">
+        &#10003; Done for the shift
+      </button>
+    </div>
+  </form>
+
+  </div><!-- /right col -->
+
+</main>
+
+<footer class="bg-wm-dark text-blue-300 text-center text-xs py-2 shrink-0">
+  Shift Passdown Generator &bull; Technician Portal &bull; Walmart &copy; 2026
+</footer>
+
+<script src="/static/app.js"></script>
+<script>
+  // ── Priority selector ────────────────────────────────────────────
+  function setPriority(btn) {
+    const group = btn.closest('.prio-group');
+    group.querySelectorAll('.prio-btn').forEach(b => {
+      b.style.borderColor = '#e5e7eb';
+      b.style.background  = 'white';
+      b.classList.remove('selected');
+      b.querySelector('.prio-label').style.color = '#374151';
+    });
+    btn.style.borderColor = btn.dataset.border;
+    btn.style.background  = btn.dataset.bg;
+    btn.classList.add('selected');
+    btn.querySelector('.prio-label').style.color = btn.dataset.border;
+    // write value into the hidden input inside the same form
+    btn.closest('form').querySelector('[name="priority"]').value = btn.dataset.priority;
+  }
+
+  function initPriority() {
+    const monitor = document.querySelector('.prio-group [data-priority="monitor"]');
+    if (monitor) setPriority(monitor);
+  }
+
+  // Select Monitor by default on page load
+  initPriority();
+
+  // ── Dark mode ────────────────────────────────────────────────────
+  function toggleDark() {
+    const on = document.body.classList.toggle('dark-mode');
+    document.getElementById('dark-css').disabled = !on;
+    localStorage.setItem('dark', on ? '1' : '');
+  }
+  if (localStorage.getItem('dark')) {
+    document.body.classList.add('dark-mode');
+    document.getElementById('dark-css').disabled = false;
+  }
+
+  // Live preview
+  const previewBox  = document.getElementById('preview-box');
+  const previewText = document.getElementById('preview-text');
+
+  function buildPreview() {
+    const unit    = document.getElementById('f_unit').value.trim();
+    const summary = document.getElementById('f_summary').value.trim();
+    const any     = unit || summary;
+    previewBox.classList.toggle('hidden', !any);
+    previewText.textContent =
+      `{{ tech_name }} | ${unit || '[Unit]'}: ${summary || '...'}`;
+  }
+
+  ['f_unit', 'f_summary'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', buildPreview);
+  });
+
+  // ── Inline validation ─────────────────────────────────
+  function showErr(fieldId, msg) {
+    const field = document.getElementById(fieldId);
+    field.classList.add('border-red-400');
+    let err = field.parentElement.querySelector('.field-err');
+    if (!err) {
+      err = document.createElement('p');
+      err.className = 'field-err text-xs text-red-500 font-semibold mt-1';
+      field.parentElement.appendChild(err);
+    }
+    err.textContent = msg;
+  }
+  function clearErr(fieldId) {
+    const field = document.getElementById(fieldId);
+    field.classList.remove('border-red-400');
+    field.parentElement.querySelector('.field-err')?.remove();
+  }
+  ['f_unit','f_summary'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => clearErr(id));
+  });
+
+  // ── Duplicate warning + submit intercept ────────────────
+  let _forceSubmit = false;
+
+  document.querySelector('[hx-post="/tech/entry"]').addEventListener('htmx:confirm', async (e) => {
+    if (_forceSubmit) { _forceSubmit = false; return; }
+    e.preventDefault();
+
+    const unit    = document.getElementById('f_unit').value.trim();
+    const summary = document.getElementById('f_summary').value.trim();
+    let valid = true;
+
+    if (!unit)    { showErr('f_unit',    'Asset ID is required'); valid = false; }
+    if (!summary) { showErr('f_summary', 'Summary is required');   valid = false; }
+    if (!valid) return;
+
+    // Check for duplicate
+    const params = new URLSearchParams({
+      shift_id:  '{{ shift.id }}',
+      tech_name: '{{ tech_name }}',
+      unit,
+    });
+    const res  = await fetch(`/tech/check-unit?${params}`);
+    const data = await res.json();
+
+    if (data.duplicate) {
+      const ok = confirm(
+        `⚠️ You already logged "${unit}" at ${
+          new Date(data.time.replace(' ','T')).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})
+        }.\n\nSave again anyway?`
+      );
+      if (!ok) return;
+    }
+
+    _forceSubmit = true;
+    e.detail.issueRequest();
+  });
+
+  // ── Relative timestamps ───────────────────────────────
+  function relTime(iso) {
+    const diff = Math.floor((Date.now() - new Date(iso.replace(' ','T'))) / 60000);
+    if (diff < 1)  return 'just now';
+    if (diff < 60) return `${diff} min ago`;
+    const h = Math.floor(diff/60), m = diff%60;
+    return `${h}h ${m}m ago`;
+  }
+  function refreshRelTimes() {
+    document.querySelectorAll('.rel-time[data-iso]').forEach(el => {
+      el.textContent = relTime(el.dataset.iso);
+    });
+  }
+  refreshRelTimes();
+  setInterval(refreshRelTimes, 60000);
+  document.addEventListener('htmx:afterSwap', refreshRelTimes);
+
+  // ── WebSocket — real-time entry refresh ────────────────────────────────
+  (function () {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    let ws;
+    function connect() {
+      ws = new WebSocket(`${proto}://${location.host}/ws/feed`);
+      ws.onmessage = (evt) => {
+        const msg = JSON.parse(evt.data);
+        // Page reloads after own uploads; WS still useful for cross-device awareness
+        if (msg.type === 'cmms_import' || msg.type === 'new_entry') {
+          htmx.trigger(document.getElementById('my-entries'), 'refresh');
+        }
+      };
+      ws.onclose = () => { setTimeout(connect, 3000); };
+      ws.onerror = () => { ws.close(); };
+      setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.send('ping'); }, 25000);
+    }
+    connect();
+  }());
+
+  // ── CMMS upload button two-phase text ─────────────────────────────
+  let _importTimer = null;
+
+  function _setUploadStatus(msg) {
+    const banner = document.getElementById('upload-status');
+    const text   = document.getElementById('upload-status-text');
+    if (!banner || !text) return;
+    if (!msg) { banner.classList.add('hidden'); return; }
+    banner.className = 'mt-3 rounded-xl border px-4 py-3 flex items-center gap-3 bg-blue-50 border-blue-200';
+    text.textContent = msg;
+  }
+
+  function _cmmsUploadStart() {
+    _setUploadStatus('\uD83D\uDCE4 Uploading file(s)\u2026');
+    const txt = document.getElementById('cmms-spinner-text');
+    if (txt) txt.textContent = 'Uploading\u2026';
+    _importTimer = setTimeout(() => {
+      _setUploadStatus('\u2699\uFE0F Importing from Cetaris\u2026');
+      const txt2 = document.getElementById('cmms-spinner-text');
+      if (txt2) txt2.textContent = 'Importing\u2026';
+    }, 1800);
+  }
+
+  function _cmmsUploadDone() {
+    clearTimeout(_importTimer);
+    _setUploadStatus('\u2705 Done! Reloading\u2026');
+    const fi = document.getElementById('cmms-file-input');
+    if (fi) fi.value = '';
+    // Show the result + done banner briefly, then reload clean
+    setTimeout(() => window.location.reload(), 2000);
+  }
+</script>
+</body>
+</html>

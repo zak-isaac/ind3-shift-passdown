@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Weekly Summary – Passdown</title>
+  <link rel="stylesheet" href="/static/tailwind.min.css">
+  <link rel="stylesheet" href="/static/dark.css" id="dark-css" disabled>
+  <script src="/static/chart.min.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+
+<header class="bg-wm-blue sticky top-0 shadow-md" style="z-index:9999; height:72px;">
+  <div class="max-w-5xl mx-auto px-5 flex items-center justify-between" style="height:72px;">
+    <div class="flex items-center gap-3">
+      <a href="/" class="flex items-center gap-2 hover:opacity-80 transition">
+        <div style="height:56px;overflow:hidden;display:flex;align-items:center;flex-shrink:0;"><img src="/static/walmart-logo-white.svg" alt="Walmart" style="height:224px;width:auto;" /></div>
+        
+      </a>
+      <div class="h-8 w-px bg-blue-400 mx-1"></div>
+      <p class="text-white font-black text-base">Weekly Summary</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="?days=7"  class="text-xs {{ 'bg-wm-spark text-gray-900' if days == 7  else 'text-blue-100 hover:text-white' }} font-bold px-3 py-1 rounded-full transition">7d</a>
+      <a href="?days=28" class="text-xs {{ 'bg-wm-spark text-gray-900' if days == 28 else 'text-blue-100 hover:text-white' }} font-bold px-3 py-1 rounded-full transition">28d</a>
+      <a href="?days=90" class="text-xs {{ 'bg-wm-spark text-gray-900' if days == 90 else 'text-blue-100 hover:text-white' }} font-bold px-3 py-1 rounded-full transition">90d</a>
+      <a href="/history" class="text-blue-100 hover:text-white text-sm transition">&#128203; Shifts</a>
+      <a href="/" class="text-blue-100 hover:text-white text-sm font-medium transition">&#127968; Home</a>
+      <a href="/lead" class="text-blue-100 hover:text-white text-sm transition">&#8592; Dashboard</a>
+      <button onclick="toggleDark()" class="text-blue-100 hover:text-white text-lg" title="Toggle dark mode">&#9790;</button>
+    </div>
+  </div>
+</header>
+
+<main class="flex-1 max-w-5xl mx-auto w-full px-4 py-8 flex flex-col gap-6">
+
+  <!-- Executive summary -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="bg-wm-blue text-white rounded-2xl p-5 text-center shadow">
+      <p class="text-4xl font-black">{{ summary.total_shifts }}</p>
+      <p class="text-blue-200 text-sm mt-1">Total Shifts</p>
+    </div>
+    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 text-center">
+      <p class="text-4xl font-black text-wm-dark">{{ summary.total_entries }}</p>
+      <p class="text-gray-500 text-sm mt-1">Total Entries</p>
+    </div>
+    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 text-center">
+      <p class="text-4xl font-black text-orange-500">{{ summary.top_assets | length }}</p>
+      <p class="text-gray-500 text-sm mt-1">Assets Reported</p>
+    </div>
+    <div class="bg-wm-spark rounded-2xl p-5 text-center shadow">
+      <p class="text-4xl font-black text-gray-900">{{ days }}d</p>
+      <p class="text-yellow-800 text-sm mt-1">Window</p>
+    </div>
+  </div>
+
+  <!-- Charts row -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+    <!-- Top problem assets bar chart -->
+    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+      <h2 class="text-wm-dark font-bold text-base mb-4 flex items-center gap-2">
+        <span>&#128308;</span> Top Problem Assets ({{ days }}d)
+      </h2>
+      {% if summary.top_assets %}
+      <div style="position:relative; height:{{ [summary.top_assets|length * 32 + 40, 160]|max }}px;">
+        <canvas id="assetsChart"></canvas>
+      </div>
+      {% else %}
+      <p class="text-gray-400 italic text-sm text-center py-8">No asset data yet — entries accumulate going forward.</p>
+      {% endif %}
+    </div>
+
+    <!-- Shift type breakdown -->
+    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+      <h2 class="text-wm-dark font-bold text-base mb-4 flex items-center gap-2">
+        <span>&#128200;</span> Activity by Shift Type
+      </h2>
+      {% if summary.by_shift_type %}
+      <div class="flex flex-col gap-3">
+        {% for t in summary.by_shift_type %}
+        <div class="flex items-center gap-3">
+          <span class="text-xs font-black w-8 text-wm-blue">{{ t.shift_type }}</span>
+          <div class="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
+            {% set max_entries = summary.by_shift_type | map(attribute='entry_count') | max %}
+            {% set pct = ((t.entry_count / max_entries * 100) if max_entries > 0 else 0) | int %}
+            <div class="bg-wm-blue h-5 rounded-full" style="width:{{ pct }}%"></div>
+          </div>
+          <span class="text-xs font-bold text-gray-600 w-16 text-right">
+            {{ t.entry_count }} entries
+          </span>
+          <span class="text-xs text-gray-400 w-16 text-right">{{ t.shift_count }} shifts</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-gray-400 italic text-sm text-center py-8">No shift data in this window.</p>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <!-- Top assets table -->
+  {% if summary.top_assets %}
+  <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+    <div class="bg-wm-dark px-5 py-3">
+      <h2 class="text-white font-bold text-sm">&#128200; Problem Asset Leaderboard — Last {{ days }} Days</h2>
+    </div>
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b border-gray-200">
+        <tr>
+          <th class="px-5 py-2 text-left text-xs font-bold text-gray-500 uppercase">#</th>
+          <th class="px-5 py-2 text-left text-xs font-bold text-gray-500 uppercase">Asset</th>
+          <th class="px-5 py-2 text-left text-xs font-bold text-gray-500 uppercase">Reports</th>
+          <th class="px-5 py-2 text-left text-xs font-bold text-gray-500 uppercase">Severity</th>
+          <th class="px-5 py-2 text-left text-xs font-bold text-gray-500 uppercase">Priority Mix</th>
+          <th class="px-5 py-2 text-left text-xs font-bold text-gray-500 uppercase">History</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for a in summary.top_assets %}
+        <tr class="hover:bg-gray-50 transition">
+          <td class="px-5 py-3 text-gray-400 font-bold">{{ loop.index }}</td>
+          <td class="px-5 py-3 font-bold text-gray-800 font-mono">{{ a.unit }}</td>
+          <td class="px-5 py-3">
+            <span class="font-black text-lg
+              {{ 'text-red-600' if a.total_reports >= 10 else ('text-orange-500' if a.total_reports >= 5 else 'text-yellow-600') }}">
+              {{ a.total_reports }}
+            </span>
+          </td>
+          <td class="px-5 py-3">
+            {% if a.total_reports >= 10 %}
+            <span class="text-xs bg-red-100 text-red-700 font-bold px-2 py-0.5 rounded-full">&#128308; Critical</span>
+            {% elif a.total_reports >= 5 %}
+            <span class="text-xs bg-orange-100 text-orange-700 font-bold px-2 py-0.5 rounded-full">&#128992; Recurring</span>
+            {% else %}
+            <span class="text-xs bg-yellow-100 text-yellow-700 font-bold px-2 py-0.5 rounded-full">&#128993; Monitor</span>
+            {% endif %}
+          </td>
+          <td class="px-5 py-3">
+            <div class="flex items-center gap-1.5 text-xs font-bold">
+              {% if a.down_count %}<span class="bg-red-100 text-red-700 px-1.5 py-0.5 rounded">🔴 {{ a.down_count }}</span>{% endif %}
+              {% if a.degraded_count %}<span class="bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded">🟡 {{ a.degraded_count }}</span>{% endif %}
+              {% if a.monitor_count %}<span class="bg-green-50 text-green-700 px-1.5 py-0.5 rounded">🟢 {{ a.monitor_count }}</span>{% endif %}
+            </div>
+          </td>
+          <td class="px-5 py-3">
+            <a href="/asset/{{ a.unit | urlencode }}/history"
+               class="text-xs text-wm-blue font-semibold hover:underline">View &#8594;</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+</main>
+
+<footer class="bg-wm-dark text-blue-300 text-center text-xs py-3">
+  Shift Passdown Generator &bull; Weekly Summary &bull; Walmart &copy; 2026
+</footer>
+
+<script>
+{% if summary.top_assets %}
+new Chart(document.getElementById('assetsChart'), {
+  type: 'bar',
+  data: {
+    labels: {{ summary.top_assets | map(attribute='unit') | list | tojson }},
+    datasets: [{
+      data:  {{ summary.top_assets | map(attribute='total_reports') | list | tojson }},
+      backgroundColor: {{ summary.top_assets | map(attribute='total_reports') | list | tojson }}.map(n =>
+        n >= 10 ? '#dc2626' : n >= 5 ? '#f97316' : '#fde047'
+      ),
+      borderRadius: 6,
+    }]
+  },
+  options: {
+    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } } },
+      y: { ticks: { font: { size: 11, weight: 'bold' } }, grid: { display: false } }
+    }
+  }
+});
+{% endif %}
+
+function toggleDark() {
+  const on = document.body.classList.toggle('dark-mode');
+  document.getElementById('dark-css').disabled = !on;
+  localStorage.setItem('dark', on ? '1' : '');
+}
+if (localStorage.getItem('dark')) {
+  document.body.classList.add('dark-mode');
+  document.getElementById('dark-css').disabled = false;
+}
+</script>
+</body>
+</html>

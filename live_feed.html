@@ -1,0 +1,119 @@
+<!-- partials/live_feed.html — Activity log feed, newest at bottom -->
+
+<style>
+  @keyframes slide-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .log-row { animation: slide-up .2s ease-out both; }
+
+  @keyframes pulse-new {
+    0%,100% { background-color: #eff6ff; }
+    50%      { background-color: #dbeafe; }
+  }
+  .row-new { animation: pulse-new 1.6s ease-in-out 3; }
+</style>
+
+{% if entries %}
+
+{% set counts = {'down': 0, 'degraded': 0, 'monitor': 0} %}
+{% for e in entries %}
+  {% if e.priority == 'down'     %}{% set _ = counts.update({'down':     counts.down     + 1}) %}{% endif %}
+  {% if e.priority == 'degraded' %}{% set _ = counts.update({'degraded': counts.degraded + 1}) %}{% endif %}
+  {% if e.priority == 'monitor'  %}{% set _ = counts.update({'monitor':  counts.monitor  + 1}) %}{% endif %}
+{% endfor %}
+
+<!-- ── Status bar ─────────────────────────────────────────────────────────── -->
+<div class="flex items-center justify-between bg-gray-900 rounded-t-2xl px-4 py-2.5">
+  <div class="flex items-center gap-3">
+    <span class="flex items-center gap-1.5">
+      <span class="relative flex h-2 w-2">
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+        <span class="relative inline-flex h-2 w-2 rounded-full bg-green-500"></span>
+      </span>
+      <span class="text-green-400 text-xs font-black tracking-widest uppercase">Live</span>
+    </span>
+    <span class="text-gray-600 text-xs select-none">|</span>
+    <span class="text-gray-300 text-xs font-semibold">{{ entries | length }} log{{ 's' if entries | length != 1 else '' }}</span>
+  </div>
+  <div class="flex items-center gap-3 text-xs font-bold">
+    {% if counts.down > 0 %}
+    <span class="text-red-400">🔴 {{ counts.down }} down</span>
+    {% endif %}
+    {% if counts.degraded > 0 %}
+    <span class="text-yellow-400">🟡 {{ counts.degraded }} degraded</span>
+    {% endif %}
+    <span class="text-gray-500">🟢 {{ counts.monitor }} monitor</span>
+  </div>
+</div>
+
+<!-- ── Log rows ───────────────────────────────────────────────────────────── -->
+<div class="border border-t-0 border-gray-200 rounded-b-2xl overflow-hidden divide-y divide-gray-100">
+
+  {% for e in entries %}
+  {% set is_down = e.priority == 'down' %}
+  {% set is_deg  = e.priority == 'degraded' %}
+
+  {% include "partials/live_feed_row.html" %}
+  </div>
+  {% endfor %}
+
+  <!-- ── Watching row ───────────────────────────────────────────────────── -->
+  <div class="flex items-center gap-2.5 px-5 py-2.5 bg-gray-50">
+    <span class="relative flex h-2 w-2 shrink-0">
+      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-60"></span>
+      <span class="relative inline-flex h-2 w-2 rounded-full bg-blue-500"></span>
+    </span>
+    <span class="text-xs text-gray-400 italic">Watching for new entries — refreshes every 10 s</span>
+    <span class="ml-auto text-[10px] text-gray-300 font-mono" id="feed-last-updated"></span>
+  </div>
+
+</div>
+
+{% else %}
+
+<!-- Empty state -->
+<div class="bg-gray-900 rounded-t-2xl px-4 py-2.5 flex items-center gap-2">
+  <span class="relative flex h-2 w-2">
+    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+    <span class="relative inline-flex h-2 w-2 rounded-full bg-green-500"></span>
+  </span>
+  <span class="text-green-400 text-xs font-black tracking-widest uppercase">Live</span>
+  <span class="text-gray-500 text-xs ml-2">· shift active, no entries yet</span>
+</div>
+<div class="border border-t-0 border-gray-200 rounded-b-2xl bg-white px-6 py-10 text-center">
+  <p class="text-2xl mb-2">📋</p>
+  <p class="text-gray-500 text-sm font-semibold">Nothing logged yet</p>
+  <p class="text-gray-400 text-xs mt-1">Technicians' entries will appear here in real time.</p>
+</div>
+
+{% endif %}
+
+<script>
+(function () {
+  var now = Date.now();
+
+  /* Relative timestamps */
+  document.querySelectorAll('#live-feed .rel-time[data-iso]').forEach(function (el) {
+    var diffS = Math.floor((now - new Date(el.dataset.iso.replace(' ','T')).getTime()) / 1000);
+    if      (diffS < 60)   el.textContent = 'just now';
+    else if (diffS < 3600) el.textContent = Math.floor(diffS / 60) + 'm ago';
+    else                   el.textContent = Math.floor(diffS / 3600) + 'h ago';
+  });
+
+  /* Pulse highlight on rows < 10 min old */
+  document.querySelectorAll('#live-feed [data-entry][data-iso]').forEach(function (row) {
+    var diffS = Math.floor((now - new Date(row.dataset.iso.replace(' ','T')).getTime()) / 1000);
+    if (diffS < 600) row.classList.add('row-new');
+  });
+
+  /* Last-updated stamp */
+  var el = document.getElementById('feed-last-updated');
+  if (el) {
+    var d = new Date();
+    var h = d.getHours(), m = d.getMinutes();
+    var p = h < 12 ? 'AM' : 'PM';
+    el.textContent = 'updated ' + (h % 12 || 12) + ':' + String(m).padStart(2,'0') + ' ' + p;
+  }
+}());
+</script>
