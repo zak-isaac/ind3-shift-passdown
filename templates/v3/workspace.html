@@ -12,7 +12,7 @@
 <main class="dashboard d2-dashboard" id="main-content">
  {% if notice %}<div class="banner success" role="status">{{ notice }}</div>{% endif %}
  {% if warning %}<div class="banner warn" role="alert">{{ warning }}</div>{% endif %}
- <div class="page-intro d2-page-intro"><div><div class="eyebrow">MAINTENANCE OPERATIONS · IND3</div><h1>Shift workspace</h1><p>One place to collect, review, and hand off everything that happened this shift.</p></div><div class="header-actions"><a class="button button-outline" href="/v3/preview?shift_id={{ shift.id }}">Preview passdown</a><button class="button button-blue" type="button" onclick="v3OpenImport()">Upload Cetaris File</button></div></div>
+ <div class="d2-toolbar-row"><button class="button button-blue" type="button" onclick="v3OpenImport()">Upload Cetaris File</button></div>
 
  <section class="d2-import-flow card" id="cetaris" aria-label="Cetaris extraction steps">
    <div class="d2-flow-step {{ 'is-complete' if imported_filename or staged else '' }}"><span class="d2-step-number">1</span><div><strong>Upload Cetaris File</strong><small>{{ staged.filename if staged else (imported_filename if imported_filename else 'One Cetaris Desktop XLSX') }}</small><span class="d2-step-status">{{ 'File ready' if staged else ('Uploaded' if imported_filename else 'Awaiting upload') }}</span></div></div>
