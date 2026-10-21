@@ -636,7 +636,7 @@ async def dev_exit():
 # HOME
 # ─────────────────────────────────────────────────────────────
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/v2-home", response_class=HTMLResponse)
 async def home(request: Request, error: str = ""):
     shifts = db.get_active_shifts()          # 0-2 active shifts
     shift  = shifts[0] if shifts else None   # backwards-compat for single-shift logic
@@ -658,6 +658,13 @@ async def home(request: Request, error: str = ""):
          "elapsed_hours": elapsed_hours, "is_dev_mode": dev_mode.is_active(),
          "day_name": day_name, "valid_shifts_today": valid_now, "error": error}
     )
+
+
+@app.get("/", include_in_schema=False)
+async def root_redirect_to_v3():
+    """Root now enters the app through V3. V2's legacy home page is still
+    reachable at /v2-home for reference during the V2->V3 migration."""
+    return RedirectResponse("/v3", status_code=303)
 
 
 @app.get("/share", response_class=HTMLResponse)
