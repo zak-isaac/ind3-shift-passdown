@@ -47,8 +47,34 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             response.set_cookie("lead_shift_id", str(sid), httponly=True, samesite="lax", path="/", max_age=12*3600)
             response.delete_cookie("mgr_session", path="/")
 
+    def _v3_live_shifts():
+        now = now_func() if now_func else datetime.now()
+        visible = []
+        for shift in db.get_active_shifts():
+            try:
+                window = shift_window(shift["shift_type"], date.fromisoformat(shift["date"]))
+                if not window:
+                    continue
+                if now > window[1]:
+                    db.close_shift(shift["id"])
+                elif now >= window[0] - timedelta(hours=1):
+                    visible.append(shift)
+            except (ValueError, KeyError, TypeError):
+                continue
+        return visible
+
+    def _v3_shift_day(code):
+        now = now_func() if now_func else datetime.now()
+        for day in (now.date(), now.date() - timedelta(days=1)):
+            if allowed_shift_days and day.weekday() not in allowed_shift_days.get(code, ()):
+                continue
+            window = shift_window(code, day)
+            if window and window[0] - timedelta(hours=1) <= now <= window[1]:
+                return day
+        return None
+
     def entry_page(request, error=""):
-        shifts=db.get_active_shifts()
+        shifts=_v3_live_shifts()
         now=now_func() if now_func else datetime.now()
         return templates.TemplateResponse(request,"v3/login.html",{
             "error":error,"shifts":shifts,"today":now.date().isoformat(),
