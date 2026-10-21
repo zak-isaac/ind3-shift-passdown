@@ -14,7 +14,7 @@
 </div></section>
 <main class="flex-1 max-w-7xl w-full mx-auto px-5 py-7"><div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
 <section class="v3c"><div class="flex items-center justify-between mb-4"><h2 class="text-wm-dark text-2xl font-black">Start your shift</h2><span class="rounded-full bg-blue-50 text-wm-blue px-3 py-1 text-xs font-black">V3</span></div>
-<p class="v3help mb-4">Enter your associate number and choose the shift you are starting. MST leads and other rostered technicians can start a shift when eligible.</p>
+<p class="v3help mb-4">Enter your associate number to access your assigned shift.</p>
 {% if error %}<div class="v3error mb-4" role="alert">{{ error }}</div>{% endif %}
 <form method="post" action="/v3/login" class="flex flex-col gap-4"><input type="hidden" name="mode" value="start">
 <div><label class="v3label" for="associate_id">Your associate number</label><input class="v3entry" id="associate_id" name="associate_id" inputmode="numeric" autocomplete="off" maxlength="30" required placeholder="Enter your associate number"></div>
