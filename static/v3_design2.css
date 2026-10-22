@@ -79,6 +79,24 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
 .d2-tool-pm { border-left-color: #6366f1; }
 .d2-tool-loto { border-left-color: #f59e0b; }
 .d2-tool-oos { border-left-color: #ef4444; }
+.d2-badge-indigo { background: #e4e7ff; color: #4338ca; }
+.d2-pm-files { margin-bottom: 8px; }
+.d2-pm-file-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 0; border-bottom: 1px solid #edf1f6; }
+.d2-pm-file-row:last-child { border-bottom: 0; }
+.d2-pm-file-row a { color: #0053e2; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.d2-pm-remove { background: none; border: 0; color: #c83939; font-weight: 800; cursor: pointer; font-size: 12px; }
+.d2-pm-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 9px; }
+.d2-pm-table th { background: #f3f6fa; padding: 4px 6px; text-align: left; color: #566e8e; font-weight: 800; }
+.d2-pm-table td { padding: 4px 6px; border-bottom: 1px solid #edf1f6; color: #374d6b; }
+.d2-pm-error { color: #c83939; font-weight: 700; }
+.d2-loto-dropdown { margin: 6px 0; }
+.d2-loto-dropdown > p { margin: 0 0 3px; font-weight: 800; text-transform: uppercase; font-size: 9px; color: #5c6e88; }
+.d2-loto-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 7px 9px; border: 1px solid #d8e3f0; border-radius: 5px; background: #f8fafd; font-size: 11px; font-weight: 700; color: #2b4162; cursor: pointer; text-align: left; }
+.d2-loto-toggle:hover { background: #fff8ec; }
+.d2-loto-panel { position: relative; margin-top: 4px; background: #fff; border: 1px solid #d8e3f0; border-radius: 6px; padding: 6px; max-height: 160px; overflow-y: auto; }
+.d2-loto-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px; }
+.d2-loto-key { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 5px; font-size: 10px; font-weight: 600; color: #374d6b; cursor: pointer; }
+.d2-loto-key:hover { background: #fff3da; }
 .d2-footer { font-size: 11px; }
 .d2-dialog { border: none; border-radius: 12px; padding: 0; width: min(750px,94vw); max-height: 89vh; overflow: auto; box-shadow: 0 18px 80px rgba(5,22,50,.34); color: #1a2d48; background: #fff; }
 .d2-dialog::backdrop { background: rgba(5,20,45,.62); }
