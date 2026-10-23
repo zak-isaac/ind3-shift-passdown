@@ -288,6 +288,9 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             selection_cols={row[1] for row in c.execute("PRAGMA table_info(v3_shift_selection)")}
             if "split_techs_json" not in selection_cols:
                 c.execute("ALTER TABLE v3_shift_selection ADD COLUMN split_techs_json TEXT NOT NULL DEFAULT '[]'")
+            pm_cols={row[1] for row in c.execute("PRAGMA table_info(v3_pm_tracking)")}
+            if "techs_json" not in pm_cols:
+                c.execute("ALTER TABLE v3_pm_tracking ADD COLUMN techs_json TEXT NOT NULL DEFAULT '[]'")
 
     def secure(request, shift_id=None):
         if get_mst_roster is not None:
@@ -781,18 +784,36 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                     else:
                         c.execute("UPDATE entries SET excluded=1 WHERE id=?", (old["id"],))
                         c.execute("UPDATE v3_entry_meta SET selection_hidden=1 WHERE entry_id=?", (old["id"],))
+        current_pm_techs={}
+        for r in records:
+            if r["kind"]=="pm":
+                current_pm_techs.setdefault(r["wo_number"],set()).add(r["tech_name"])
         with db._conn() as c:
-            tracked = {r["wo_number"]:r["was_preexisting"] for r in c.execute(
-                "SELECT wo_number,was_preexisting FROM v3_pm_tracking WHERE shift_id=?", (shift_id,))}
-            for wo in tracked:
-                if wo in incoming_by_wo and wo not in eligible_pms:
-                    if not tracked[wo]:
-                        c.execute("DELETE FROM pm_wos WHERE shift_id=? AND wo_number=?", (shift_id,wo))
-                    c.execute("DELETE FROM v3_pm_tracking WHERE shift_id=? AND wo_number=?", (shift_id,wo))
+            tracked={r["wo_number"]:dict(r) for r in c.execute(
+                "SELECT wo_number,was_preexisting,techs_json FROM v3_pm_tracking WHERE shift_id=?",(shift_id,))}
+            for wo,meta in tracked.items():
+                old_techs=set(json.loads(meta["techs_json"] or "[]"))
+                # Backfill pre-migration attribution from last stored Cetaris export.
+                if not old_techs:
+                    prior=c.execute("SELECT rows_json FROM v3_shift_source WHERE shift_id=?",(shift_id,)).fetchone()
+                    if prior:
+                        old_techs={r["tech_name"] for r in json.loads(prior["rows_json"])
+                                  if r["wo_number"]==wo and r["rfr"].strip().casefold() in
+                                  ("preventive maintenance","preventative maintenance")}
+                contributors=(old_techs & selected) | current_pm_techs.get(wo,set())
+                revoked=(wo in incoming_by_wo and wo not in eligible_pms)
+                deselected=(bool(old_techs) and not contributors)
+                if revoked or deselected:
+                    if not meta["was_preexisting"]:
+                        c.execute("DELETE FROM pm_wos WHERE shift_id=? AND wo_number=?",(shift_id,wo))
+                    c.execute("DELETE FROM v3_pm_tracking WHERE shift_id=? AND wo_number=?",(shift_id,wo))
+                elif contributors:
+                    c.execute("UPDATE v3_pm_tracking SET techs_json=? WHERE shift_id=? AND wo_number=?",
+                              (json.dumps(sorted(old_techs|current_pm_techs.get(wo,set()))),shift_id,wo))
             for wo in eligible_pms-tracked.keys():
-                exists = c.execute("SELECT 1 FROM pm_wos WHERE shift_id=? AND wo_number=?", (shift_id,wo)).fetchone()
-                c.execute("INSERT OR IGNORE INTO v3_pm_tracking (shift_id,wo_number,was_preexisting) VALUES (?,?,?)",
-                          (shift_id,wo,int(bool(exists))))
+                exists=c.execute("SELECT 1 FROM pm_wos WHERE shift_id=? AND wo_number=?",(shift_id,wo)).fetchone()
+                c.execute("INSERT OR IGNORE INTO v3_pm_tracking (shift_id,wo_number,was_preexisting,techs_json) VALUES (?,?,?,?)",
+                          (shift_id,wo,int(bool(exists)),json.dumps(sorted(current_pm_techs.get(wo,set())))))
         for r in records:
             if r["kind"]=="oos":
                 continue  # Breakdown OOS requires separate state tracking
