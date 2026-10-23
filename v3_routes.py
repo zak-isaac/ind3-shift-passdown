@@ -1,7 +1,4 @@
-"""Parallel V3 shift workspace for MST and technician shift starters. V2 report and maintenance handlers remain unchanged.
-
-V3 is opt-in at /v3. No AI path is invoked by this router.
-"""
+"""V3-only MST Command Center. Legacy report/export functions remain internal."""
 from __future__ import annotations
 
 import json
@@ -43,11 +40,10 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
     def set_session_cookies(response, who, sid):
         response.set_cookie(v3_cookie, signed_session(who["associate"],sid,elevated=bool(who.get("elevated")) or bool(who["profile"].get("is_manager"))), max_age=12*3600,
                             httponly=True, samesite="strict", path="/", secure=False)
-        # Legacy controls remain usable with the SAME shift bound to V2.
-        if get_v2_cookie_value:
-            response.set_cookie("lead_auth", get_v2_cookie_value(), httponly=True, samesite="lax", path="/", max_age=12*3600)
-            response.set_cookie("lead_shift_id", str(sid), httponly=True, samesite="lax", path="/", max_age=12*3600)
-            response.delete_cookie("mgr_session", path="/")
+        # V3 is the only authenticated UI; clear any stale V2 cookies.
+        for cookie in ("lead_auth","lead_shift_id","mgr_session",
+                       "tech_assoc","tech_shift","tech_name"):
+            response.delete_cookie(cookie,path="/")
 
     def _v3_live_shifts():
         now = now_func() if now_func else datetime.now()
@@ -107,6 +103,8 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         profile=get_mst_roster().get(associate)
         if not profile:
             return entry_page(request,"Associate number not found in the current roster.")
+        if not profile.get("is_mst"):
+            return entry_page(request,"Only authorized MST associates can start or resume shifts.")
         # Never accept the synthetic manager identifier as a login credential.
         if profile.get("is_manager"):
             return entry_page(request, "Use verified management access.")
@@ -204,8 +202,9 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             if len(active)>=2:
                 return entry_page(request, "Two shifts are already active.", master_verified=True)
             try:
-                sid=db.start_shift(day.isoformat(),shift_type,"Manager",
-                                   opened_by_role="mst",is_ot=False,opened_by_assoc="8972")
+                sid=db.start_shift(day.isoformat(),shift_type,
+                                   who["profile"].get("display_name") or "Manager",
+                                   opened_by_role="mst",is_ot=False,opened_by_assoc=who["associate"])
             except ValueError:
                 return entry_page(request, "Unable to start shift.", master_verified=True)
         else:
