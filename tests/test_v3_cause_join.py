@@ -115,3 +115,42 @@ def test_cause_file_upload_joins_into_workspace_happenings(client_and_shift):
     workspace = client.get("/v3", params={"shift_id": sid})
     assert workspace.status_code == 200
     assert "Sensor failure" in workspace.text
+
+
+def test_main_import_cause_column_available_for_report_without_separate_file(client_and_shift):
+    """Regression coverage for: an MST who only uploads the ONE main Cetaris
+    timecard file (which has its own "Cause" column, no separate
+    cause/repair-description export) saw cause text on the workspace page
+    (served by v3_entry_meta.cause_text) but NOT in the emailed/downloaded
+    report -- because report generation (main.py's lead_generate/shift_end)
+    only ever read db.get_wo_causes(), which is exclusively populated by the
+    SEPARATE cause-file upload path and knows nothing about the main
+    import's own Cause column. db.get_v3_entry_causes() is the fix: it reads
+    the same per-entry cause_text the workspace page already uses, so report
+    generation can merge it in too.
+    """
+    client, sid = client_and_shift
+    timecard_xlsx = _xlsx_bytes(
+        ["WO Number", "Asset ID", "Asset #", "WO Status", "SJ / PM Code", "Repair Class",
+         "Last Shift", "Service/Repair Description", "Technician", "Technician Remarks",
+         "Cause", "Start Date", "WO Closed Date/Time", "Primary RFR"],
+        [[28099999, None, "TRKGATE0003", "Closed", None, "Unplanned", "S2", "Gate won't open",
+          "Smith, John", "Replaced sensor", "Sensor failure (from main file)",
+          "2026-10-20 08:00:00", "2026-10-20 09:00:00", "Breakdown"]],
+    )
+    staged = client.post("/v3/import", data={"shift_id": sid},
+                          files={"file": ("timecard.xlsx", timecard_xlsx,
+                                  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    token = re.search(r"/v3/import/([a-f0-9]{32})/confirm", staged.text).group(1)
+    confirmed = client.post(f"/v3/import/{token}/confirm", data={"shift_id": sid, "techs": ["Smith, John"]},
+                             follow_redirects=False)
+    assert confirmed.status_code == 303
+
+    # No separate cause file uploaded at all -- the dedicated-file lookup
+    # must stay empty, while the main-import lookup must carry the cause.
+    assert db.get_wo_causes(sid) == {}
+    assert db.get_v3_entry_causes(sid) == {"28099999": "Sensor failure (from main file)"}
+
+    # Same merge pattern used in main.py's report generation call sites.
+    merged = {**db.get_wo_causes(sid), **db.get_v3_entry_causes(sid)}
+    assert merged["28099999"] == "Sensor failure (from main file)"

@@ -857,7 +857,7 @@ async def shift_end(request: Request, shift_id: int = Form(...)):
         co_result     = consolidate_entries(raw_entries)
         co_happenings = consolidated_to_happenings(
             co_result, wo_prefix_re=_WO_PREFIX_RE,
-            cause_lookup=db.get_wo_causes(shift_id),
+            cause_lookup={**db.get_wo_causes(shift_id), **db.get_v3_entry_causes(shift_id)},
         )
         happenings_input = [
             HappeningInput(
@@ -3022,7 +3022,7 @@ async def lead_generate(
     co_result   = consolidate_entries(db_entries)   # handles excluded filter internally
     co_happenings = consolidated_to_happenings(
         co_result, wo_prefix_re=_WO_PREFIX_RE,
-        cause_lookup=db.get_wo_causes(shift_id),
+        cause_lookup={**db.get_wo_causes(shift_id), **db.get_v3_entry_causes(shift_id)},
     )
 
     # Optional: upgrade merged summaries via Element LLM if key is configured
