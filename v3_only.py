@@ -18,6 +18,11 @@ _REPORT_PATH = re.compile(
 
 
 def _keep_route(route):
+    # FastAPI 0.161+ stores included APIRouters in a lazy _IncludedRouter
+    # wrapper instead of flattening every endpoint into app.router.routes.
+    # main.py includes exactly one child router: the V3 Command Center.
+    if type(route).__name__ == "_IncludedRouter":
+        return True
     path = getattr(route, "path", "")
     return (
         path == "/"
@@ -30,7 +35,6 @@ def _keep_route(route):
 
 def retire_legacy_routes(app):
     """Unregister V2 endpoints so they cannot execute or appear in OpenAPI."""
-    print("[v3-only] pre-retirement V3 paths:", [getattr(route,"path","") for route in app.router.routes if "v3" in getattr(route,"path","")], flush=True)
     app.router.routes[:] = [route for route in app.router.routes if _keep_route(route)]
     app.openapi_schema = None
 
