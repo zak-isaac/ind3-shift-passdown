@@ -1,6 +1,6 @@
 # IND3 V3 operational patch — staging and deployment
 
-This branch contains **application source code changes**, not merely a specification. It is a **draft pull request** and must NOT replace the workshop production application until local Code Puppy changes are reconciled and all acceptance checks pass.
+These **application source code changes** are merged into `main`, not merely specified. The workshop production application must NOT be replaced until local Code Puppy changes are reconciled and all acceptance checks pass.
 
 ## V3-only startup and retired V2
 
