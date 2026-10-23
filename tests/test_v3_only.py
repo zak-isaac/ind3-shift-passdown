@@ -63,6 +63,7 @@ def test_export_requires_owner_or_verified_master(monkeypatch):
 def test_actual_main_registers_only_v3_and_exports():
     import main
     paths={getattr(route,"path","") for route in main.app.router.routes}
+    print("MAIN V3-ONLY ROUTES:", sorted(paths))
     assert "/" in paths and "/v3" in paths and "/v3/login" in paths, sorted(paths)
     assert "/v2-home" not in paths
     assert "/lead" not in paths
