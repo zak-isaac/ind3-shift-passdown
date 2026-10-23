@@ -3481,7 +3481,7 @@ async def download_report(report_id: int):
 # ── V3-only MST workspace ─────────────────────────────────────────────────────
 # Legacy handlers remain internal for the V3 report/export engine only.
 from v3_routes import create_v3_router
-app.include_router(create_v3_router(
+_v3_router = create_v3_router(
     templates=templates,
     is_lead_authed=_is_lead_authed,
     can_manage_shift=_can_manage_shift,
@@ -3496,7 +3496,10 @@ app.include_router(create_v3_router(
     get_v2_cookie_value=_get_pin_hash,
     legacy_lead_page=lead_page,
     generate_report=lead_generate,
-))
+)
+print('[v3-only] router defined paths:', [r.path for r in _v3_router.routes], flush=True)
+app.include_router(_v3_router)
+print('[v3-only] included paths:', [r.path for r in app.router.routes if '/v3' in r.path], flush=True)
 
 # Retire V2 routes before serving; preserve only V3 and protected exports.
 from v3_only import enable_v3_only
