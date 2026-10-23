@@ -26,8 +26,9 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import datetime
-from io import BytesIO
+from io import BytesIO, StringIO
 from typing import Any
+import csv
 
 from openpyxl import load_workbook
 
@@ -43,7 +44,12 @@ REQUIRED = (
     "WO Closed Date/Time",
 )
 # Optional: read when present, never required. See module docstring.
-_OPTIONAL = ("Primary RFR",)
+# "Update Date / Time" (Cetaris column BG) reflects when a WO's record was
+# actually last touched/closed -- more reliable than "WO Closed Date/Time"
+# per 2026-10-23 facility feedback, so it's preferred wherever both exist
+# (see select_records() and v3_split.owner_for_close()). Optional, not
+# required: older exports predate this column.
+_OPTIONAL = ("Primary RFR", "Update Date / Time")
 
 DATE_FORMATS = ("%m/%d/%Y %I:%M %p", "%m/%d/%Y %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d")
 MAX_SIZE = 12 * 1024 * 1024
@@ -65,25 +71,57 @@ def _parse_dt(value: Any) -> datetime | None:
     return None
 
 
-def parse_excel(data: bytes) -> list[dict]:
-    """Parse a bounded, validated workbook into JSON-serializable normalized rows."""
-    if len(data) > MAX_SIZE:
-        raise ValueError("This Excel file exceeds the 12 MB import limit.")
+def _open_xlsx_grid(data: bytes):
+    """Return (headers, row_iterator, workbook) for a real .xlsx workbook.
+    Raises ValueError if this isn't a readable xlsx -- caller falls back to
+    CSV, never shown to the user directly."""
     try:
         workbook = load_workbook(BytesIO(data), read_only=True, data_only=True)
     except Exception as exc:
-        raise ValueError("Unable to read this file as an Excel (.xlsx) workbook. "
-                          "Make sure you selected the actual exported report file.") from exc
+        raise ValueError("not an xlsx workbook") from exc
+    sheet = workbook.active
+    source = sheet.iter_rows(values_only=True)
+    return next(source, None), source, workbook
+
+
+def _open_csv_grid(data: bytes):
+    """Return (headers, row_iterator, None) for a CSV export. Raises
+    ValueError if the bytes aren't readable text -- caller surfaces the
+    final combined error, never this one directly."""
     try:
-        sheet = workbook.active
-        source = sheet.iter_rows(values_only=True)
-        headers = next(source, None)
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise ValueError("not a readable CSV") from exc
+    rows = csv.reader(StringIO(text))
+    headers = next(rows, None)
+    return headers, rows, None
+
+
+def parse_excel(data: bytes) -> list[dict]:
+    """Parse a bounded, validated Cetaris work order export (.xlsx or .csv)
+    into JSON-serializable normalized rows. Format is detected by actual
+    content (tries xlsx first, falls back to CSV), never by filename --
+    see v3_routes.py's stage_import().
+    """
+    if len(data) > MAX_SIZE:
+        raise ValueError("This file exceeds the 12 MB import limit.")
+    try:
+        headers, source, workbook = _open_xlsx_grid(data)
+    except ValueError:
+        try:
+            headers, source, workbook = _open_csv_grid(data)
+        except ValueError:
+            raise ValueError(
+                "Unable to read this file as an Excel (.xlsx) or CSV work order export. "
+                "Make sure you selected the actual exported report file."
+            )
+    try:
         if not headers:
-            raise ValueError("Excel file has no headings.")
-        mapping = {str(name).strip().casefold(): pos for pos, name in enumerate(headers) if name is not None}
+            raise ValueError("File has no headings.")
+        mapping = {str(name).strip().casefold(): pos for pos, name in enumerate(headers) if name is not None and str(name).strip()}
         missing = [name for name in REQUIRED if name.casefold() not in mapping]
         if missing:
-            raise ValueError("This Excel file doesn't match the expected Cetaris work order export. Missing columns: " + ", ".join(missing))
+            raise ValueError("This file doesn't match the expected Cetaris work order export. Missing columns: " + ", ".join(missing))
 
         def get(row, label):
             pos = mapping.get(label.casefold())
@@ -99,6 +137,11 @@ def parse_excel(data: bytes) -> list[dict]:
                 continue
             started = _parse_dt(get(row, "Start Date"))
             closed_at = _parse_dt(get(row, "WO Closed Date/Time"))
+            # "Update Date / Time" reflects when the record was actually last
+            # touched/closed -- more reliable than "WO Closed Date/Time" per
+            # 2026-10-23 facility feedback. Optional column; absent on older
+            # exports, in which case callers fall back to closed_at.
+            updated_at = _parse_dt(get(row, "Update Date / Time"))
             # Asset ID comes from 'Asset ID', falling back to 'Asset #' only
             # when Asset ID is missing -- real exports leave Asset ID blank
             # for most rows, so Asset # is the common case, not the fallback.
@@ -113,13 +156,15 @@ def parse_excel(data: bytes) -> list[dict]:
                 "remarks": _text(get(row, "Technician Remarks")),
                 "start_at": started.isoformat(timespec="seconds") if started else "",
                 "closed_at": closed_at.isoformat(timespec="seconds") if closed_at else "",
+                "updated_at": updated_at.isoformat(timespec="seconds") if updated_at else "",
                 "cause": _text(get(row, "Cause")),
                 "last_shift": _text(get(row, "Last Shift")),
                 "rfr": _text(get(row, "Primary RFR")),
             })
         return results
     finally:
-        workbook.close()
+        if workbook is not None:
+            workbook.close()
 
 
 def technician_counts(rows: list[dict]) -> list[dict]:
@@ -153,7 +198,11 @@ def select_records(rows: list[dict], selected: set[str], start: datetime, end: d
             continue
         summary["selected_rows"] += 1
         started = _parse_dt(r["start_at"])
-        closed_at = _parse_dt(r["closed_at"])
+        # "Update Date / Time" is the more reliable real-close signal per
+        # 2026-10-23 facility feedback -- "WO Closed Date/Time" can be stale.
+        # Prefer it when present; fall back to WO Closed Date/Time for older
+        # exports that predate this column.
+        closed_at = _parse_dt(r.get("updated_at") or r["closed_at"])
         in_window = started is not None and start <= started <= end
         closed_in_window = closed_at is not None and start <= closed_at <= end
         if started is None:
@@ -165,7 +214,7 @@ def select_records(rows: list[dict], selected: set[str], start: datetime, end: d
                 # Conflicting signals: started outside the window but closed
                 # inside it. Don't guess which shift gets credit.
                 summary["ambiguous_shift"] += 1
-                ambiguous.append({**r, "reason": "Start Date and WO Closed Date/Time disagree on shift -- needs MST review."})
+                ambiguous.append({**r, "reason": "Start Date and Update/Closed Date disagree on shift -- needs MST review."})
                 continue
             summary["outside_shift"] += 1
             excluded.append({**r, "reason": "Outside this shift's reporting window."})
@@ -193,6 +242,10 @@ def select_records(rows: list[dict], selected: set[str], start: datetime, end: d
             grouped[key]["cause"] = r["cause"]
         if not grouped[key]["reported_issue"] and r["reported_issue"]:
             grouped[key]["reported_issue"] = r["reported_issue"]
+        # Keep the LATEST update timestamp across a WO's duplicate labor
+        # rows -- ISO8601 strings sort lexicographically same as chronologically.
+        if r.get("updated_at","") > grouped[key].get("updated_at",""):
+            grouped[key]["updated_at"] = r["updated_at"]
     records = list(grouped.values())
     # Count DISTINCT WO numbers, not rows/labor entries/technicians -- a PM
     # WO logged by two technicians, or with two remarks, still counts once.

@@ -211,14 +211,26 @@ def test_upload_accepted_regardless_of_filename_extension(client_and_shift):
 
 
 def test_garbage_content_rejected_with_content_based_message(client_and_shift):
-    """A wrong/corrupt file (not a real workbook) must be rejected based on
-    its content, with a message that doesn't blame the filename/device."""
+    """Plain text that isn't a real workbook falls through to CSV parsing
+    (it's readable as text), then gets rejected for not matching the
+    expected columns -- content-based all the way, no filename blame."""
     client, sid = client_and_shift
     staged = client.post("/v3/import", data={"shift_id": sid},
                           files={"file": ("report.xlsx", b"not a real workbook", "application/octet-stream")})
     assert staged.status_code == 200
-    assert "Unable to read this file as an Excel" in staged.text
+    assert "doesn&#39;t match the expected Cetaris work order export" in staged.text
     assert "Please upload a Cetaris Desktop" not in staged.text
+
+
+def test_unreadable_binary_rejected_with_universal_message(client_and_shift):
+    """Bytes that are neither a valid xlsx workbook NOR readable text (so
+    CSV fallback also fails) must still get a clear, content-based message."""
+    client, sid = client_and_shift
+    garbage = bytes([0xFF, 0xFE, 0x00, 0x01, 0x02, 0x80, 0x81]) * 20
+    staged = client.post("/v3/import", data={"shift_id": sid},
+                          files={"file": ("report.xlsx", garbage, "application/octet-stream")})
+    assert staged.status_code == 200
+    assert "Unable to read this file as an Excel (.xlsx) or CSV" in staged.text
 
 
 def test_no_file_selected_gives_clear_message(client_and_shift):
@@ -227,3 +239,63 @@ def test_no_file_selected_gives_clear_message(client_and_shift):
                           files={"file": ("", b"", "application/octet-stream")})
     assert staged.status_code == 200
     assert "No file was selected" in staged.text
+
+
+def _csv_bytes(headers: list[str], rows: list[list]) -> bytes:
+    import csv as _csv
+    buf = io.StringIO()
+    writer = _csv.writer(buf)
+    writer.writerow(headers)
+    for row in rows:
+        writer.writerow(row)
+    return buf.getvalue().encode("utf-8")
+
+
+def test_csv_upload_works_same_as_xlsx(client_and_shift):
+    """A tech's downloaded CSV export of the same report must import
+    identically to the xlsx version -- universal by file content, not format."""
+    client, sid = client_and_shift
+    timecard_csv = _csv_bytes(
+        ["WO Number", "Asset ID", "Asset #", "WO Status", "SJ / PM Code", "Repair Class",
+         "Last Shift", "Service/Repair Description", "Technician", "Technician Remarks",
+         "Cause", "Start Date", "WO Closed Date/Time", "Primary RFR"],
+        [["28066666", "", "TRKGATE0006", "Closed", "", "Unplanned", "S2", "Gate won't open",
+          "Smith, John", "Replaced sensor", "", "2026-10-20 08:00:00", "2026-10-20 09:00:00", "Breakdown"]],
+    )
+    staged = client.post("/v3/import", data={"shift_id": sid},
+                          files={"file": ("export.csv", timecard_csv, "text/csv")})
+    assert staged.status_code == 200, staged.text[:500]
+    assert "Smith, John" in staged.text
+    token = re.search(r"/v3/import/([a-f0-9]{32})/confirm", staged.text).group(1)
+    confirmed = client.post(f"/v3/import/{token}/confirm", data={"shift_id": sid, "techs": ["Smith, John"]},
+                             follow_redirects=False)
+    assert confirmed.status_code == 303
+
+
+def test_update_date_time_preferred_over_stale_wo_closed_date(client_and_shift):
+    """Real-world case: 'WO Closed Date/Time' can be stale/wrong; 'Update
+    Date / Time' reflects when the record was actually last touched/closed.
+    A WO whose Closed Date falls outside the shift window but whose Update
+    Date falls inside it must be included normally, not flagged ambiguous.
+    """
+    client, sid = client_and_shift
+    timecard_xlsx = _xlsx_bytes(
+        ["WO Number", "Asset ID", "Asset #", "WO Status", "SJ / PM Code", "Repair Class",
+         "Last Shift", "Service/Repair Description", "Technician", "Technician Remarks",
+         "Cause", "Start Date", "WO Closed Date/Time", "Primary RFR", "Update Date / Time"],
+        # Closed Date/Time (stale, outside the 2026-10-20 window) vs
+        # Update Date / Time (accurate, inside the window).
+        [[28055555, None, "TRKGATE0007", "Closed", None, "Unplanned", "S2", "Gate won't open",
+          "Smith, John", "Replaced sensor", None, "2026-10-20 08:00:00", "2026-10-19 23:00:00",
+          "Breakdown", "2026-10-20 10:00:00"]],
+    )
+    staged = client.post("/v3/import", data={"shift_id": sid},
+                          files={"file": ("timecard.xlsx", timecard_xlsx,
+                                  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    token = re.search(r"/v3/import/([a-f0-9]{32})/confirm", staged.text).group(1)
+    confirmed = client.post(f"/v3/import/{token}/confirm", data={"shift_id": sid, "techs": ["Smith, John"]},
+                             follow_redirects=True)
+    assert confirmed.status_code == 200
+    assert "flagged for MST review" not in confirmed.text
+    entries = db.get_entries(sid)
+    assert len(entries) == 1 and entries[0]["unit"] == "TRKGATE0007"

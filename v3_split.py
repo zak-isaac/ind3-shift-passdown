@@ -1,11 +1,10 @@
 """S4/S5 split-worker WO attribution by administrative WO close timestamp.
 
-Ported from the personal-GitHub operational-integration branch
-(github.com/zak-isaac/ind3-shift-passdown, commits a54d49a/a27ae85/bfee9cb/d0635ce).
-
-NOT WIRED IN YET: standalone, reviewed building block. Hooking this into the
-live shift-generation flow (v3_routes.py) needs a follow-up pass to decide
-where split-worker selection happens in local's current workflow.
+Wired into v3_routes.py's confirm_import() for S4/S5 imports. Prefers
+"Update Date / Time" over "WO Closed Date/Time" as the real close signal
+when both exist (2026-10-23 facility feedback: Update Date/Time reflects
+when the record was actually last touched/closed, more reliably than WO
+Closed Date/Time) -- see owner_for_close() callers below.
 """
 from __future__ import annotations
 from datetime import date, datetime, time, timedelta
@@ -46,7 +45,7 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None):
         if status not in ("closed","completed"):
             accepted.append(r)
             continue
-        owner=owner_for_close(r.get("closed_at"),shift_day)
+        owner=owner_for_close(r.get("updated_at") or r.get("closed_at"),shift_day)
         if owner is None:
             if decisions.get(wo) in ("S4","S5"):
                 owner=decisions[wo]
