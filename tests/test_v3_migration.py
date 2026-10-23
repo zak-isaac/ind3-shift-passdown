@@ -57,6 +57,29 @@ def test_v3_navigation_and_pages(client_and_shift):
     assert "/v3/operations" in client.get("/v3/preview",params={"shift_id":sid}).text
 
 
+def test_excluded_happenings_never_shown_in_workspace(client_and_shift):
+    """Excluded entries (manual exclude, deselected tech, stale WO) are noise,
+    not signal -- the workspace table must only ever show what's currently in
+    scope for this shift, never a greyed-out 'Excluded' row."""
+    client,sid=client_and_shift
+    added=client.post("/v3/manual",data={"shift_id":sid,"unit":"VOIDFILL9001","issue":"Test exclude flow"},
+                       follow_redirects=False)
+    assert added.status_code==303
+    entry=next(e for e in db.get_entries(sid) if e["unit"]=="VOIDFILL9001")
+
+    before=client.get("/v3",params={"shift_id":sid})
+    assert "VOIDFILL9001" in before.text
+    assert "Excluded" not in before.text
+
+    excl=client.post(f"/v3/happening/{entry['id']}/exclude",data={"shift_id":sid,"excluded":"1"},
+                      follow_redirects=False)
+    assert excl.status_code==303
+    assert db.get_entry(entry["id"])["excluded"]==1
+
+    after=client.get("/v3",params={"shift_id":sid})
+    assert "VOIDFILL9001" not in after.text
+
+
 def test_history_eml_redownload(client_and_shift):
     client,sid=client_and_shift
     db.save_report(sid,"Test generated report","")

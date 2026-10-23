@@ -344,7 +344,10 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             if not g["cause_text"] and r["cause_text"]:
                 g["cause_text"] = r["cause_text"]
         return {
-            "happenings": list(groups.values()),
+            # Excluded happenings (deselected technician, stale WO, manual
+            # exclude) are noise, not signal -- the shift owner only needs to
+            # review and report on what's actually in scope for this shift.
+            "happenings": [g for g in groups.values() if not g["excluded"]],
             "pm_wos": [dict(p) for p in pm_rows],
             "pm_count": len(pm_rows),
             "selected_techs": json.loads(selection["technicians_json"]) if selection else [],
