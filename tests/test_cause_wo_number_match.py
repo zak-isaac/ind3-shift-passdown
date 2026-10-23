@@ -69,6 +69,24 @@ class TestCauseWoNumberMatch(unittest.TestCase):
         self.assertEqual(normalize_wo("28017126"), "28017126")
         self.assertEqual(normalize_wo(None), "")
 
+    def test_real_cetaris_desktop_export_never_misdetected_as_cause_file(self):
+        """Root cause of a live outage: the real Cetaris Desktop timecard export
+        has BOTH 'Primary RFR' and a separate plain 'RFR' column, plus
+        'Technician Remarks' (not 'Tech Remarks'). looks_like_cause_file() only
+        guarded against the literal header 'Tech Remarks', so a genuine 100+
+        column timecard export -- which also satisfies 'WO Number' + 'RFR' --
+        got misrouted through the cause-only path: entire upload silently
+        swallowed, zero entries created, no technician-selection popup, no
+        error shown anywhere."""
+        from cause_lookup import looks_like_cause_file
+        real_shaped_timecard = _xlsx_bytes(
+            ["WO Number", "Asset #", "WO Status", "Primary RFR", "RFR",
+             "Service/Repair Description", "Technician", "Technician Remarks", "Start Date"],
+            [[28017126, "TRKGATE0002", "Closed", "Proactive Repair", "Proactive Repair",
+              "Gate check", "Smith, John", "Checked alignment", "10/22/2026 3:00 PM"]],
+        )
+        self.assertFalse(looks_like_cause_file(real_shaped_timecard))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -25,10 +25,16 @@ _CAUSE_FIELDS = ("Repair Description", "RFR")
 # disagree on what counts as PM.
 _PM_RFR_VALUES = {"preventive maintenance", "pm"}
 
-# Headers that mean "this is a timecard file, not a cause file" -- if this
-# shows up, looks_like_cause_file() returns False so we never mis-route a
-# normal timecard upload through the cause-only path.
-_TIMECARD_ONLY_HEADER = "Tech Remarks"
+# Headers that mean "this is a timecard file, not a cause file" -- if ANY of
+# these show up, looks_like_cause_file() returns False so we never mis-route a
+# normal timecard upload through the cause-only path. Must list every real
+# Cetaris Desktop header spelling we've seen, not just one: the real export
+# has 'Technician Remarks' (not 'Tech Remarks'), and ALSO has a plain 'RFR'
+# column in addition to 'Primary RFR' -- without this guard matching the
+# ACTUAL header text, a genuine 106-column timecard export gets misread as a
+# cause file (since it has 'WO Number' + 'RFR', the exact cause-file shape),
+# silently swallowing the entire upload with zero entries and no popup.
+_TIMECARD_ONLY_HEADERS = ("Tech Remarks", "Technician Remarks", "Technician")
 
 
 def _rows_from_xlsx(content: bytes) -> list[dict]:
@@ -106,7 +112,7 @@ def looks_like_cause_file(content: bytes | str) -> bool:
     if not rows:
         return False
     headers = set(rows[0].keys())
-    if _TIMECARD_ONLY_HEADER in headers:
+    if any(h in headers for h in _TIMECARD_ONLY_HEADERS):
         return False
     return "WO Number" in headers and any(f in headers for f in _CAUSE_FIELDS)
 
