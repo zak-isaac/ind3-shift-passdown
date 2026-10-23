@@ -24,7 +24,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                      shift_window, lead_redirect, get_mst_roster=None, verify_mst_pin=None,
                      start_eligibility=None, allowed_shift_days=None, now_func=None,
                      get_v2_cookie_value=None, generate_report=None,
-                     verify_master_code=None):
+                     verify_master_code=None, build_eml_response=None):
     router = APIRouter(prefix="/v3", tags=["Shift V3"])
 
     # Fallback mirrors main.py's _MASTER_CODES so standalone/test usage of this
@@ -567,6 +567,23 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         if not report:
             raise HTTPException(500,"Report was not saved")
         return RedirectResponse(f"/v3/report/{report['id']}?shift_id={shift_id}",status_code=303)
+
+    @router.get("/send")
+    async def v3_send(request:Request,shift_id:int):
+        """One-click 'Generate & Send': builds the report, then streams the .eml
+        directly back as a download -- same single-hop UX as V2's compose button,
+        no intermediate operations/report pages."""
+        secure(request,shift_id)
+        if generate_report is None:
+            raise HTTPException(503,"Report generator unavailable")
+        if build_eml_response is None:
+            raise HTTPException(503,"Email composer unavailable")
+        await generate_report(request,shift_id=shift_id,extra_title=[],extra_note=[],
+                              vendor_name=[],ro_item=[],rts_unit=[])
+        report=db.get_last_report_for_shift(shift_id)
+        if not report:
+            raise HTTPException(500,"Report was not saved")
+        return await build_eml_response(report["id"],subject="",html_body="")
 
     def report_access(request,report_id):
         report=db.get_report(report_id)

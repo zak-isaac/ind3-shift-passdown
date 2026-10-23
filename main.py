@@ -3314,4 +3314,5 @@ app.include_router(create_v3_router(
     get_v2_cookie_value=_get_pin_hash,
     generate_report=lead_generate,
     verify_master_code=_is_master_credential,
+    build_eml_response=_build_eml_response,
 ))
