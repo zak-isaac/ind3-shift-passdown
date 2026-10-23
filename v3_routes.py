@@ -39,7 +39,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         return [shift for shift in db.get_active_shifts() if shift_owned_by(shift,who)]
 
     def set_session_cookies(response, who, sid):
-        response.set_cookie(v3_cookie, signed_session(who["associate"],sid), max_age=12*3600,
+        response.set_cookie(v3_cookie, signed_session(who["associate"],sid,elevated=bool(who.get("elevated")) or bool(who["profile"].get("is_manager"))), max_age=12*3600,
                             httponly=True, samesite="strict", path="/", secure=False)
         # Legacy controls remain usable with the SAME shift bound to V2.
         if get_v2_cookie_value:
@@ -105,14 +105,9 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         profile=get_mst_roster().get(associate)
         if not profile:
             return entry_page(request,"Associate number not found in the current roster.")
-        # The existing test manager uses the same associate-number field.
-        # This does not grant access to any other manager profile.
+        # Never accept the synthetic manager identifier as a login credential.
         if profile.get("is_manager"):
-            if associate != "8972":
-                return entry_page(request,"This management profile cannot use the test shift selector.")
-            response = entry_page(request, master_verified=True)
-            set_session_cookies(response, {"associate":associate,"profile":profile}, 0)
-            return response
+            return entry_page(request, "Use verified management access.")
         who={"associate":associate,"profile":profile}
         owned=[sh for sh in _v3_live_shifts() if shift_owned_by(sh,who)]
         if mode=="resume":
@@ -168,14 +163,29 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         return response
 
     @router.post("/master/verify", response_class=HTMLResponse)
-    async def verify_master(request:Request, master_code:str=Form(...)):
-        if not hmac.compare_digest(master_code.strip(), "8972"):
-            return entry_page(request, "Invalid testing master code.")
-        profile = (get_mst_roster() or {}).get("8972") if get_mst_roster else None
-        if not profile or not profile.get("is_manager"):
-            return entry_page(request, "Manager test profile is missing.")
+    async def verify_master(request:Request, master_code:str=Form(""), associate_id:str=Form("")):
+        # Both credentials must be explicitly configured on the workshop server.
+        # Neither associate number alone nor a hardcoded code grants access.
+        roster = get_mst_roster() if get_mst_roster else {}
+        associate = associate_id.strip()
+        shared = os.environ.get("IND3_V3_MASTER_CODE","")
+        personal_assoc = os.environ.get("IND3_V3_PERSONAL_MASTER_ASSOC","").strip()
+        personal_secret = os.environ.get("IND3_V3_PERSONAL_MASTER_SECRET","")
+        if associate:
+            valid = bool(personal_assoc and personal_secret and associate==personal_assoc
+                         and hmac.compare_digest(master_code.strip(),personal_secret))
+            profile = roster.get(associate) if valid else None
+            if not profile or profile.get("is_manager"):
+                return entry_page(request,"Management verification failed.")
+            profile = {**profile,"is_manager":True}
+        else:
+            valid = bool(shared and hmac.compare_digest(master_code.strip(),shared))
+            profile = roster.get("8972") if valid else None
+            if not profile or not profile.get("is_manager"):
+                return entry_page(request,"Management verification failed.")
+            associate = "8972"
         response = entry_page(request, master_verified=True)
-        set_session_cookies(response, {"associate":"8972","profile":profile}, 0)
+        set_session_cookies(response, {"associate":associate,"profile":profile,"elevated":True}, 0)
         return response
 
     @router.post("/master/select")
