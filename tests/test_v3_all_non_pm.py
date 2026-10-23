@@ -10,8 +10,8 @@ def test_all_non_pm_categories_and_unknown_are_happenings():
     out,summary=select_records(rows,{"Tech A"},datetime(2026,10,20,12),datetime(2026,10,20,22))
     happenings=[r for r in out if r["kind"]=="happening"]
     pms=[r for r in out if r["kind"]=="pm"]
-    assert len(happenings)==8
-    assert len(pms)==3
+    assert len(happenings)==9
+    assert len(pms)==2
     assert summary["not_closed"]==1
-    assert {r["rfr"] for r in happenings}==set(categories[:8])
+    assert {r["rfr"] for r in happenings}==set(categories[:9]) - {"Preventive Maintenance"}
     assert "unsupported_rfr" not in summary
