@@ -14,7 +14,7 @@ from openpyxl import load_workbook
 
 REQUIRED = (
     "WO Number", "Asset #", "WO Status", "Primary RFR",
-    "Service/Repair Description", "Technician", "Technician Remarks", "Start Date",
+    "Service/Repair Description", "Technician", "Technician Remarks",
 )
 PM_CATEGORIES = {"preventive maintenance", "preventative maintenance", "pm"}
 DATE_FORMATS = ("%m/%d/%Y %I:%M %p", "%m/%d/%Y %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d")
@@ -75,6 +75,7 @@ def parse_excel(data: bytes) -> list[dict]:
                 "tech_name": tech,
                 "remarks": _text(get(row,"Technician Remarks")),
                 "start_at": started.isoformat(timespec="seconds") if started else "",
+                "closed_at": _parse_dt(get(row, "WO Closed Date/Time")).isoformat(timespec="seconds") if _parse_dt(get(row, "WO Closed Date/Time")) else "",
                 "cause": _text(get(row,"Cause")),
                 "work_accomplished": _text(get(row,"Work Accomplished")),
             })
@@ -98,15 +99,17 @@ def select_records(rows: list[dict], selected: set[str], start: datetime, end: d
         if r["tech_name"] not in selected:
             continue
         summary["selected_rows"] += 1
-        started = _parse_dt(r["start_at"])
-        if started is None or not start <= started <= end:
-            summary["outside_shift"] += 1
+        # Labor Start Date is not a WO eligibility boundary.
+        status = r["status"].strip().casefold()
+        category = r["rfr"].strip().casefold()
+        if category == "breakdown" and status == "in process":
+            summary["breakdown_in_process"] += 1
+            eligible.append({**r, "kind": "oos"})
             continue
-        if r["status"].strip().casefold() != "closed":
+        if status != "closed" and not (category == "breakdown" and status == "completed"):
             summary["not_closed"] += 1
             continue
-        category = r["rfr"].strip().casefold()
-        if category in PM_CATEGORIES:
+        if category in {"preventive maintenance", "preventative maintenance"}:
             summary["pm_rows"] += 1
             eligible.append({**r, "kind": "pm"})
         else:
@@ -129,4 +132,5 @@ def select_records(rows: list[dict], selected: set[str], start: datetime, end: d
     records = list(grouped.values())
     summary["unique_pm_wos"] = len({r["wo_number"] for r in records if r["kind"] == "pm"})
     summary["unique_happening_wos"] = len({r["wo_number"] for r in records if r["kind"] == "happening"})
+    summary["unique_oos_wos"] = len({r["wo_number"] for r in records if r["kind"] == "oos"})
     return records, dict(summary)
