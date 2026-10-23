@@ -20,8 +20,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pytest
       - name: Check Python syntax
-        run: python -m compileall -q main.py v3_routes.py v3_identity.py v3_cetaris.py
+        run: python -m compileall -q main.py v3_routes.py v3_identity.py v3_cetaris.py v3_breakdown.py
       - name: Run V3 migration regression tests
-        run: pytest -q tests/test_v3_migration.py
+        run: pytest -q tests/test_v3_migration.py tests/test_v3_operational_patch.py tests/test_v3_all_non_pm.py
       - name: Run existing V3 route tests
         run: pytest -q tests/test_v3_routes.py
