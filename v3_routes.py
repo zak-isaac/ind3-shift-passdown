@@ -17,6 +17,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 import db
+import cause_lookup
 from v3_cetaris import parse_excel, select_records, technician_counts, MAX_SIZE
 
 
@@ -305,6 +306,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
 
     def model(shift_id):
         entries = db.get_entries(shift_id)
+        wo_causes = db.get_wo_causes(shift_id)
         with db._conn() as c:
             meta_rows = c.execute("SELECT * FROM v3_entry_meta WHERE shift_id=?", (shift_id,)).fetchall()
             pm_rows = c.execute("SELECT * FROM pm_wos WHERE shift_id=? ORDER BY wo_number", (shift_id,)).fetchall()
@@ -317,7 +319,11 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             m = meta.get(e["id"], {})
             r = dict(e)
             r["reported_issue"] = m.get("reported_issue") or e.get("issue", "")
-            r["cause_text"] = m.get("cause_text") or ""
+            # Cause text: an edited/imported cause on the entry itself wins; otherwise
+            # fall back to a separately-uploaded cause/repair-description export
+            # (same two-file workflow as V2 -- see cause_lookup.py), joined live by
+            # WO Number so upload order (timecard first or cause file first) never matters.
+            r["cause_text"] = m.get("cause_text") or wo_causes.get(e.get("wo_number") or "", "")
             r["needs_review"] = bool(m.get("needs_review"))
             r["mst_edited"] = bool(m.get("mst_edited"))
             r["rfr_type"] = m.get("rfr_type") or ("Work Request" if e.get("tech_name") in ("MST (Manual)","Shift Owner (Manual)") else "Other")
@@ -739,9 +745,18 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
     @router.post("/import",response_class=HTMLResponse)
     async def stage_import(request:Request,shift_id:int=Form(...),file:UploadFile=File(...)):
         shift=secure(request,shift_id)
+        data=await file.read(MAX_SIZE + 1)
+        # Cause/repair-description export (WO Number + Repair Description) --
+        # a separate file from the timecard export, same as V2. Detected by
+        # header shape so it never gets routed through parse_excel(). Just
+        # joins by WO Number and stores the text; doesn't touch entries.
+        if cause_lookup.looks_like_cause_file(data):
+            causes=cause_lookup.parse_cause_file(data)
+            for wo_number,cause_text in causes.items():
+                db.upsert_wo_cause(shift_id=shift_id,wo_number=wo_number,cause_text=cause_text)
+            return render(request,shift,notice=f"Linked cause text for {len(causes)} work order(s).")
         if not file.filename or not file.filename.lower().endswith(".xlsx"):
             return render(request,shift,warning="Please upload a Cetaris Desktop .xlsx report.")
-        data=await file.read(MAX_SIZE + 1)
         try:
             records=parse_excel(data)
         except ValueError as exc:
