@@ -18,6 +18,8 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 import db
 import cause_lookup
+import v3_breakdown
+import v3_split
 from v3_cetaris import parse_excel, select_records, technician_counts, MAX_SIZE
 
 
@@ -402,6 +404,14 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             c.execute("DELETE FROM oos_units WHERE unit=?",(unit,))
         return return_workspace(shift_id,"Asset returned to service")
 
+    @router.post("/breakdown/decide")
+    async def v3_breakdown_decide(request:Request,shift_id:int=Form(...),wo_number:str=Form(...),decision:str=Form(...)):
+        secure(request,shift_id)
+        if decision not in ("rts","keep_oos"): raise HTTPException(400,"Decision must be rts or keep_oos")
+        v3_breakdown.decide(db,shift_id,{wo_number:decision})
+        notice="Asset returned to service" if decision=="rts" else "Asset kept out of service per MST decision"
+        return return_workspace(shift_id,notice)
+
     @router.post("/rts/undo")
     async def v3_undo_rts(request:Request,shift_id:int=Form(...),unit:str=Form(...)):
         secure(request,shift_id)
@@ -460,6 +470,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             "loto":db.get_loto(shift["id"]),
             "oos_units":db.get_oos_units(),
             "rts_units":db.get_rts_events(shift["id"]),
+            "breakdown_pending":v3_breakdown.pending(db),
             "shift_notes":db.get_shift_notes(shift["id"]),
             "carry_overs":db.get_carry_over_entries(shift["id"]),
             "vendors":v3_vendors(shift["id"]),
@@ -850,6 +861,22 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         window=shift_window(shift["shift_type"],date.fromisoformat(shift["date"]))
         if not window:
             return render(request,shift,warning="Shift timing is not configured. Import cannot continue.")
+
+        # S4/S5 share Cetaris's "24 HOUR" shift labeling and can both import the
+        # same WO export. Attribute closed/completed WOs to whichever shift's
+        # window the administrative WO Closed Date/Time actually falls in;
+        # anything ambiguous (overlap zone, missing timestamp) is held out
+        # here and surfaced to the MST instead of being double-counted or
+        # silently guessed either way.
+        split_pending=[]
+        if shift["shift_type"] in ("S4","S5"):
+            rows,split_pending=v3_split.assign(rows,selected,shift["shift_type"],date.fromisoformat(shift["date"]))
+
+        # Breakdown WOs get sidecar OOS/RTS lifecycle tracking independent of
+        # the happenings/PM report -- runs on every import, every shift type.
+        # Shares the existing oos_units/rts_log tables, so a WO going "in
+        # process" shows up in the OOS panel you already have.
+        breakdown_updates=v3_breakdown.sync(db,rows,selected,shift_id)
         records,stats=select_records(rows,selected,*window)
         added,unchanged,pending=0,0,0
         # Use short transactions. Existing db helpers open their own connections;
@@ -980,8 +1007,12 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             skipped_parts.append(f"{stats['outside_shift']} outside this shift's time window")
         if stats.get("ambiguous_shift"):
             skipped_parts.append(f"{stats['ambiguous_shift']} flagged for MST review (timestamps don't clearly establish the shift)")
+        if split_pending:
+            skipped_parts.append(f"{len(split_pending)} need an explicit S4/S5 ownership call (ambiguous close time)")
         if skipped_parts:
             notice += " Skipped " + " and ".join(skipped_parts) + " (not counted as happenings)."
+        if breakdown_updates:
+            notice += f" {breakdown_updates} breakdown WO(s) updated in the OOS/RTS tracker."
         from urllib.parse import quote
         return RedirectResponse(f"/v3?shift_id={shift_id}&notice={quote(notice)}",status_code=303)
 

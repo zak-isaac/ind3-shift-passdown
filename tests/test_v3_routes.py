@@ -219,3 +219,76 @@ def test_unfamiliar_rfr_imports_and_reopened_wo_is_excluded(app_client):
     third=send([base])
     assert third.status_code==200
     assert db.get_entry(imported['id'])['excluded']==0
+
+
+def test_breakdown_wo_tracked_as_oos_then_rts_decision(app_client):
+    """Importing an in-process Breakdown WO marks the asset OOS via the
+    shared oos_units table; marking it Completed surfaces an explicit RTS
+    decision instead of silently assuming the unit is back up."""
+    import json, uuid
+    client,sid=app_client
+    client.get('/v3')
+    base={"wo_number":"55001","tech_name":"Ssaku, Isaac","asset_id":"VOIDFILL0500",
+          "status":"In Process","rfr":"Breakdown","reported_issue":"Conveyor jam",
+          "cause":"","remarks":"Working it","start_at":"2026-10-20T13:00:00",
+          "closed_at":"","repair_class":"Unplanned","pm_code":"","last_shift":"S2"}
+    def send(rows):
+        token=uuid.uuid4().hex
+        with db._conn() as c:
+            c.execute('INSERT INTO v3_import_batches(token,shift_id,filename,created_at,rows_json) VALUES (?,?,?,?,?)',
+                      (token,sid,'sample.xlsx',datetime.now().isoformat(timespec='seconds'),json.dumps(rows)))
+        return client.post(f'/v3/import/{token}/confirm',data={'shift_id':str(sid),'techs':['Ssaku, Isaac']},follow_redirects=True)
+    first=send([base])
+    assert first.status_code==200,first.text[:500]
+    assert 'VOIDFILL0500' in db.get_oos_units()
+    workspace=client.get(f'/v3?shift_id={sid}')
+    assert 'No breakdown WOs awaiting a decision.' in workspace.text
+    completed=send([{**base,'status':'Completed'}])
+    assert completed.status_code==200
+    workspace=client.get(f'/v3?shift_id={sid}')
+    assert 'WO #55001' in workspace.text
+    assert 'VOIDFILL0500' in db.get_oos_units(), 'still OOS until an explicit decision is made'
+    decided=client.post('/v3/breakdown/decide',data={'shift_id':str(sid),'wo_number':'55001','decision':'rts'},follow_redirects=True)
+    assert decided.status_code==200
+    assert 'VOIDFILL0500' not in db.get_oos_units()
+
+
+def test_s4_s5_split_shift_ownership(tmp_path):
+    """A WO closed inside S4's window must not be credited to an S5 import of
+    the same 24-hour Cetaris export; an ambiguous close time is held out and
+    surfaced to the MST instead of being guessed."""
+    import json, uuid
+    db.set_db_path(tmp_path / 'test_split.db')
+    db.init_db()
+    s5_sid=db.start_shift('2026-10-20','S5','Test MST S5')
+    app=FastAPI()
+    app.mount('/static', StaticFiles(directory=str(DIR/'static')), name='static')
+    templates=Jinja2Templates(directory=str(DIR/'templates'))
+    app.include_router(create_v3_router(
+        templates,
+        is_lead_authed=lambda req: req.cookies.get('lead_auth')=='test',
+        can_manage_shift=lambda req, candidate: candidate == s5_sid,
+        resolve_my_shift=lambda req: db.get_shift(s5_sid),
+        shift_window=lambda shift,d:(datetime.combine(d,time(0)),datetime.combine(d+timedelta(days=1),time(0))),
+        lead_redirect=lambda dest: RedirectResponse('/lead/login?next='+dest,status_code=303)
+    ))
+    client=TestClient(app)
+    client.cookies.set('lead_auth','test')
+    client.get('/v3')
+    row_for_s4=dict(wo_number="66001",tech_name="Ssaku, Isaac",asset_id="M1",status="Closed",
+                     rfr="Process Interruption",reported_issue="Fixed",cause="",remarks="Done",
+                     start_at="2026-10-20T10:00:00",closed_at="2026-10-20T10:30:00",
+                     repair_class="",pm_code="",last_shift="S4")
+    ambiguous_row=dict(row_for_s4,wo_number="66002",closed_at="")
+    def send(sid,rows):
+        token=uuid.uuid4().hex
+        with db._conn() as c:
+            c.execute('INSERT INTO v3_import_batches(token,shift_id,filename,created_at,rows_json) VALUES (?,?,?,?,?)',
+                      (token,sid,'sample.xlsx',datetime.now().isoformat(timespec='seconds'),json.dumps(rows)))
+        return client.post(f'/v3/import/{token}/confirm',data={'shift_id':str(sid),'techs':['Ssaku, Isaac']},follow_redirects=True)
+    resp=send(s5_sid,[row_for_s4,ambiguous_row])
+    assert resp.status_code==200,resp.text[:500]
+    s5_entries=db.get_entries(s5_sid)
+    assert not any(e['wo_number']=='66001' for e in s5_entries), 'closed during S4 window, must not count toward S5'
+    assert not any(e['wo_number']=='66002' for e in s5_entries), 'ambiguous close time must not be guessed'
+    assert 'explicit S4/S5 ownership call' in resp.text
