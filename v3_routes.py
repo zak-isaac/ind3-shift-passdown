@@ -18,6 +18,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 import db
 import v3_breakdown
+import v3_split
 from v3_cetaris import parse_excel, select_records, technician_counts, MAX_SIZE
 
 
@@ -284,6 +285,9 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                 c.execute("ALTER TABLE v3_entry_meta ADD COLUMN selection_hidden INTEGER NOT NULL DEFAULT 0")
             if "source_snapshot" not in cols:
                 c.execute("ALTER TABLE v3_entry_meta ADD COLUMN source_snapshot TEXT NOT NULL DEFAULT ''")
+            selection_cols={row[1] for row in c.execute("PRAGMA table_info(v3_shift_selection)")}
+            if "split_techs_json" not in selection_cols:
+                c.execute("ALTER TABLE v3_shift_selection ADD COLUMN split_techs_json TEXT NOT NULL DEFAULT '[]'")
 
     def secure(request, shift_id=None):
         if get_mst_roster is not None:
@@ -339,6 +343,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             "pm_wos": [dict(p) for p in pm_rows],
             "pm_count": len(pm_rows),
             "selected_techs": json.loads(selection["technicians_json"]) if selection else [],
+            "selected_split_techs": json.loads(selection["split_techs_json"]) if selection else [],
             "imported_filename": selection["filename"] if selection else "",
             "imported_at": selection["imported_at"] if selection else "",
             "pending_breakdowns": v3_breakdown.pending(db),
@@ -683,7 +688,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         })
 
     @router.post("/import/{token}/confirm")
-    async def confirm_import(request:Request,token:str,shift_id:int=Form(...),techs:list[str]=Form(default=[])):
+    async def confirm_import(request:Request,token:str,shift_id:int=Form(...),techs:list[str]=Form(default=[]),split_techs:list[str]=Form(default=[])):
         shift=secure(request,shift_id)
         with db._conn() as c:
             batch=c.execute("SELECT * FROM v3_import_batches WHERE token=? AND shift_id=?",(token,shift_id)).fetchone()
@@ -704,7 +709,21 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         window=shift_window(shift["shift_type"],date.fromisoformat(shift["date"]))
         if not window:
             return render(request,shift,warning="Shift timing is not configured. Import cannot continue.")
-        records,stats=select_records(rows,selected,*window)
+        split_selected=set(split_techs) & selected if shift["shift_type"] in ("S4","S5") else set()
+        submitted=await request.form()
+        decisions={key[len("split_wo_"):]:value for key,value in submitted.multi_items()
+                   if key.startswith("split_wo_") and value in ("S4","S5")}
+        attributed,unresolved=v3_split.assign(rows,split_selected,shift["shift_type"],
+                                              shift["date"],decisions)
+        if unresolved:
+            return render(request,shift,
+                warning="Choose the owning shift for each ambiguous S4/S5 work order.",
+                staged={"token":token,"filename":batch["filename"],
+                        "counts":technician_counts(rows),"total_rows":len(rows),
+                        "split_review":unresolved,
+                        "checked_techs":sorted(selected),
+                        "checked_split_techs":sorted(split_selected)})
+        records,stats=select_records(attributed,selected,*window)
         v3_breakdown.sync(db,rows,selected,shift_id)
         added,unchanged,pending=0,0,0
         # Use short transactions. Existing db helpers open their own connections;
@@ -820,9 +839,9 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             c.execute("INSERT INTO v3_shift_source(shift_id,filename,rows_json) VALUES (?,?,?) "
                       "ON CONFLICT(shift_id) DO UPDATE SET filename=excluded.filename,rows_json=excluded.rows_json",
                       (shift_id,batch["filename"],batch["rows_json"]))
-            c.execute("INSERT INTO v3_shift_selection(shift_id,technicians_json,filename,imported_at) VALUES (?,?,?,?) "
-                      "ON CONFLICT(shift_id) DO UPDATE SET technicians_json=excluded.technicians_json, filename=excluded.filename, imported_at=excluded.imported_at",
-                      (shift_id,json.dumps(sorted(selected)),batch["filename"],datetime.now().strftime("%Y-%m-%d %H:%M")))
+            c.execute("INSERT INTO v3_shift_selection(shift_id,technicians_json,filename,imported_at,split_techs_json) VALUES (?,?,?,?,?) "
+                      "ON CONFLICT(shift_id) DO UPDATE SET technicians_json=excluded.technicians_json,filename=excluded.filename,imported_at=excluded.imported_at,split_techs_json=excluded.split_techs_json",
+                      (shift_id,json.dumps(sorted(selected)),batch["filename"],datetime.now().strftime("%Y-%m-%d %H:%M"),json.dumps(sorted(split_selected))))
             c.execute("DELETE FROM v3_import_batches WHERE token=?",(token,))
         notice=f"Imported {added} new technician/WO entries; {unchanged} unchanged; {pending} flagged for review. {stats.get('unique_pm_wos',0)} distinct closed PM WOs in this import."
         skipped_parts=[]
