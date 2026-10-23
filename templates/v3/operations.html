@@ -1,0 +1,40 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>IND3 &middot; Report &amp; Shift Close</title><link rel="stylesheet" href="/static/v3.css"><link rel="stylesheet" href="/static/v3_design2.css"><script src="/static/htmx.min.js"></script></head><body>
+<div class="shell design2-shell">
+{% set active_page = 'workspace' %}
+{% include 'v3/_sidebar.html' %}
+<div class="viewport">
+<main class="d2-dashboard" id="main-content">
+
+<div class="d2-page-intro"><div><p class="eyebrow">SHIFT CLOSEOUT</p><h1>Generate &amp; Send Passdown</h1><p>{{ shift.shift_type }} &middot; {{ shift.date }} &middot; {{ shift.lead_name }}</p></div></div>
+{% if warning %}<div class="v3-admin-notice v3-notice-warn">{{ warning }}</div>{% endif %}
+
+<div class="v3-ops-grid">
+  <section class="card v3-admin-card v3-accent-blue">
+    <div class="v3-admin-card-head"><h2>Passdown report</h2></div>
+    <p class="v3-admin-card-sub">Review the recorded work orders, closed PMs, LOTO, vendors and shift notes before generating the report.</p>
+    <div class="v3-ops-actions">
+      <a class="button button-outline" href="/v3/preview?shift_id={{ shift.id }}">Preview passdown</a>
+      <form method="post" action="/v3/generate"><input type="hidden" name="shift_id" value="{{ shift.id }}"><button class="button button-blue" type="submit">Generate report</button></form>
+    </div>
+  </section>
+  <section class="card v3-admin-card v3-accent-amber">
+    <div class="v3-admin-card-head"><h2>End shift</h2></div>
+    <p class="v3-admin-card-sub">End the shift only after confirming your report. Ending locks this active shift and retains the saved report.</p>
+    <form method="post" action="/v3/end" onsubmit="return confirm('End this shift? This will close the active shift.')"><input type="hidden" name="shift_id" value="{{ shift.id }}"><button class="button button-danger" type="submit">End shift</button></form>
+  </section>
+</div>
+
+{% if report %}
+<section class="card v3-admin-card v3-accent-green">
+  <div class="v3-admin-card-head"><h2>Latest generated report</h2><span class="v3-admin-card-tag v3-tag-on">Generated {{ report.generated_at }}</span></div>
+  <div class="v3-ops-actions">
+    <a class="button button-blue" href="/v3/report/{{ report.id }}?shift_id={{ shift.id }}">Open report &amp; Outlook options</a>
+    <a class="button button-outline" href="/report/{{ report.id }}/docx">Word</a>
+    <a class="button button-outline" href="/report/{{ report.id }}/pdf">PDF</a>
+  </div>
+</section>
+{% endif %}
+
+</main>
+</div></div>
+</body></html>

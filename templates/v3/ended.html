@@ -1,0 +1,17 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>IND3 &middot; Shift Closed</title><link rel="stylesheet" href="/static/v3.css"><link rel="stylesheet" href="/static/v3_design2.css"></head><body>
+<div class="shell design2-shell">
+{% include 'v3/_sidebar.html' %}
+<div class="viewport">
+<main class="d2-dashboard v3-end-page" id="main-content">
+<section class="card v3-end-hero">
+  <div class="v3-end-check">&#10003;</div>
+  <h1>Shift Closed</h1>
+  <p>{{ shift.shift_type }} &middot; {{ shift.date }} &middot; {{ shift.lead_name }} &mdash; the shift is closed and the report is retained in shift history.</p>
+  <div class="v3-ops-actions">
+    {% if report %}<a class="button button-blue" href="/v3/report/{{ report.id }}">View final report</a>{% endif %}
+    <a class="button button-outline" href="/v3/login">Return to shift login</a>
+  </div>
+</section>
+</main>
+</div></div>
+</body></html>

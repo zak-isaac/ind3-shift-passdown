@@ -193,6 +193,23 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
 .v3-webhook-actions { display: flex; gap: 10px; }
 @media(max-width: 830px) { .v3-admin-kpis { grid-template-columns: 1fr 1fr; } .v3-form-grid { grid-template-columns: 1fr; } }
 
+/* ── Operations / Report / Ended ── */
+.v3-admin-notice.v3-notice-warn { background: #fef3db; color: #8a6400; border: 1px solid #f3dca3; }
+.v3-ops-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px; }
+.v3-ops-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+@media(max-width: 760px) { .v3-ops-grid { grid-template-columns: 1fr; } }
+
+.v3-end-page { max-width: 1020px; margin: 0 auto; }
+.v3-end-hero { text-align: center; padding: 44px 30px; }
+.v3-end-check { width: 62px; height: 62px; border-radius: 50%; background: #def5e6; color: #0c7739; display: grid; place-items: center; font-size: 30px; font-weight: 900; margin: 0 auto 18px; }
+.v3-end-hero h1 { font-size: 26px; margin: 0 0 6px; color: #112548; }
+.v3-end-hero p { color: #667891; margin: 0 0 24px; }
+.v3-end-hero .v3-ops-actions { justify-content: center; }
+
+.v3-report-text { white-space: pre-wrap; line-height: 1.7; font-size: 13px; color: #253b5b; background: #f8fafd; border: 1px solid #e9eef5; border-radius: 10px; padding: 18px 20px; max-height: 60vh; overflow: auto; }
+.v3-back-link { display: inline-block; margin-bottom: 14px; color: #0053e2; font-weight: 700; font-size: 12px; }
+
+
 /* ── Shift happenings table — pro polish pass ── */
 .d2-happenings { border-top: 3px solid #0053e2; }
 .d2-wo-table thead th { position: sticky; top: 0; z-index: 1; }

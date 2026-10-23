@@ -1,0 +1,28 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>IND3 &middot; Generated Passdown</title><link rel="stylesheet" href="/static/v3.css"><link rel="stylesheet" href="/static/v3_design2.css"></head><body>
+<div class="shell design2-shell">
+{% set active_page = 'workspace' %}
+{% include 'v3/_sidebar.html' %}
+<div class="viewport">
+<main class="d2-dashboard" id="main-content">
+<a class="v3-back-link" href="/v3/operations?shift_id={{ shift.id }}">&larr; Back to report tools</a>
+<div class="d2-page-intro"><div><p class="eyebrow">GENERATED PASSDOWN</p><h1>{{ shift.shift_type }} &middot; {{ shift.date }}</h1><p>Shift owner: {{ shift.lead_name }}</p></div></div>
+
+<section class="card v3-admin-card v3-accent-blue">
+  <div class="v3-admin-card-head"><h2>Export &amp; Compose</h2></div>
+  <div class="v3-ops-actions">
+    <a class="button button-blue" href="/report/{{ report.id }}/compose-outlook">Open &amp; Compose in Outlook (.eml)</a>
+    <a class="button button-outline" href="/report/{{ report.id }}/docx">Download Word</a>
+    <a class="button button-outline" href="/report/{{ report.id }}/pdf">Download PDF</a>
+    <a class="button button-outline" href="/report/{{ report.id }}/download">Download text</a>
+  </div>
+  <p class="v3-admin-card-sub" style="margin-top:14px">Review recipients and content in Outlook before sending. Composing does not automatically send an email.</p>
+</section>
+
+<section class="card v3-admin-card v3-accent-green">
+  <div class="v3-admin-card-head"><h2>Report content</h2></div>
+  <div class="v3-report-text">{{ report.content }}</div>
+</section>
+
+</main>
+</div></div>
+</body></html>
