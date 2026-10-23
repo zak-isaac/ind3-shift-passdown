@@ -63,10 +63,15 @@ def test_export_requires_owner_or_verified_master(monkeypatch):
 def test_actual_main_registers_only_v3_and_exports():
     import main
     paths={getattr(route,"path","") for route in main.app.router.routes}
-    print("MAIN V3-ONLY ROUTES:", sorted(paths))
-    assert "/" in paths and "/v3" in paths and "/v3/login" in paths, sorted(paths)
+    assert "/" in paths
     assert "/v2-home" not in paths
     assert "/lead" not in paths
     assert "/tech" not in paths
     assert "/lead/generate" not in paths
     assert "/report/{report_id}/compose-outlook" in paths
+    # FastAPI 0.161 uses _IncludedRouter rather than flat route entries.
+    assert any(type(route).__name__=="_IncludedRouter" for route in main.app.router.routes)
+    client=TestClient(main.app)
+    assert client.get("/",follow_redirects=False).headers["location"]=="/v3"
+    assert client.get("/v3/login").status_code==200
+    assert client.post("/lead/generate").status_code==410
