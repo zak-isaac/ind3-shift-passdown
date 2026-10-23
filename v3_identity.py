@@ -1,5 +1,21 @@
 """Signed V3 shift-binding; associate number is identification, NOT proof of identity.
 A corporate identity provider should replace this when deployed beyond trusted workstations.
+
+NOTE on master/manager access: the personal-GitHub operational branch this
+file was partly ported from gates the "8972" manager profile (and a personal
+override) behind a signed `elevated` flag plus IND3_V3_MASTER_CODE /
+IND3_V3_PERSONAL_MASTER_ASSOC / IND3_V3_PERSONAL_MASTER_SECRET environment
+variables (see that branch's docs/V3_OPERATIONAL_PATCH_DEPLOYMENT.md). That
+is the *right* long-term design, but nothing in this app's actual login flow
+(v3_login_submit / /master/verify in v3_routes.py) sets elevated=True, and
+those env vars were never configured here -- porting just the gate without
+the rest silently locked EVERY manager/master login out, including Isaac's
+existing 2759 master code (see main.py's _MASTER_CODES, which already does
+the real gating at the point of entry). Reverted to the simple pre-port
+behavior below until the full env-var-backed hardening is deliberately
+rolled out with real secrets and Walmart IT sign-off -- not something to
+half-wire. `elevated` stays in sign()'s cookie payload as inert plumbing
+(harmless, 4-part cookies decode fine) for whenever that day comes.
 """
 from __future__ import annotations
 import base64, hashlib, hmac, os, secrets, time
@@ -22,17 +38,10 @@ def read(request, roster):
         elevated=parts[3]=="1" if len(parts)==4 else False
         if not (0 <= time.time()-int(issued) < 12*3600): return None
         person=roster.get(assoc)
-        # 8972 / synthetic manager must not become an associate-number sign-in
-        # unless this session was verified + elevated via the master-code flow.
+        # 8972 / synthetic manager (and any master-code holder main.py already
+        # mapped to that profile via _is_master_credential before this cookie
+        # was ever issued) is vetted upstream at login -- see module docstring.
         if not person: return None
-        if person.get("is_manager"):
-            if assoc!="8972" or not elevated or not os.environ.get("IND3_V3_MASTER_CODE"):
-                return None
-        if elevated and not person.get("is_manager"):
-            allowed=os.environ.get("IND3_V3_PERSONAL_MASTER_ASSOC","").strip()
-            if not allowed or assoc!=allowed or not os.environ.get("IND3_V3_PERSONAL_MASTER_SECRET"):
-                return None
-            person={**person,"is_manager":True}
         return {"associate":assoc,"shift_id":int(sid),"profile":person,"elevated":elevated}
     except (ValueError,TypeError,KeyError,UnicodeDecodeError): return None
 
