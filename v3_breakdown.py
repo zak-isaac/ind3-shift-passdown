@@ -60,13 +60,22 @@ def sync(db, rows, selected, shift_id):
     """
     ensure_tables(db)
     priority={"in process":1,"completed":2,"closed":3}
+    # Real Cetaris exports at this facility don't use a literal "Completed"
+    # status for breakdown WOs -- a tech finishing the repair puts it at
+    # "Manager Review Required" (pending admin sign-off/closure), which is
+    # exactly the "tech says done, needs an RTS/keep-OOS call" moment this
+    # module's `completed` bucket exists for. Alias known real-world
+    # synonyms onto the canonical three states so pending()/decide() (which
+    # key off the literal string "completed") keep working unchanged.
+    status_aliases={"manager review required":"completed"}
     selected_wos={}
     with db._conn() as c:
         tracked={r[0] for r in c.execute("SELECT wo_number FROM v3_breakdown_state")}
     for r in rows:
         if r.get("rfr","").strip().casefold()!="breakdown": continue
         wo=str(r.get("wo_number","")).strip()
-        status=str(r.get("status","")).strip().casefold()
+        raw_status=str(r.get("status","")).strip().casefold()
+        status=status_aliases.get(raw_status,raw_status)
         asset=str(r.get("asset_id","")).strip()
         if not wo or not asset or status not in priority: continue
         if r.get("tech_name") not in selected and wo not in tracked: continue
