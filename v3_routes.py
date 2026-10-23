@@ -17,6 +17,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 import db
+import v3_breakdown
 from v3_cetaris import parse_excel, select_records, technician_counts, MAX_SIZE
 
 
@@ -299,6 +300,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             if not shift or not shift.get("is_active"): raise HTTPException(404,"No active shift")
             if not can_manage_shift(request,shift["id"]): raise HTTPException(403,"You do not own this shift")
         ensure_tables()
+        v3_breakdown.ensure_tables(db)
         return shift
 
     def model(shift_id):
@@ -339,6 +341,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             "selected_techs": json.loads(selection["technicians_json"]) if selection else [],
             "imported_filename": selection["filename"] if selection else "",
             "imported_at": selection["imported_at"] if selection else "",
+            "pending_breakdowns": v3_breakdown.pending(db),
         }
 
     def _remarks(e):
@@ -374,6 +377,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         unit=unit.strip().upper()
         if not unit or len(unit)>80: raise HTTPException(400,"Asset ID must be 1-80 characters")
         db.add_oos_unit(unit)
+        v3_breakdown.hold(db,unit,True)
         return return_workspace(shift_id,"Asset marked out of service")
 
     @router.post("/oos/rts")
@@ -386,6 +390,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             c.execute("INSERT INTO rts_log (shift_id,unit,removed_at) VALUES (?,?,?)",
                       (shift_id,unit,datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")))
             c.execute("DELETE FROM oos_units WHERE unit=?",(unit,))
+        v3_breakdown.hold(db,unit,False)
         return return_workspace(shift_id,"Asset returned to service")
 
     @router.post("/rts/undo")
@@ -394,6 +399,20 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         if unit not in db.get_rts_events(shift_id): raise HTTPException(404,"RTS record not found")
         db.delete_rts_event(shift_id,unit)
         return return_workspace(shift_id,"RTS log entry removed")
+
+    @router.post("/breakdown/confirm")
+    async def confirm_breakdown_rts(request:Request,shift_id:int=Form(...)):
+        secure(request,shift_id)
+        submitted=await request.form()
+        allowed={r["wo_number"] for r in v3_breakdown.pending(db)}
+        decisions={}
+        for key,value in submitted.multi_items():
+            if key.startswith("decision_"):
+                wo=key[len("decision_"):]
+                if wo in allowed and value in ("rts","keep_oos"):
+                    decisions[wo]=value
+        v3_breakdown.decide(db,shift_id,decisions)
+        return return_workspace(shift_id,"Breakdown RTS decisions saved")
 
     @router.post("/vendor/add")
     async def v3_vendor_add(request:Request,shift_id:int=Form(...),name:str=Form(...),notes:str=Form("")):
@@ -668,6 +687,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         if not window:
             return render(request,shift,warning="Shift timing is not configured. Import cannot continue.")
         records,stats=select_records(rows,selected,*window)
+        v3_breakdown.sync(db,rows,selected,shift_id)
         added,unchanged,pending=0,0,0
         # Use short transactions. Existing db helpers open their own connections;
         # nesting them inside an active SQLite write transaction risks 'database locked'.
