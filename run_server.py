@@ -1,5 +1,5 @@
 """
-IND3 Passdown Server launcher.
+IND3 V3-only Shift Passdown Server launcher.
 
 Why this exists: `uvicorn main:app` on its own uses uvicorn's default
 logging config, which omits timestamps from access-log lines

@@ -181,3 +181,28 @@ def test_unfamiliar_rfr_imports_and_reopened_wo_is_excluded(app_client):
     third=send([base])
     assert third.status_code==200
     assert db.get_entry(imported['id'])['excluded']==0
+
+
+def test_cumulative_reimport_keeps_work_orders_absent_from_later_file(app_client):
+    """A new daily export must not silently remove older completed WOs or PMs."""
+    import json, uuid
+    client,sid=app_client
+    client.get('/v3')
+    base={"tech_name":"Tech A","asset_id":"M1","status":"Closed",
+          "reported_issue":"Reported issue","cause":"WRONG COLUMN",
+          "remarks":"Fixed","start_at":"2020-01-01T10:00:00"}
+    def confirm(rows):
+        token=uuid.uuid4().hex
+        with db._conn() as c:
+            c.execute('INSERT INTO v3_import_batches(token,shift_id,filename,created_at,rows_json) VALUES (?,?,?,?,?)',
+                      (token,sid,'test.xlsx',datetime.now().isoformat(timespec='seconds'),json.dumps(rows)))
+        response=client.post(f'/v3/import/{token}/confirm',data={'shift_id':sid,'techs':['Tech A']},follow_redirects=False)
+        assert response.status_code==303,response.text
+    confirm([{**base,'wo_number':'100','rfr':'Proactive Repair'},
+             {**base,'wo_number':'200','rfr':'Preventive Maintenance'}])
+    assert db.get_pm_count(sid)==1
+    assert any(e['wo_number']=='100' and not e['excluded'] for e in db.get_entries(sid))
+    confirm([{**base,'wo_number':'300','rfr':'Work Request'}])
+    assert db.get_pm_count(sid)==1
+    active={e['wo_number'] for e in db.get_entries(sid) if not e['excluded']}
+    assert active=={'100','300'}

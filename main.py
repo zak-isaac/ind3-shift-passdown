@@ -241,43 +241,30 @@ def _find_end_shift_grace_shift(entered: str):
     return None
 
 
+def _v3_authenticated(request: Request):
+    """Only a valid, signed V3 session authorizes operational work."""
+    from v3_identity import read
+    return read(request, _ROSTER)
+
+
 def _is_lead_authed(request: Request) -> bool:
-    # V3 associates reuse the exact V2 handlers. Validate the signed session
-    # before granting access, even if the legacy V2 cookie was also set.
-    from v3_identity import COOKIE, read
-    if COOKIE in request.cookies:
-        return read(request, _ROSTER) is not None
-    return request.cookies.get(_LEAD_COOKIE) == _get_pin_hash()
+    return _v3_authenticated(request) is not None
 
 
 def _get_lead_shift_id(request: Request) -> int:
-    """Return the shift_id this MST session was bound to, or 0 if manager/unknown."""
-    try:
-        return int(request.cookies.get(_LEAD_SHIFT_COOKIE, "0"))
-    except (ValueError, TypeError):
-        return 0
+    session = _v3_authenticated(request)
+    return int(session["shift_id"]) if session else 0
 
 
 def _can_manage_shift(request: Request, shift_id: int) -> bool:
-    """True if this session is allowed to view/mutate the given shift.
-    Master credential (_MASTER_CODES) bypasses the check entirely. A regular
-    MST session may ONLY manage the exact shift it's bound to -- an unbound
-    session (bound == 0, e.g. an old cookie from before binding existed, or
-    a login that couldn't tell which of several active shifts was theirs)
-    is fail-closed: it can't touch ANY specific shift until it picks one
-    explicitly (see lead_page()'s shift-resolution logic). This is what
-    stops an S5 MST from opening an S4 shift, or any other shift that isn't
-    theirs, just by guessing a shift_id.
-    """
-    from v3_identity import COOKIE, read, owns
-    if COOKIE in request.cookies:
-        signed=read(request,_ROSTER)
-        sh=db.get_shift(shift_id)
-        return bool(signed and signed["shift_id"]==shift_id and owns(sh,signed))
-    if _is_manager_authed(request):
-        return True
-    bound = _get_lead_shift_id(request)
-    return bound != 0 and bound == shift_id
+    """Do not accept V2 cookies, PINs, or guessed shift IDs."""
+    from v3_identity import owns
+    session = _v3_authenticated(request)
+    shift = db.get_shift(shift_id)
+    return bool(
+        session and session["shift_id"] == shift_id
+        and owns(shift, session)
+    )
 
 
 def _require_shift_access(request: Request, shift_id: int) -> None:
@@ -310,10 +297,9 @@ def _resolve_my_shift(request: Request) -> dict | None:
 
 
 def _is_manager_authed(request: Request) -> bool:
-    """True only when the session was opened with a master credential."""
-    from v3_identity import COOKIE
-    if COOKIE in request.cookies: return False
-    return request.cookies.get(_MGR_COOKIE) == _MGR_TOKEN
+    session = _v3_authenticated(request)
+    return bool(session and session["profile"].get("is_manager"))
+
 
 def _lead_redirect(dest: str = "/lead"):
     return RedirectResponse(f"/lead/login?next={dest}", status_code=303)
@@ -3492,10 +3478,10 @@ async def download_report(report_id: int):
         headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
 
-# ── Parallel MST-only V3 workspace ───────────────────────────────────────────
-# V2 remains untouched; V3 reuses its authorization and shift-window policies.
+# ── V3-only MST workspace ─────────────────────────────────────────────────────
+# Legacy handlers remain internal for the V3 report/export engine only.
 from v3_routes import create_v3_router
-app.include_router(create_v3_router(
+_v3_router = create_v3_router(
     templates=templates,
     is_lead_authed=_is_lead_authed,
     can_manage_shift=_can_manage_shift,
@@ -3510,4 +3496,9 @@ app.include_router(create_v3_router(
     get_v2_cookie_value=_get_pin_hash,
     legacy_lead_page=lead_page,
     generate_report=lead_generate,
-))
+)
+app.include_router(_v3_router)
+
+# Retire V2 routes before serving; preserve only V3 and protected exports.
+from v3_only import enable_v3_only
+enable_v3_only(app, roster_provider=lambda: _ROSTER)
