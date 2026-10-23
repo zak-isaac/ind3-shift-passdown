@@ -2536,7 +2536,7 @@ async def _build_eml_response(report_id: int, subject: str, html_body: str) -> R
         shift_label = f"{d.shift_type}-{d.date}-"
     filename = f"passdown-{shift_label}{report_id}.eml"
     return Response(
-        content=eml.encode("utf-8"),
+        content=_sigs.embed_spark_in_eml(eml.encode("utf-8")),
         media_type="message/rfc822",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
@@ -3406,7 +3406,7 @@ def _build_eml(subject: str, to_addrs: str, html_body: str) -> bytes:
         "",
         wrapped,
     ]
-    return "\r\n".join(lines).encode("utf-8")
+    return _sigs.embed_spark_in_eml("\r\n".join(lines).encode("utf-8"))
 
 
 @app.get("/report/{report_id}/eml")
