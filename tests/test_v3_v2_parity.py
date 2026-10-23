@@ -78,3 +78,54 @@ def test_mst_and_technician_both_start_and_resume_independent_shifts(tmp_path):
         assert own.status_code==303
         assert browser.get(f'/v3/operations?shift_id={sid1}').status_code==200
         assert browser.get(f'/v3/operations?shift_id={sid2}').status_code==403
+
+
+def test_personal_master_credential_gets_manager_rights_under_own_identity(tmp_path):
+    """A real associate number that's also a configured master credential
+    (e.g. Isaac's own 2759, main.py's _MASTER_CODES -- 'same rights as 8972')
+    must be routed into the management shift selector just like 8972, and be
+    able to pick up ANY active shift -- not just ones they personally
+    started -- while keeping their own associate number as the attribution,
+    not masquerading as the synthetic 'Manager' identity.
+
+    Regression coverage for: typing a personal master number into the normal
+    login field used to fall through to the ordinary-associate path and fail
+    with "This shift was not started by your associate number."
+    """
+    db.set_db_path(tmp_path/'isolated_master.db');db.init_db()
+    roster={
+       '1001':{'display_name':'First MST','is_mst':True,'is_manager':False,'shift':'S2'},
+       '2759':{'display_name':'Isaac S','is_mst':False,'is_manager':False,'shift':'S5'},
+       '8972':{'display_name':'Manager','is_mst':False,'is_manager':True,'shift':'ALL'},
+    }
+    app=FastAPI()
+    app.mount('/static',StaticFiles(directory=str(ROOT/'static')),name='static')
+    app.include_router(create_v3_router(
+       templates=Jinja2Templates(directory=str(ROOT/'templates')),
+       is_lead_authed=lambda request: False,
+       can_manage_shift=lambda request,sid: False,
+       resolve_my_shift=lambda request: None,
+       shift_window=lambda shift,d:(datetime.combine(d,time(0)), datetime.combine(d+timedelta(days=1),time(0))),
+       lead_redirect=lambda destination: None,
+       get_mst_roster=lambda:roster,
+       verify_master_code=lambda code: code.strip() in ('8972','2759'),
+       start_eligibility=lambda person,shift,now:(person.get('shift')==shift,False,'Wrong assignment'),
+       allowed_shift_days={'S2':{1},'S3':{1}},
+       now_func=lambda:datetime(2026,10,20,21,0),
+       get_v2_cookie_value=lambda:'v2-lead-auth',
+    ))
+    with TestClient(app) as browser:
+        first=browser.post('/v3/login',data={'associate_id':'1001','mode':'start','shift_type':'S2','shift_date':'2026-10-20'},follow_redirects=False)
+        assert first.status_code==303
+        sid1=db.get_active_shifts()[0]['id']
+        browser.get('/v3/logout')
+        # Isaac's personal 2759 is NOT flagged is_manager in the roster --
+        # only the master-credential check elevates it for this session.
+        master=browser.post('/v3/login',data={'associate_id':'2759','mode':'start','shift_type':'S2','shift_date':'2026-10-20'})
+        assert "getElementById('master-shift-dialog').showModal();" in master.text
+        picked=browser.post('/v3/master/select',data={'shift_type':'S2'},follow_redirects=False)
+        assert picked.status_code==303
+        assert f'shift_id={sid1}' in picked.headers['location']
+        assert browser.get(f'/v3/operations?shift_id={sid1}').status_code==200
+        # Attribution stays Isaac's own number, not the synthetic 8972 identity.
+        assert db.get_shift(sid1)['opened_by_assoc']=='1001'

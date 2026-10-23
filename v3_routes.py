@@ -49,8 +49,8 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         who=decode_session(request)
         return [shift for shift in db.get_active_shifts() if shift_owned_by(shift,who)]
 
-    def set_session_cookies(response, who, sid):
-        response.set_cookie(v3_cookie, signed_session(who["associate"],sid), max_age=12*3600,
+    def set_session_cookies(response, who, sid, elevated=False):
+        response.set_cookie(v3_cookie, signed_session(who["associate"],sid,elevated=elevated), max_age=12*3600,
                             httponly=True, samesite="strict", path="/", secure=False)
         # Legacy controls remain usable with the SAME shift bound to V2.
         if get_v2_cookie_value:
@@ -120,12 +120,18 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         if not profile:
             return entry_page(request,"Associate number not found in the current roster.")
         # The existing test manager uses the same associate-number field.
-        # This does not grant access to any other manager profile.
+        # This does not grant access to any other manager profile -- except a
+        # personal master credential (main.py's _MASTER_CODES, e.g. Isaac's
+        # own 2759), which gets the same manager-equivalent rights as the
+        # shared 8972 profile, attributed to the real associate number
+        # instead of masquerading as the synthetic "Manager" identity.
+        if not profile.get("is_manager") and _verify_master(associate):
+            profile={**profile,"is_manager":True}
         if profile.get("is_manager"):
             if not _verify_master(associate):
                 return entry_page(request,"This management profile cannot use the test shift selector.")
             response = entry_page(request, master_verified=True)
-            set_session_cookies(response, {"associate":associate,"profile":profile}, 0)
+            set_session_cookies(response, {"associate":associate,"profile":profile}, 0, elevated=True)
             return response
         who={"associate":associate,"profile":profile}
         owned=[sh for sh in _v3_live_shifts() if shift_owned_by(sh,who)]
@@ -178,7 +184,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         except ValueError:
             return entry_page(request,"The active-shift limit was reached. Try again.")
         response=RedirectResponse(f"/v3?shift_id={sid}",status_code=303)
-        set_session_cookies(response,who,sid)
+        set_session_cookies(response,who,sid,elevated=who.get("elevated",False))
         return response
 
     @router.post("/master/verify", response_class=HTMLResponse)
@@ -193,7 +199,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         if not profile or not profile.get("is_manager"):
             return entry_page(request, "Manager test profile is missing.")
         response = entry_page(request, master_verified=True)
-        set_session_cookies(response, {"associate":"8972","profile":profile}, 0)
+        set_session_cookies(response, {"associate":"8972","profile":profile}, 0, elevated=True)
         return response
 
     @router.post("/master/select")
@@ -217,7 +223,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         else:
             sid=chosen["id"]
         response=RedirectResponse(f"/v3?shift_id={sid}",status_code=303)
-        set_session_cookies(response,who,sid)
+        set_session_cookies(response,who,sid,elevated=who.get("elevated",False))
         return response
 
     @router.get("/logout")

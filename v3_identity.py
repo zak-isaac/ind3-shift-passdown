@@ -1,21 +1,23 @@
 """Signed V3 shift-binding; associate number is identification, NOT proof of identity.
 A corporate identity provider should replace this when deployed beyond trusted workstations.
 
-NOTE on master/manager access: the personal-GitHub operational branch this
-file was partly ported from gates the "8972" manager profile (and a personal
-override) behind a signed `elevated` flag plus IND3_V3_MASTER_CODE /
-IND3_V3_PERSONAL_MASTER_ASSOC / IND3_V3_PERSONAL_MASTER_SECRET environment
-variables (see that branch's docs/V3_OPERATIONAL_PATCH_DEPLOYMENT.md). That
-is the *right* long-term design, but nothing in this app's actual login flow
-(v3_login_submit / /master/verify in v3_routes.py) sets elevated=True, and
-those env vars were never configured here -- porting just the gate without
-the rest silently locked EVERY manager/master login out, including Isaac's
-existing 2759 master code (see main.py's _MASTER_CODES, which already does
-the real gating at the point of entry). Reverted to the simple pre-port
-behavior below until the full env-var-backed hardening is deliberately
-rolled out with real secrets and Walmart IT sign-off -- not something to
-half-wire. `elevated` stays in sign()'s cookie payload as inert plumbing
-(harmless, 4-part cookies decode fine) for whenever that day comes.
+The `elevated` bit carried in the signed cookie is how a personal master
+credential (a real associate number that's also configured as a master code
+in main.py's _MASTER_CODES, e.g. Isaac's own 2759) stays recognized as
+manager-equivalent on every subsequent request, not just the login response.
+It is only ever set server-side in v3_routes.py AFTER
+_verify_master()/_is_master_credential() already approved the associate
+number -- the HMAC signature on this cookie is the real trust boundary, so
+re-deriving is_manager from it on read is safe: a client cannot forge
+elevated=1 without the server's signing secret.
+
+NOTE: an earlier version of this file additionally gated manager access
+behind unsigned IND3_V3_MASTER_CODE / IND3_V3_PERSONAL_MASTER_ASSOC
+environment variables, ported from a GitHub operational branch built for a
+login flow that doesn't exist here. Nothing in this app's actual login route
+ever configured those env vars, so it silently locked out every
+manager/master login (see git history, 2026-10-23). Removed -- the signed
+elevated flag is sufficient on its own.
 """
 from __future__ import annotations
 import base64, hashlib, hmac, os, secrets, time
@@ -38,10 +40,14 @@ def read(request, roster):
         elevated=parts[3]=="1" if len(parts)==4 else False
         if not (0 <= time.time()-int(issued) < 12*3600): return None
         person=roster.get(assoc)
-        # 8972 / synthetic manager (and any master-code holder main.py already
-        # mapped to that profile via _is_master_credential before this cookie
-        # was ever issued) is vetted upstream at login -- see module docstring.
         if not person: return None
+        # A signed elevated=1 bit means v3_routes.py already ran
+        # _verify_master()/_is_master_credential() on this associate number
+        # before issuing the cookie -- safe to grant manager-equivalent
+        # rights here even if the roster itself doesn't flag them a manager
+        # (e.g. a personal master credential like Isaac's own 2759).
+        if elevated and not person.get("is_manager"):
+            person={**person,"is_manager":True}
         return {"associate":assoc,"shift_id":int(sid),"profile":person,"elevated":elevated}
     except (ValueError,TypeError,KeyError,UnicodeDecodeError): return None
 
