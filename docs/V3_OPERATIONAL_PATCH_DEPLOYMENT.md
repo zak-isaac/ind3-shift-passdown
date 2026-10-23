@@ -2,6 +2,17 @@
 
 This branch contains **application source code changes**, not merely a specification. It is a **draft pull request** and must NOT replace the workshop production application until local Code Puppy changes are reconciled and all acceptance checks pass.
 
+## V3-only startup and retired V2
+
+The standard `python run_server.py` startup now exposes **V3 only**:
+- `http://<approved-workshop-host>:8765/` redirects to `/v3`; unauthenticated MSTs see `/v3/login`
+- V2 home, lead, tech, admin, shift mutation and other legacy routes are unregistered, not just hidden
+- Existing `/report/{id}/compose-outlook`, PDF, Word, EML and text exports remain available **only to authorized V3 sessions**
+- V3 login issues only the signed V3 cookie and clears stale V2 cookies
+- The existing database, reporting engine and exporters remain in place; no V2 screens are exposed
+
+This is a **route retirement**, not destructive removal of the historical source or stored shifts. Do not delete the V2 database or the shared report-generation code.
+
 ## Changes in this branch
 - Cetaris: no Start Date eligibility filtering for normal shifts; WO Closed Date/Time parsed; Completed Breakdown becomes a happening; In Process Breakdown enters WO-specific OOS tracking; PM counted only when Preventive Maintenance + Closed.
 - Drax: shift-assigned technicians prechecked on the existing selection dialog; other staff optional.
