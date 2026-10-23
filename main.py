@@ -3497,9 +3497,7 @@ _v3_router = create_v3_router(
     legacy_lead_page=lead_page,
     generate_report=lead_generate,
 )
-print('[v3-only] router defined paths:', [r.path for r in _v3_router.routes], flush=True)
 app.include_router(_v3_router)
-print('[v3-only] included paths:', [r.path for r in app.router.routes if '/v3' in r.path], flush=True)
 
 # Retire V2 routes before serving; preserve only V3 and protected exports.
 from v3_only import enable_v3_only
