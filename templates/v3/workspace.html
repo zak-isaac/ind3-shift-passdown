@@ -29,13 +29,19 @@
    <div class="card d2-kpi"><div><small>Completed PMs</small><strong>{{ pm_count }}</strong><span>Unique closed PM WOs</span></div></div>
  </section>
 
- <div class="d2-import-summary card" role="status">
+ <div class="d2-import-summary card {{ 'd2-import-pending' if staged else '' }}" role="status">
+  {% if staged %}
+  <div><strong>New file uploaded &mdash; select technicians to finish</strong>
+  <span>{{ staged.filename }} is waiting for you to confirm technicians below before it's used. Nothing from it is in your report yet.</span></div>
+  <div class="d2-import-summary-actions"><button type="button" class="button button-blue" onclick="document.getElementById('v3-tech-dialog')?.showModal()">Select technicians now</button></div>
+  {% else %}
   <div><strong>{{ 'Cetaris report ready' if imported_filename else 'Awaiting Cetaris file' }}</strong>
-  <span>{{ imported_filename if imported_filename else 'Import a .xlsx report to populate Shift Happenings.' }}</span></div>
+  <span>{{ (imported_filename + (' \u2014 imported ' + imported_at if imported_at else '')) if imported_filename else 'Import a .xlsx report to populate Shift Happenings.' }}</span></div>
   <div class="d2-import-summary-actions">
    <button type="button" class="button button-outline" onclick="v3OpenImport()">{{ 'Replace file' if imported_filename else 'Choose Excel file' }}</button>
    {% if imported_filename %}<a class="button button-outline" href="/v3/technicians?shift_id={{ shift.id }}">Change technicians</a>{% endif %}
   </div>
+  {% endif %}
  </div>
 
  <dialog class="d2-dialog" id="v3-import-dialog" aria-labelledby="v3-import-title">

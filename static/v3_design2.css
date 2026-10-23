@@ -48,6 +48,8 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
 .d2-shift-kpi strong { font-size: 15px; }
 .d2-kpi span:last-child { font-size: 11px; }
 .d2-import-summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 17px; margin-bottom: 16px; }
+.d2-import-summary.d2-import-pending { border: 1px solid #f0b429; background: #fffaf0; }
+.d2-import-summary.d2-import-pending strong { color: #92610c; }
 .d2-import-summary strong { font-size: 13px; color: #1d3558; display: block; }
 .d2-import-summary span { display: block; color:#5c6e88; font-size: 12px; margin-top: 3px; }
 .d2-import-summary-actions { display: flex; gap: 8px; flex-wrap: wrap; }
