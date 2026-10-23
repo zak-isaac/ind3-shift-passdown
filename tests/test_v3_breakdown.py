@@ -58,3 +58,29 @@ def test_unrecognized_status_is_ignored_not_crashed(tmp_path):
     updated = v3_breakdown.sync(db, rows, {"Tech A"}, shift_id=1)
     assert updated == 0
     assert v3_breakdown.pending(db) == []
+
+
+def test_wo_closed_on_first_sighting_still_logs_rts(tmp_path):
+    """A breakdown WO whose entire lifecycle (In Process -> Closed) happens
+    within a single Cetaris export shows up Closed the FIRST time this
+    tracker ever sees it -- it was never separately added to oos_units, but
+    it's still a real 'equipment is back up' event the next shift needs to
+    see. Regression coverage for: CR0009/DD0247 closed breakdowns that never
+    appeared in Returned to Service, 2026-10-23."""
+    db.set_db_path(tmp_path / "breakdown5.db")
+    db.init_db()
+    rows = [_row("28025965", "Tech A", "CR0009", "Closed")]
+    v3_breakdown.sync(db, rows, {"Tech A"}, shift_id=42)
+    events = db.get_rts_events(42)
+    assert "CR0009" in events
+
+
+def test_rts_is_not_double_logged_on_reimport(tmp_path):
+    db.set_db_path(tmp_path / "breakdown6.db")
+    db.init_db()
+    rows = [_row("600", "Tech A", "M5", "Closed")]
+    v3_breakdown.sync(db, rows, {"Tech A"}, shift_id=1)
+    v3_breakdown.sync(db, rows, {"Tech A"}, shift_id=1)
+    with db._conn() as c:
+        count = c.execute("SELECT COUNT(*) FROM rts_log WHERE unit=?", ("M5",)).fetchone()[0]
+    assert count == 1

@@ -42,15 +42,20 @@ def _maybe_rts(db, c, wo, asset, shift_id):
         return False
     state=c.execute("SELECT rts_logged FROM v3_breakdown_state WHERE wo_number=?", (wo,)).fetchone()
     if not state or state[0]: return False
-    # Only create RTS event if the unit is currently OOS; avoid fabricating
-    # returns-to-service for old WOs that were never tracked as OOS.
+    # A resolving breakdown is a real RTS event worth reporting even if the
+    # asset was never separately in oos_units -- e.g. a WO whose entire
+    # lifecycle (In Process -> Closed) happened within a single Cetaris
+    # export, so the FIRST time this tracker ever saw it, it was already
+    # Closed. The next shift still needs to know "this equipment is back
+    # up" regardless of our own bookkeeping gaps. Only the oos_units cleanup
+    # is conditional on presence (deleting something absent is a no-op).
     present=c.execute("SELECT 1 FROM oos_units WHERE unit=?", (asset,)).fetchone()
     if present:
         c.execute("DELETE FROM oos_units WHERE unit=?", (asset,))
-        c.execute("INSERT INTO rts_log(shift_id,unit,removed_at) VALUES (?,?,?)",
-                  (shift_id,asset,datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")))
+    c.execute("INSERT INTO rts_log(shift_id,unit,removed_at) VALUES (?,?,?)",
+              (shift_id,asset,datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")))
     c.execute("UPDATE v3_breakdown_state SET rts_logged=1 WHERE wo_number=?", (wo,))
-    return bool(present)
+    return True
 
 def sync(db, rows, selected, shift_id):
     """Apply same-WO status updates. Unselected staff can update tracked WOs only.
