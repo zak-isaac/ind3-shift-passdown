@@ -14,7 +14,7 @@ REM set PASSDOWN_EMAIL_PASS=your-app-password
 REM set PASSDOWN_EMAIL_TO=supervisor@wal-mart.com
 
 set PYTHONUTF8=1
-echo Starting server on http://localhost:8765
+echo Starting server on http://localhost:8766
 echo Press Ctrl+C to stop.
 echo.
 

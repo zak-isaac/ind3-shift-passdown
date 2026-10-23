@@ -4,13 +4,13 @@ Captures real screenshots of the LIVE production app (read-only pages only --
 no forms are submitted, no data is created or modified) to build a training
 walkthrough for onboarding.
 
-Run with the server already up on localhost:8765.
+Run with the server already up on localhost:8766.
 """
 import re
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
-BASE = "http://localhost:8765"
+BASE = "http://localhost:8766"
 OUT = Path(__file__).resolve().parent / "docs" / "walkthrough" / "screenshots"
 OUT.mkdir(parents=True, exist_ok=True)
 

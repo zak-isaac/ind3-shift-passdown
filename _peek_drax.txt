@@ -1,0 +1,7 @@
+HEADERS: ('Name', 'Assoc. #', 'Default ID', 'Agency', 'Shift', 'Job Title')
+rows: 26
+{'Name': 'FLOR JIMENEZ CORIA', 'Assoc. #': 4968, 'Default ID': 'fdj000y', 'Agency': 'walmart', 'Shift': 'S1', 'Job Title': 'Technician'}
+{'Name': 'HARRY NUSBAUM', 'Assoc. #': 2019, 'Default ID': 'hjn0001', 'Agency': 'walmart', 'Shift': 'S1', 'Job Title': 'Technician'}
+{'Name': 'JACOB MASON', 'Assoc. #': 2336, 'Default ID': 'jam0063', 'Agency': 'walmart', 'Shift': 'S1', 'Job Title': 'Technician'}
+{'Name': 'LEN WARD', 'Assoc. #': 196, 'Default ID': 'ldw006f', 'Agency': 'walmart', 'Shift': 'S1', 'Job Title': 'Manager'}
+{'Name': 'MALCOLM BUTLER', 'Assoc. #': 2008, 'Default ID': 'mbutle1', 'Agency': 'walmart', 'Shift': 'S1', 'Job Title': 'Technician'}

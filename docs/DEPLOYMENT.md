@@ -13,7 +13,7 @@ account, not necessarily a developer.
   available
 - Outlook installed and configured for the account that will send passdown
   emails (COM automation reads the active Outlook profile — no password needed)
-- Port `8765` free on the machine
+- Port `8766` free on the machine
 
 ## First-Time Install
 
@@ -34,10 +34,10 @@ account, not necessarily a developer.
    Restarts   : every 1 min on crash (up to 99x)
    State now  : Running
    Access URLs:
-     This PC   : http://localhost:8765
-     Other PCs : http://<this-PC's-IP>:8765
+     This PC   : http://localhost:8766
+     Other PCs : http://<this-PC's-IP>:8766
    ```
-5. Open `http://localhost:8765` in a browser to confirm it loads.
+5. Open `http://localhost:8766` in a browser to confirm it loads.
 
 That's it. The task now survives reboots, hibernation, and user logoff —
 nobody needs to be logged into Windows for the server to run.
@@ -46,7 +46,7 @@ nobody needs to be logged into Windows for the server to run.
 
 ```powershell
 # Is something listening on the port?
-Get-NetTCPConnection -LocalPort 8765 -State Listen
+Get-NetTCPConnection -LocalPort 8766 -State Listen
 
 # What does the scheduled task think its state is?
 Get-ScheduledTask -TaskName IND3PassdownServer | Select-Object TaskName, State
@@ -58,7 +58,7 @@ Get-Content "C:\Users\ins0002\Documents\puppy_workspace\IND3-Passdown-Server\ser
 A healthy startup looks like this in the log:
 ```
 INFO:     Application startup complete.
-INFO:     Uvicorn running on http://0.0.0.0:8765 (Press CTRL+C to quit)
+INFO:     Uvicorn running on http://0.0.0.0:8766 (Press CTRL+C to quit)
 [ai_rewriter] Warming up '<model name>'...
 ```
 
@@ -66,13 +66,13 @@ INFO:     Uvicorn running on http://0.0.0.0:8765 (Press CTRL+C to quit)
 
 ### "Only one usage of each socket address" / server keeps crash-looping
 
-This means **something else already owns port 8765** — usually a leftover
+This means **something else already owns port 8766** — usually a leftover
 process from a previous install that was never cleaned up. The scheduled
 task will crash-loop every 5 seconds forever until the port is freed.
 
 **Diagnose:**
 ```powershell
-Get-NetTCPConnection -LocalPort 8765 -State Listen
+Get-NetTCPConnection -LocalPort 8766 -State Listen
 ```
 Note the PID it returns, then check how long it's been running:
 ```powershell
@@ -101,7 +101,7 @@ port is free and bind to it correctly. Confirm with the health check above.
 The Python process only reads code at startup. Editing `.py` files while the
 service is running does nothing until it restarts. After any code change:
 ```powershell
-Stop-Process -Id (Get-NetTCPConnection -LocalPort 8765 -State Listen).OwningProcess -Force
+Stop-Process -Id (Get-NetTCPConnection -LocalPort 8766 -State Listen).OwningProcess -Force
 ```
 Wait ~5-10 seconds for the scheduled task's auto-restart to pick it back up,
 then re-verify with the health check.

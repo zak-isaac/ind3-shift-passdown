@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>How Repair Causes Get Added to Shift Reports</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { background: #0f172a; }
+  .mermaid { background: white; border-radius: 1rem; padding: 2rem; }
+</style>
+</head>
+<body class="min-h-screen p-6 md:p-10">
+
+  <div class="max-w-6xl mx-auto">
+    <div class="mb-6">
+      <h1 class="text-2xl md:text-3xl font-black text-white">How Repair Causes Get Added to Shift Reports</h1>
+      <p class="text-slate-400 text-sm mt-1">
+        We get two files every shift: one with what the tech wrote, and one with what actually caused
+        the problem. This shows how those two get matched up and turned into one clean line in the report.
+      </p>
+    </div>
+
+    <div class="mermaid">
+flowchart TD
+    A["Tech or Lead uploads the file(s)<br/>can pick more than one at a time"] --> B{"Look at each file"}
+
+    B --> C{"Does this file list what<br/>caused each problem?<br/>(no tech notes in it)"}
+
+    C -- "Yes — this is the CAUSE file" --> D["Read each row:<br/>Work Order # + what caused it"]
+    D --> D1{"Was this just routine<br/>scheduled maintenance?"}
+    D1 -- "Yes" --> D2["Skip it —<br/>routine maintenance is only<br/>COUNTED, never listed"]
+    D1 -- "No" --> D3[("Save the cause note,<br/>tagged to its Work Order #")]
+
+    C -- "No — this is the TIMECARD file" --> E["Read each row:<br/>Asset, Work Order #,<br/>and what the tech wrote"]
+    E --> E1{"Was this just routine<br/>scheduled maintenance?"}
+    E1 -- "Yes" --> E2["Just add 1 to the<br/>'PMs completed' count"]
+    E1 -- "No" --> E3["Keep it:<br/>Asset name + tech's note"]
+    E3 --> F["Fix spelling, and combine<br/>notes if more than one<br/>tech worked the same job"]
+    F --> G[("Saved as a real<br/>shift happening")]
+
+    subgraph REPORT["When the shift report is built"]
+      G --> H["Group everything by<br/>Work Order #"]
+      D3 --> I["Pull in any saved<br/>cause notes for this shift"]
+      E2 --> K["Total up all the<br/>PMs completed"]
+      H --> J["Build one line per Work Order:<br/>Asset name, PLUS the cause<br/>if we found a match"]
+      I --> J
+      J --> L["Finished list of<br/>shift happenings"]
+      K --> L
+      L --> M["Full shift report"]
+    end
+
+    M --> N["Turned into the email /<br/>on-screen preview"]
+    N --> O["What everyone sees:<br/><b>Asset : What caused it : What the tech did (Work Order #12345).</b>"]
+
+    style D2 fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    style E2 fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    style D3 fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    style G fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    style O fill:#dcfce7,stroke:#16a34a,color:#14532d,font-weight:bold
+    style REPORT fill:#f8fafc,stroke:#94a3b8
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-4 mt-6">
+      <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+        <p class="text-red-400 font-bold text-sm mb-1">Routine maintenance never shows up as a "problem"</p>
+        <p class="text-slate-300 text-xs">We check for routine scheduled maintenance TWICE — once in the
+        timecard file and once in the cause file — so it can never accidentally show up as an issue.
+        It only ever shows as a total count at the top.</p>
+      </div>
+      <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+        <p class="text-blue-400 font-bold text-sm mb-1">The two files stay separate until the very end</p>
+        <p class="text-slate-300 text-xs">The tech's notes and the repair-cause notes are kept apart the
+        whole time. They only get matched together, by Work Order number, at the moment the report is
+        actually built.</p>
+      </div>
+      <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+        <p class="text-green-400 font-bold text-sm mb-1">Nothing breaks if a file is missing</p>
+        <p class="text-slate-300 text-xs">If no cause file gets uploaded, or a Work Order just doesn't
+        have a match, the report looks exactly like it always has: Asset name, then what the tech did.</p>
+      </div>
+    </div>
+  </div>
+
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: 'default', flowchart: { curve: 'basis' } });
+</script>
+</body>
+</html>

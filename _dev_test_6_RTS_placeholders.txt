@@ -1,0 +1,403 @@
+Repeatability + Factual-Accuracy Test Report
+Model: gemma3n-e2b (confirmed via `ollama list` before running)
+gemma4:e4b: BLOCKED -- Ollama 0.9.4 has no 'gemma4' architecture support
+temperature=0.0  seed=42  threads=unchanged (default)
+Runs per case: 3
+==============================================================================
+
+##############################################################################
+# CASE: rts_placeholder_01_explicit_true
+# Asset: RTSTEST0001  WO#: 27970000
+# ORIGINAL INPUT: ['RTSTEST0001 is operating normally.']
+##############################################################################
+
+--- Run 1 ---
+validation_result=False  fallback_result=True
+asset_id='RTSTEST0001'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=True
+narrative='RTSTEST0001 is operating normally.'
+missing_facts=[]
+invented_facts=["asset_id 'RTSTEST0001' leaked into narrative text"]
+corrected_fields (model disagreed, deterministic value used): []
+
+--- Run 2 ---
+validation_result=False  fallback_result=True
+asset_id='RTSTEST0001'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=True
+narrative='RTSTEST0001 is operating normally.'
+missing_facts=[]
+invented_facts=["asset_id 'RTSTEST0001' leaked into narrative text"]
+corrected_fields (model disagreed, deterministic value used): []
+
+--- Run 3 ---
+validation_result=False  fallback_result=True
+asset_id='RTSTEST0001'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=True
+narrative='RTSTEST0001 is operating normally.'
+missing_facts=[]
+invented_facts=["asset_id 'RTSTEST0001' leaked into narrative text"]
+corrected_fields (model disagreed, deterministic value used): []
+
+--- Consistency summary for rts_placeholder_01_explicit_true ---
+Exact-output consistency (runs 2-10 byte-identical to run 1): 2/2
+Functional consistency: STABLE across all 10 runs
+Any invented facts across any run: True
+Any missing facts across any run: False
+Fallback triggered on any run: True
+Expected returned_to_service in (True,): MATCHED on all 3 runs
+
+>>> FINAL PASS/FAIL for rts_placeholder_01_explicit_true: FAIL
+
+##############################################################################
+# CASE: rts_placeholder_02_negated_true_phrase
+# Asset: RTSTEST0002  WO#: 27970001
+# ORIGINAL INPUT: ['RTSTEST0002 is not operating normally.']
+##############################################################################
+
+--- Run 1 ---
+validation_result=False  fallback_result=True
+asset_id='RTSTEST0002'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=False
+narrative='RTSTEST0002 is not operating normally.'
+missing_facts=[]
+invented_facts=["asset_id 'RTSTEST0002' leaked into narrative text"]
+corrected_fields (model disagreed, deterministic value used): []
+
+--- Run 2 ---
+validation_result=False  fallback_result=True
+asset_id='RTSTEST0002'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=False
+narrative='RTSTEST0002 is not operating normally.'
+missing_facts=[]
+invented_facts=["asset_id 'RTSTEST0002' leaked into narrative text"]
+corrected_fields (model disagreed, deterministic value used): []
+
+--- Run 3 ---
+validation_result=False  fallback_result=True
+asset_id='RTSTEST0002'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=False
+narrative='RTSTEST0002 is not operating normally.'
+missing_facts=[]
+invented_facts=["asset_id 'RTSTEST0002' leaked into narrative text"]
+corrected_fields (model disagreed, deterministic value used): []
+
+--- Consistency summary for rts_placeholder_02_negated_true_phrase ---
+Exact-output consistency (runs 2-10 byte-identical to run 1): 2/2
+Functional consistency: STABLE across all 10 runs
+Any invented facts across any run: True
+Any missing facts across any run: False
+Fallback triggered on any run: True
+Expected returned_to_service in (False, None): MATCHED on all 3 runs
+
+>>> FINAL PASS/FAIL for rts_placeholder_02_negated_true_phrase: FAIL
+
+##############################################################################
+# CASE: rts_placeholder_03_unable_to_return
+# Asset: RTSTEST0003  WO#: 27970002
+# ORIGINAL INPUT: ['Unable to return RTSTEST0003 to service.']
+##############################################################################
+
+--- Run 1 ---
+validation_result=False  fallback_result=True
+asset_id='RTSTEST0003'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=False
+narrative='Unable to return RTSTEST0003 to service.'
+missing_facts=[]
+invented_facts=["asset_id 'RTSTEST0003' leaked into narrative text"]
+corrected_fields (model disagreed, deterministic value used): []
+
+--- Run 2 ---
+validation_result=False  fallback_result=True
+asset_id='RTSTEST0003'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=False
+narrative='Unable to return RTSTEST0003 to service.'
+missing_facts=[]
+invented_facts=["asset_id 'RTSTEST0003' leaked into narrative text"]
+corrected_fields (model disagreed, deterministic value used): []
+
+--- Run 3 ---
+validation_result=False  fallback_result=True
+asset_id='RTSTEST0003'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=False
+narrative='Unable to return RTSTEST0003 to service.'
+missing_facts=[]
+invented_facts=["asset_id 'RTSTEST0003' leaked into narrative text"]
+corrected_fields (model disagreed, deterministic value used): []
+
+--- Consistency summary for rts_placeholder_03_unable_to_return ---
+Exact-output consistency (runs 2-10 byte-identical to run 1): 2/2
+Functional consistency: STABLE across all 10 runs
+Any invented facts across any run: True
+Any missing facts across any run: False
+Fallback triggered on any run: True
+Expected returned_to_service in (False,): MATCHED on all 3 runs
+
+>>> FINAL PASS/FAIL for rts_placeholder_03_unable_to_return: FAIL
+
+##############################################################################
+# CASE: rts_placeholder_04_reversed_by_later_fault
+# Asset: RTSTEST0004  WO#: 27970003
+# ORIGINAL INPUT: ['RTSTEST0004 was returned to service but faulted again.']
+##############################################################################
+
+--- Run 1 ---
+validation_result=False  fallback_result=True
+asset_id='RTSTEST0004'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=False
+narrative='RTSTEST0004 was returned to service but faulted again.'
+missing_facts=[]
+invented_facts=["asset_id 'RTSTEST0004' leaked into narrative text"]
+corrected_fields (model disagreed, deterministic value used): ['returned_to_service: model guessed True, contradicting source (source implies False) -- overwritten with the source-derived value']
+
+--- Run 2 ---
+validation_result=False  fallback_result=True
+asset_id='RTSTEST0004'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=False
+narrative='RTSTEST0004 was returned to service but faulted again.'
+missing_facts=[]
+invented_facts=["asset_id 'RTSTEST0004' leaked into narrative text"]
+corrected_fields (model disagreed, deterministic value used): ['returned_to_service: model guessed True, contradicting source (source implies False) -- overwritten with the source-derived value']
+
+--- Run 3 ---
+validation_result=False  fallback_result=True
+asset_id='RTSTEST0004'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=False
+narrative='RTSTEST0004 was returned to service but faulted again.'
+missing_facts=[]
+invented_facts=["asset_id 'RTSTEST0004' leaked into narrative text"]
+corrected_fields (model disagreed, deterministic value used): ['returned_to_service: model guessed True, contradicting source (source implies False) -- overwritten with the source-derived value']
+
+--- Consistency summary for rts_placeholder_04_reversed_by_later_fault ---
+Exact-output consistency (runs 2-10 byte-identical to run 1): 2/2
+Functional consistency: STABLE across all 10 runs
+Any invented facts across any run: True
+Any missing facts across any run: False
+Fallback triggered on any run: True
+Expected returned_to_service in (False,): MATCHED on all 3 runs
+
+>>> FINAL PASS/FAIL for rts_placeholder_04_reversed_by_later_fault: FAIL
+
+##############################################################################
+# CASE: rts_placeholder_05_explicit_unresolved
+# Asset: RTSTEST0005  WO#: 27970004
+# ORIGINAL INPUT: ['RTSTEST0005 ran briefly; the issue remains unresolved.']
+##############################################################################
+
+--- Run 1 ---
+validation_result=False  fallback_result=True
+asset_id='RTSTEST0005'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=False
+narrative='RTSTEST0005 ran briefly; the issue remains unresolved.'
+missing_facts=[]
+invented_facts=["asset_id 'RTSTEST0005' leaked into narrative text"]
+corrected_fields (model disagreed, deterministic value used): []
+
+--- Run 2 ---
+validation_result=False  fallback_result=True
+asset_id='RTSTEST0005'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=False
+narrative='RTSTEST0005 ran briefly; the issue remains unresolved.'
+missing_facts=[]
+invented_facts=["asset_id 'RTSTEST0005' leaked into narrative text"]
+corrected_fields (model disagreed, deterministic value used): []
+
+--- Run 3 ---
+validation_result=False  fallback_result=True
+asset_id='RTSTEST0005'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=False
+narrative='RTSTEST0005 ran briefly; the issue remains unresolved.'
+missing_facts=[]
+invented_facts=["asset_id 'RTSTEST0005' leaked into narrative text"]
+corrected_fields (model disagreed, deterministic value used): []
+
+--- Consistency summary for rts_placeholder_05_explicit_unresolved ---
+Exact-output consistency (runs 2-10 byte-identical to run 1): 2/2
+Functional consistency: STABLE across all 10 runs
+Any invented facts across any run: True
+Any missing facts across any run: False
+Fallback triggered on any run: True
+Expected returned_to_service in (False,): MATCHED on all 3 runs
+
+>>> FINAL PASS/FAIL for rts_placeholder_05_explicit_unresolved: FAIL
+
+##############################################################################
+# CASE: rts_placeholder_06_action_only_no_status
+# Asset: RTSTEST0006  WO#: 27970005
+# ORIGINAL INPUT: ['Repair completed on RTSTEST0006.']
+##############################################################################
+
+--- Run 1 ---
+validation_result=False  fallback_result=True
+asset_id='RTSTEST0006'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=None
+narrative='Repair completed on RTSTEST0006.'
+missing_facts=[]
+invented_facts=["asset_id 'RTSTEST0006' leaked into narrative text"]
+corrected_fields (model disagreed, deterministic value used): []
+
+--- Run 2 ---
+validation_result=False  fallback_result=True
+asset_id='RTSTEST0006'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=None
+narrative='Repair completed on RTSTEST0006.'
+missing_facts=[]
+invented_facts=["asset_id 'RTSTEST0006' leaked into narrative text"]
+corrected_fields (model disagreed, deterministic value used): []
+
+--- Run 3 ---
+validation_result=False  fallback_result=True
+asset_id='RTSTEST0006'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=None
+narrative='Repair completed on RTSTEST0006.'
+missing_facts=[]
+invented_facts=["asset_id 'RTSTEST0006' leaked into narrative text"]
+corrected_fields (model disagreed, deterministic value used): []
+
+--- Consistency summary for rts_placeholder_06_action_only_no_status ---
+Exact-output consistency (runs 2-10 byte-identical to run 1): 2/2
+Functional consistency: STABLE across all 10 runs
+Any invented facts across any run: True
+Any missing facts across any run: False
+Fallback triggered on any run: True
+Expected returned_to_service in (None,): MATCHED on all 3 runs
+
+>>> FINAL PASS/FAIL for rts_placeholder_06_action_only_no_status: FAIL
+
+##############################################################################
+# CASE: rts_placeholder_07_reset_no_status
+# Asset: RTSTEST0007  WO#: 27970006
+# ORIGINAL INPUT: ['RTSTEST0007 was reset and tested.']
+##############################################################################
+
+--- Run 1 ---
+validation_result=False  fallback_result=True
+asset_id='RTSTEST0007'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=None
+narrative='RTSTEST0007 was reset and tested.'
+missing_facts=[]
+invented_facts=["asset_id 'RTSTEST0007' leaked into narrative text"]
+corrected_fields (model disagreed, deterministic value used): []
+
+--- Run 2 ---
+validation_result=False  fallback_result=True
+asset_id='RTSTEST0007'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=None
+narrative='RTSTEST0007 was reset and tested.'
+missing_facts=[]
+invented_facts=["asset_id 'RTSTEST0007' leaked into narrative text"]
+corrected_fields (model disagreed, deterministic value used): []
+
+--- Run 3 ---
+validation_result=False  fallback_result=True
+asset_id='RTSTEST0007'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=None
+narrative='RTSTEST0007 was reset and tested.'
+missing_facts=[]
+invented_facts=["asset_id 'RTSTEST0007' leaked into narrative text"]
+corrected_fields (model disagreed, deterministic value used): []
+
+--- Consistency summary for rts_placeholder_07_reset_no_status ---
+Exact-output consistency (runs 2-10 byte-identical to run 1): 2/2
+Functional consistency: STABLE across all 10 runs
+Any invented facts across any run: True
+Any missing facts across any run: False
+Fallback triggered on any run: True
+Expected returned_to_service in (None,): MATCHED on all 3 runs
+
+>>> FINAL PASS/FAIL for rts_placeholder_07_reset_no_status: FAIL
+
+##############################################################################
+# CASE: rts_placeholder_08_intermittent_faults
+# Asset: RTSTEST0008  WO#: 27970007
+# ORIGINAL INPUT: ['RTSTEST0008 is running, but intermittent faults remain.']
+##############################################################################
+
+--- Run 1 ---
+validation_result=False  fallback_result=True
+asset_id='RTSTEST0008'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=False
+narrative='RTSTEST0008 is running, but intermittent faults remain.'
+missing_facts=[]
+invented_facts=["asset_id 'RTSTEST0008' leaked into narrative text"]
+corrected_fields (model disagreed, deterministic value used): []
+
+--- Run 2 ---
+validation_result=False  fallback_result=True
+asset_id='RTSTEST0008'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=False
+narrative='RTSTEST0008 is running, but intermittent faults remain.'
+missing_facts=[]
+invented_facts=["asset_id 'RTSTEST0008' leaked into narrative text"]
+corrected_fields (model disagreed, deterministic value used): []
+
+--- Run 3 ---
+validation_result=False  fallback_result=True
+asset_id='RTSTEST0008'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=False
+narrative='RTSTEST0008 is running, but intermittent faults remain.'
+missing_facts=[]
+invented_facts=["asset_id 'RTSTEST0008' leaked into narrative text"]
+corrected_fields (model disagreed, deterministic value used): []
+
+--- Consistency summary for rts_placeholder_08_intermittent_faults ---
+Exact-output consistency (runs 2-10 byte-identical to run 1): 2/2
+Functional consistency: STABLE across all 10 runs
+Any invented facts across any run: True
+Any missing facts across any run: False
+Fallback triggered on any run: True
+Expected returned_to_service in (False,): MATCHED on all 3 runs
+
+>>> FINAL PASS/FAIL for rts_placeholder_08_intermittent_faults: FAIL
+
+==============================================================================
+OVERALL: ONE OR MORE CASES FAILED
+_USE_AI in ai_rewriter.py: UNCHANGED (still disabled, per instruction)
+==============================================================================

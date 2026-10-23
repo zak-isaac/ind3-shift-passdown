@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>IND3 Passdown Tool — Click to Explore</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { background: #0f172a; }
+  .mermaid { background: white; border-radius: 1rem; padding: 2rem; }
+  .node rect, .node polygon { cursor: pointer; }
+  .tag { display: inline-block; font-family: monospace; font-size: 11px; padding: 2px 8px;
+         border-radius: 999px; margin: 2px; }
+  .tag-db { background: #dbeafe; color: #1e3a8a; border: 1px solid #93c5fd; }
+  .tag-code { background: #ede9fe; color: #4c1d95; border: 1px solid #c4b5fd; }
+</style>
+</head>
+<body class="min-h-screen p-6 md:p-10">
+
+  <div class="max-w-5xl mx-auto">
+    <div class="mb-6">
+      <h1 class="text-2xl md:text-3xl font-black text-white">IND3 Passdown Tool — Click to Explore</h1>
+      <p class="text-slate-400 text-sm mt-1">Click any box below to see what's actually happening behind the scenes — database tables, engine logic, all of it.</p>
+      <div class="flex items-center gap-4 mt-3 text-xs">
+        <span class="flex items-center gap-1.5 text-slate-300"><span class="w-3 h-3 rounded bg-white border border-slate-400 inline-block"></span> Working today</span>
+        <span class="flex items-center gap-1.5 text-slate-400"><span class="w-3 h-3 rounded bg-slate-300 border border-dashed border-slate-500 inline-block"></span> Built, but turned off</span>
+      </div>
+    </div>
+
+    <div class="mermaid">
+flowchart TD
+    A["Sign In"] --> B["Start or Join the Shift"]
+    B --> C["Work the Shift<br/>(log notes + upload files)"]
+    C --> D["Build the Report"]
+    D --> E["Send It Out<br/>(email, print, or export)"]
+    E --> F["Close Out the Shift"]
+
+    X["Smart AI Rewrite"]
+    D -.-> X
+    X -.-> D
+
+    style X fill:#cbd5e1,stroke:#64748b,stroke-dasharray: 5 5,color:#334155
+
+    click A call showDetail("A")
+    click B call showDetail("B")
+    click C call showDetail("C")
+    click D call showDetail("D")
+    click E call showDetail("E")
+    click F call showDetail("F")
+    click X call showDetail("X")
+    </div>
+
+    <div id="detail-panel" class="mt-6 bg-slate-800 border border-slate-700 rounded-xl p-6 hidden">
+      <h2 id="detail-title" class="text-xl font-black text-white mb-1"></h2>
+      <p id="detail-desc" class="text-slate-300 text-sm mb-4"></p>
+
+      <p class="text-slate-400 text-xs font-bold uppercase tracking-wide mb-1">What happens, step by step</p>
+      <ul id="detail-steps" class="list-disc list-inside text-slate-200 text-sm mb-4 space-y-1"></ul>
+
+      <div class="grid md:grid-cols-2 gap-4">
+        <div>
+          <p class="text-slate-400 text-xs font-bold uppercase tracking-wide mb-1">Database tables touched</p>
+          <div id="detail-db"></div>
+        </div>
+        <div>
+          <p class="text-slate-400 text-xs font-bold uppercase tracking-wide mb-1">Code behind it</p>
+          <div id="detail-code"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="detail-placeholder" class="mt-6 text-slate-500 text-sm italic text-center">
+      Click a box above to see the details.
+    </div>
+  </div>
+
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose', flowchart: { curve: 'basis' } });
+
+  const DETAILS = {
+    A: {
+      title: "Sign In",
+      desc: "Everyone -- tech, lead, or MST -- has to identify themselves before touching anything.",
+      steps: [
+        "Tech types in their associate number",
+        "Lead / MST types in their name plus the manager code",
+        "The app checks that number/code against the known roster",
+        "A separate Dev/Test mode exists for practicing -- it uses a completely separate sandbox so real shift data is never touched"
+      ],
+      db: ["associates"],
+      code: ["main.py (login routes)", "dev_mode.py"]
+    },
+    B: {
+      title: "Start or Join the Shift",
+      desc: "Before anyone can log anything, there has to be an open shift to log it against.",
+      steps: [
+        "App checks: is a shift already open for this date + shift type right now?",
+        "If not, a brand new shift record is created",
+        "If one's already running, the person joins that same shift instead of starting a duplicate",
+        "Shift start/stop times are locked to real shift windows, with a small grace period on both ends for handover"
+      ],
+      db: ["shifts"],
+      code: ["main.py (shift-start routes)"]
+    },
+    C: {
+      title: "Work the Shift",
+      desc: "This is where most of the raw data gets created -- by hand and from uploaded files.",
+      steps: [
+        "Tech can type entries directly (what unit, what the issue was, what was done)",
+        "Tech can upload one or more files exported from Cetaris",
+        "Each uploaded file is automatically sorted: a 'timecard' file (has the tech's own notes) goes one way, a 'cause' file (says what actually caused the problem) goes another way",
+        "Preventive maintenance work is recognized and only counted -- it never shows up as an individual issue",
+        "Lead/MST watches a live activity feed, can edit or remove any entry, and tracks things like Out-of-Service equipment, Returned-to-Service, vendors on site, and general notes"
+      ],
+      db: ["entries", "pm_wos", "wo_causes", "oos_units", "rts_log", "associates"],
+      code: ["cetaris_parser.py", "cause_lookup.py", "db.py"]
+    },
+    D: {
+      title: "Build the Report",
+      desc: "Once the shift is ending, everything that was logged gets pulled together into one clean report.",
+      steps: [
+        "Every entry logged during the shift gets pulled from the database",
+        "Entries are grouped by Work Order number -- if two techs worked the same job, their notes get combined into one block",
+        "Any saved cause notes are matched in, by Work Order number",
+        "Preventive maintenance is totaled up into a single count",
+        "Spelling is automatically cleaned up",
+        "(Optional, currently off) A smart AI rewrite step could turn the raw notes into a more polished paragraph"
+      ],
+      db: ["entries", "wo_causes", "pm_wos"],
+      code: ["wo_consolidator.py", "cause_lookup.py", "spelling_fix.py", "formatter.py"]
+    },
+    E: {
+      title: "Send It Out",
+      desc: "The finished report can go out in a few different formats, all from the same data.",
+      steps: [
+        "Preview it right on screen before sending anything",
+        "Export a PDF or Word document copy",
+        "Print a paper copy",
+        "MST reviews it and manually clicks Send Email when ready",
+        "Share a link to the report instead of (or alongside) emailing it",
+        "The finished report is saved so it can be reopened later without rebuilding it"
+      ],
+      db: ["reports"],
+      code: ["formatter.py", "exporters.py", "outlook_sender.py"]
+    },
+    F: {
+      title: "Close Out the Shift",
+      desc: "Wrapping up -- and making sure the record sticks around for good.",
+      steps: [
+        "The shift is marked as no longer active",
+        "Nothing ever gets deleted -- every entry and every report stays in the database permanently",
+        "That history later shows up in the Analytics and Asset History views"
+      ],
+      db: ["shifts"],
+      code: ["main.py (shift-end route)", "registry.py"]
+    },
+    X: {
+      title: "Smart AI Rewrite (built, but turned off)",
+      desc: "A fully-built option that uses a local AI model to turn messy raw notes into a polished paragraph.",
+      steps: [
+        "Takes all the combined notes for a Work Order and asks an AI model running on this machine (nothing sent to the internet) to rewrite it cleanly",
+        "Has extensive safety checks built in to catch the AI inventing details that were never actually said",
+        "Has been tested heavily, but it's currently switched OFF in the real app",
+        "The app uses a simpler, rule-based cleanup instead -- it's instant and can never make anything up",
+        "This option is sitting there ready to be turned back on later if wanted"
+      ],
+      db: [],
+      code: ["ai_rewriter.py", "ai_json_rewrite.py"]
+    }
+  };
+
+  function showDetail(id) {
+    const d = DETAILS[id];
+    if (!d) return;
+    document.getElementById("detail-placeholder").classList.add("hidden");
+    const panel = document.getElementById("detail-panel");
+    panel.classList.remove("hidden");
+    document.getElementById("detail-title").textContent = d.title;
+    document.getElementById("detail-desc").textContent = d.desc;
+    document.getElementById("detail-steps").innerHTML = d.steps.map(s => `<li>${s}</li>`).join("");
+    document.getElementById("detail-db").innerHTML = d.db.length
+      ? d.db.map(t => `<span class="tag tag-db">${t}</span>`).join("")
+      : '<span class="text-slate-500 text-xs italic">none -- nothing saved at this step</span>';
+    document.getElementById("detail-code").innerHTML = d.code.map(c => `<span class="tag tag-code">${c}</span>`).join("");
+    panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+</script>
+</body>
+</html>

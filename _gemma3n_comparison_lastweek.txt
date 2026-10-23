@@ -1,0 +1,52 @@
+
+##############################################################################
+# SHIFT 68  |  2026-09-14 S2
+##############################################################################
+
+------------------------------------------------------------------------------
+WO #27969739  Asset: BALER0004
+RAW: change 2 wire | Assist with 2 baler wires
+DETERMINISTIC: Change 2 wire; Performed 2 baler wires.
+GEMMA3N-E2B:   Change 2 wire; Performed 2 baler wires.
+
+------------------------------------------------------------------------------
+WO #27969747  Asset: FLEX0009
+RAW: assisted | Had a bad brush salvaged from electric motors on bench because we don't have brushes for newer motors model 72553 is the brush part needed
+DETERMINISTIC: Had a bad brush salvaged from electric motors on bench because don't have brushes for newer motors model 72553 is the brush part needed.
+GEMMA3N-E2B:   Had a bad brush salvaged from electric motors on bench because don't have brushes for newer motors model 72553 is the brush part needed.
+
+------------------------------------------------------------------------------
+WO #27833520  Asset: RTU-W-07
+RAW: Turned unit back on
+DETERMINISTIC: Turned unit back on.
+GEMMA3N-E2B:   Turned unit back on.
+
+------------------------------------------------------------------------------
+WO #27969718  Asset: VRC0001
+RAW: Recalibrated each floor
+DETERMINISTIC: Recalibrated each floor.
+GEMMA3N-E2B:   Recalibrated each floor.
+
+------------------------------------------------------------------------------
+WO #27969809  Asset: FLEX0007
+RAW: had to replace a bad brush on motor 4 with spare motors | Assisted with installing a new brush for the motor.
+DETERMINISTIC: Had to replace a bad brush on motor 4 with spare motors.
+GEMMA3N-E2B:   Had to replace a bad brush on motor 4 with spare motors.
+
+------------------------------------------------------------------------------
+WO #27969816  Asset: FLEX0004
+RAW: Replaced lower brushes on motors 9,5,4 | Assisted with installing new brushes on the flex
+DETERMINISTIC: Replaced lower brushes on motors 9,5,4; Installed new brushes on the flex.
+GEMMA3N-E2B:   Replaced lower brushes on motors 9,5,4; Installed new brushes on the flex.
+
+------------------------------------------------------------------------------
+WO #27969760  Asset: CR0009
+RAW: Braking: 4ft Plugging: 1ft | New load wheels added.
+DETERMINISTIC: Braking: 4ft Plugging: 1ft; New load wheels added.
+GEMMA3N-E2B:   Braking: 4ft Plugging: 1ft; New load wheels added.
+
+------------------------------------------------------------------------------
+WO #27911889  Asset: SCRUB0001
+RAW: trying the fittings on the new drive motor from the old motor getting replaced.
+DETERMINISTIC: Trying the fittings on the new drive motor from the old motor getting replaced.
+GEMMA3N-E2B:   Trying the fittings on the new drive motor from the old motor getting replaced.

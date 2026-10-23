@@ -1,0 +1,93 @@
+
+=================================== ERRORS ====================================
+________________ ERROR collecting tests/test_v3_cause_join.py _________________
+tests\test_v3_cause_join.py:22: in <module>
+    from fastapi.testclient import TestClient
+.venv\Lib\site-packages\fastapi\testclient.py:1: in <module>
+    from starlette.testclient import TestClient as TestClient  # noqa
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\starlette\testclient.py:85: in <module>
+    httpx.Response,
+    ^^^^^^^^^^^^^^
+E   AttributeError: module 'httpx' has no attribute 'Response'
+________________ ERROR collecting tests/test_v3_identity_ui.py ________________
+tests\test_v3_identity_ui.py:9: in <module>
+    from fastapi.testclient import TestClient
+.venv\Lib\site-packages\fastapi\testclient.py:1: in <module>
+    from starlette.testclient import TestClient as TestClient  # noqa
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\starlette\testclient.py:85: in <module>
+    httpx.Response,
+    ^^^^^^^^^^^^^^
+E   AttributeError: module 'httpx' has no attribute 'Response'
+_______________ ERROR collecting tests/test_v3_live_app_e2e.py ________________
+tests\test_v3_live_app_e2e.py:24: in <module>
+    from fastapi.testclient import TestClient
+.venv\Lib\site-packages\fastapi\testclient.py:1: in <module>
+    from starlette.testclient import TestClient as TestClient  # noqa
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\starlette\testclient.py:85: in <module>
+    httpx.Response,
+    ^^^^^^^^^^^^^^
+E   AttributeError: module 'httpx' has no attribute 'Response'
+_________________ ERROR collecting tests/test_v3_migration.py _________________
+tests\test_v3_migration.py:9: in <module>
+    from fastapi.testclient import TestClient
+.venv\Lib\site-packages\fastapi\testclient.py:1: in <module>
+    from starlette.testclient import TestClient as TestClient  # noqa
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\starlette\testclient.py:85: in <module>
+    httpx.Response,
+    ^^^^^^^^^^^^^^
+E   AttributeError: module 'httpx' has no attribute 'Response'
+_____________ ERROR collecting tests/test_v3_native_operations.py _____________
+tests\test_v3_native_operations.py:5: in <module>
+    from fastapi.testclient import TestClient
+.venv\Lib\site-packages\fastapi\testclient.py:1: in <module>
+    from starlette.testclient import TestClient as TestClient  # noqa
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\starlette\testclient.py:85: in <module>
+    httpx.Response,
+    ^^^^^^^^^^^^^^
+E   AttributeError: module 'httpx' has no attribute 'Response'
+______________ ERROR collecting tests/test_v3_overlap_shifts.py _______________
+tests\test_v3_overlap_shifts.py:13: in <module>
+    from fastapi.testclient import TestClient
+.venv\Lib\site-packages\fastapi\testclient.py:1: in <module>
+    from starlette.testclient import TestClient as TestClient  # noqa
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\starlette\testclient.py:85: in <module>
+    httpx.Response,
+    ^^^^^^^^^^^^^^
+E   AttributeError: module 'httpx' has no attribute 'Response'
+__________________ ERROR collecting tests/test_v3_routes.py ___________________
+tests\test_v3_routes.py:10: in <module>
+    from fastapi.testclient import TestClient
+.venv\Lib\site-packages\fastapi\testclient.py:1: in <module>
+    from starlette.testclient import TestClient as TestClient  # noqa
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\starlette\testclient.py:85: in <module>
+    httpx.Response,
+    ^^^^^^^^^^^^^^
+E   AttributeError: module 'httpx' has no attribute 'Response'
+_________________ ERROR collecting tests/test_v3_v2_parity.py _________________
+tests\test_v3_v2_parity.py:7: in <module>
+    from fastapi.testclient import TestClient
+.venv\Lib\site-packages\fastapi\testclient.py:1: in <module>
+    from starlette.testclient import TestClient as TestClient  # noqa
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\starlette\testclient.py:85: in <module>
+    httpx.Response,
+    ^^^^^^^^^^^^^^
+E   AttributeError: module 'httpx' has no attribute 'Response'
+=========================== short test summary info ===========================
+ERROR tests/test_v3_cause_join.py - AttributeError: module 'httpx' has no att...
+ERROR tests/test_v3_identity_ui.py - AttributeError: module 'httpx' has no at...
+ERROR tests/test_v3_live_app_e2e.py - AttributeError: module 'httpx' has no a...
+ERROR tests/test_v3_migration.py - AttributeError: module 'httpx' has no attr...
+ERROR tests/test_v3_native_operations.py - AttributeError: module 'httpx' has...
+ERROR tests/test_v3_overlap_shifts.py - AttributeError: module 'httpx' has no...
+ERROR tests/test_v3_routes.py - AttributeError: module 'httpx' has no attribu...
+ERROR tests/test_v3_v2_parity.py - AttributeError: module 'httpx' has no attr...
+!!!!!!!!!!!!!!!!!!! Interrupted: 8 errors during collection !!!!!!!!!!!!!!!!!!!
+8 errors in 1.65s

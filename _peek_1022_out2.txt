@@ -1,0 +1,440 @@
+ALL HEADERS (106):
+  [0] 'WO Number'
+  [1] 'LN'
+  [2] 'WO Date / Time'
+  [3] 'Asset #'
+  [4] 'Bldg Type'
+  [5] 'Bldg Type Code'
+  [6] 'Bldg No'
+  [7] 'Bldg No Code'
+  [8] 'Asset ID'
+  [9] 'WO Status'
+  [10] 'Standard Time'
+  [11] 'SJ / PM Code'
+  [12] 'PM Duration'
+  [13] 'PM Due Date'
+  [14] 'Next PM Due Date'
+  [15] 'Repair Class'
+  [16] 'Last Technician'
+  [17] 'Last Shift'
+  [18] 'WO Red Tag'
+  [19] 'Warranty'
+  [20] 'WO Primary Meter'
+  [21] 'WO Primary LTD'
+  [22] 'Primary Meter Type'
+  [23] 'WO Secondary Meter'
+  [24] 'WO Secondary LTD'
+  [25] 'Secondary Meter Type'
+  [26] 'WO Repair Facility'
+  [27] 'WO Repair Facility Code'
+  [28] 'Primary RFR'
+  [29] 'RFR'
+  [30] 'Eq Type'
+  [31] 'Previous WO'
+  [32] 'Promise Date / Time'
+  [33] 'Time Until Promise Time'
+  [34] 'Work Order Notes'
+  [35] 'Engine S/N'
+  [36] 'Service/Repair Description'
+  [37] 'SN / S/N'
+  [38] 'Technician'
+  [39] 'Technician Remarks'
+  [40] 'Work Accomplished'
+  [41] 'Start Date'
+  [42] 'Reg Hrs'
+  [43] 'OT Hrs'
+  [44] 'Correction'
+  [45] 'Cause'
+  [46] 'Alt WO Status'
+  [47] 'In Service Date / Time'
+  [48] 'Engine Manufacturer'
+  [49] 'Engine Model'
+  [50] 'Trans Manufacturer'
+  [51] 'Trans Model'
+  [52] 'Trans S/N'
+  [53] 'Document Currency'
+  [54] 'Preferred Technician'
+  [55] "Technician's Supervisor"
+  [56] 'Create Date / Time'
+  [57] 'Create User'
+  [58] 'Update Date / Time'
+  [59] 'Update User'
+  [60] 'Out Of Service Date / Time'
+  [61] 'RCC Issue #'
+  [62] 'RCC Supplier Code'
+  [63] 'RCC Supplier Name'
+  [64] 'Original Bldg Type'
+  [65] 'Original Bldg Type Code'
+  [66] 'Original Bldg No'
+  [67] 'Original Bldg No Code'
+  [68] 'Downtime'
+  [69] 'Down Hours'
+  [70] 'WO Line Status'
+  [71] 'Alt Line Status'
+  [72] 'Orig Customer Code'
+  [73] 'Orig Asset #'
+  [74] 'Eq Manufacturer'
+  [75] 'Eq Model'
+  [76] 'Eq Year'
+  [77] 'WO Repair Cost'
+  [78] 'Warranty Agmt Manufacturer'
+  [79] 'WO Domicile Facility'
+  [80] 'Eq Domicile Facility'
+  [81] 'Completed By'
+  [82] 'Voided By'
+  [83] 'Repair Est Cost'
+  [84] 'Wrk Req Ref#'
+  [85] 'WO Closed Date/Time'
+  [86] 'Eq Cost Center'
+  [87] 'Facility Division'
+  [88] 'Facility Region'
+  [89] 'WO Last Complete Date / Time'
+  [90] 'Delay Time'
+  [91] 'Priority'
+  [92] 'Asset Location'
+  [93] 'Look Ahead Date'
+  [94] 'Sub-Asset#'
+  [95] 'Asset Criticality'
+  [96] 'Planned'
+  [97] 'Location Description'
+  [98] 'Stop City'
+  [99] 'Stop Status'
+  [100] 'Next Stop Customer Name'
+  [101] 'Dispatch Pro #'
+  [102] 'Stop Updated Date / Time'
+  [103] 'Current City'
+  [104] 'Current State / Province'
+  [105] 'Asset Business Unit'
+
+--- Sample full rows (as dicts) ---
+{
+  "WO Number": "28024738",
+  "LN": "1",
+  "WO Date / Time": "10/22/2026 9:27 PM",
+  "Asset #": "PKM.1050402",
+  "Bldg Type": "NEXT-GEN",
+  "Bldg Type Code": "NEXT-GEN",
+  "Bldg No": "8972 McCordsville, IN",
+  "Bldg No Code": "0708972",
+  "Asset ID": null,
+  "WO Status": "Closed",
+  "Standard Time": "0",
+  "SJ / PM Code": null,
+  "PM Duration": null,
+  "PM Due Date": null,
+  "Next PM Due Date": null,
+  "Repair Class": "Unplanned",
+  "Last Technician": "Nicolaou, Chris",
+  "Last Shift": "S2",
+  "WO Red Tag": "Not Red Tagged",
+  "Warranty": "Not Warrantable",
+  "WO Primary Meter": "1302",
+  "WO Primary LTD": "1302",
+  "Primary Meter Type": "Days",
+  "WO Secondary Meter": null,
+  "WO Secondary LTD": null,
+  "Secondary Meter Type": null,
+  "WO Repair Facility": "8972 McCordsville, IN",
+  "WO Repair Facility Code": "0708972",
+  "Primary RFR": "Proactive Repair",
+  "RFR": "Proactive Repair",
+  "Eq Type": "Packaging Equipment",
+  "Previous WO": null,
+  "Promise Date / Time": null,
+  "Time Until Promise Time": null,
+  "Work Order Notes": null,
+  "Engine S/N": null,
+  "Service/Repair Description": "Checking Label placement",
+  "SN / S/N": null,
+  "Technician": "Nicolaou, Chris",
+  "Technician Remarks": "No adjustment needed",
+  "Work Accomplished": "Validation / Audit",
+  "Start Date": "10/22/2026 9:27 PM",
+  "Reg Hrs": "0.1833",
+  "OT Hrs": "0",
+  "Correction": "No adjustment needed",
+  "Cause": null,
+  "Alt WO Status": null,
+  "In Service Date / Time": "10/22/2026 9:38 PM",
+  "Engine Manufacturer": null,
+  "Engine Model": null,
+  "Trans Manufacturer": null,
+  "Trans Model": null,
+  "Trans S/N": null,
+  "Document Currency": "$ US",
+  "Preferred Technician": null,
+  "Technician's Supervisor": null,
+  "Create Date / Time": "10/22/2026 8:27 PM",
+  "Create User": "Nicolaou, Chris",
+  "Update Date / Time": "10/22/2026 8:40 PM",
+  "Update User": "Baysinger, Dakota",
+  "Out Of Service Date / Time": "10/22/2026 9:27 PM",
+  "RCC Issue #": "0",
+  "RCC Supplier Code": null,
+  "RCC Supplier Name": null,
+  "Original Bldg Type": "NEXT-GEN",
+  "Original Bldg Type Code": "NEXT-GEN",
+  "Original Bldg No": "8972 McCordsville, IN",
+  "Original Bldg No Code": "0708972",
+  "Downtime": "00d 00h 11m",
+  "Down Hours": "0.18",
+  "WO Line Status": "Closed",
+  "Alt Line Status": null,
+  "Orig Customer Code": null,
+  "Orig Asset #": "PKM.1050402",
+  "Eq Manufacturer": "Packsize",
+  "Eq Model": "Packaging Machine",
+  "Eq Year": "2022",
+  "WO Repair Cost": "5.32",
+  "Warranty Agmt Manufacturer": null,
+  "WO Domicile Facility": "8972 McCordsville, IN",
+  "Eq Domicile Facility": "8972 McCordsville, IN",
+  "Completed By": "Baysinger, Dakota",
+  "Voided By": null,
+  "Repair Est Cost": "0.00",
+  "Wrk Req Ref#": null,
+  "WO Closed Date/Time": "10/22/2026 9:40 PM",
+  "Eq Cost Center": "0",
+  "Facility Division": "Maintenance",
+  "Facility Region": "NEXT-GEN",
+  "WO Last Complete Date / Time": "10/22/2026 9:40 PM",
+  "Delay Time": "0.00",
+  "Priority": null,
+  "Asset Location": null,
+  "Look Ahead Date": null,
+  "Sub-Asset#": null,
+  "Asset Criticality": "A",
+  "Planned": "No",
+  "Location Description": null,
+  "Stop City": null,
+  "Stop Status": null,
+  "Next Stop Customer Name": null,
+  "Dispatch Pro #": null,
+  "Stop Updated Date / Time": null,
+  "Current City": null,
+  "Current State / Province": null,
+  "Asset Business Unit": null
+}
+{
+  "WO Number": "28024739",
+  "LN": "1",
+  "WO Date / Time": "10/22/2026 9:27 PM",
+  "Asset #": "PKM.1050532",
+  "Bldg Type": "NEXT-GEN",
+  "Bldg Type Code": "NEXT-GEN",
+  "Bldg No": "8972 McCordsville, IN",
+  "Bldg No Code": "0708972",
+  "Asset ID": null,
+  "WO Status": "Closed",
+  "Standard Time": "0",
+  "SJ / PM Code": null,
+  "PM Duration": null,
+  "PM Due Date": null,
+  "Next PM Due Date": null,
+  "Repair Class": "Unplanned",
+  "Last Technician": "Lopez, Adelfo",
+  "Last Shift": "24 HOUR",
+  "WO Red Tag": "Not Red Tagged",
+  "Warranty": "Not Warrantable",
+  "WO Primary Meter": "1085",
+  "WO Primary LTD": "1085",
+  "Primary Meter Type": "Days",
+  "WO Secondary Meter": null,
+  "WO Secondary LTD": null,
+  "Secondary Meter Type": null,
+  "WO Repair Facility": "8972 McCordsville, IN",
+  "WO Repair Facility Code": "0708972",
+  "Primary RFR": "Proactive Repair",
+  "RFR": "Proactive Repair",
+  "Eq Type": "Packaging Equipment",
+  "Previous WO": null,
+  "Promise Date / Time": null,
+  "Time Until Promise Time": null,
+  "Work Order Notes": null,
+  "Engine S/N": null,
+  "Service/Repair Description": "label check",
+  "SN / S/N": null,
+  "Technician": "Lopez, Adelfo",
+  "Technician Remarks": "no adjustment need it",
+  "Work Accomplished": "Validation / Audit",
+  "Start Date": "10/22/2026 9:28 PM",
+  "Reg Hrs": "0",
+  "OT Hrs": "0.1833",
+  "Correction": "no adjustment need it",
+  "Cause": null,
+  "Alt WO Status": null,
+  "In Service Date / Time": "10/22/2026 9:39 PM",
+  "Engine Manufacturer": null,
+  "Engine Model": null,
+  "Trans Manufacturer": null,
+  "Trans Model": null,
+  "Trans S/N": null,
+  "Document Currency": "$ US",
+  "Preferred Technician": null,
+  "Technician's Supervisor": null,
+  "Create Date / Time": "10/22/2026 8:28 PM",
+  "Create User": "Lopez, Adelfo",
+  "Update Date / Time": "10/22/2026 8:40 PM",
+  "Update User": "Baysinger, Dakota",
+  "Out Of Service Date / Time": "10/22/2026 9:28 PM",
+  "RCC Issue #": "0",
+  "RCC Supplier Code": null,
+  "RCC Supplier Name": null,
+  "Original Bldg Type": "NEXT-GEN",
+  "Original Bldg Type Code": "NEXT-GEN",
+  "Original Bldg No": "8972 McCordsville, IN",
+  "Original Bldg No Code": "0708972",
+  "Downtime": "00d 00h 11m",
+  "Down Hours": "0.18",
+  "WO Line Status": "Closed",
+  "Alt Line Status": null,
+  "Orig Customer Code": null,
+  "Orig Asset #": "PKM.1050532",
+  "Eq Manufacturer": "Packsize",
+  "Eq Model": "Packaging Machine",
+  "Eq Year": "2022",
+  "WO Repair Cost": "7.97",
+  "Warranty Agmt Manufacturer": null,
+  "WO Domicile Facility": "8972 McCordsville, IN",
+  "Eq Domicile Facility": "8972 McCordsville, IN",
+  "Completed By": "Baysinger, Dakota",
+  "Voided By": null,
+  "Repair Est Cost": "0.00",
+  "Wrk Req Ref#": null,
+  "WO Closed Date/Time": "10/22/2026 9:40 PM",
+  "Eq Cost Center": "0",
+  "Facility Division": "Maintenance",
+  "Facility Region": "NEXT-GEN",
+  "WO Last Complete Date / Time": "10/22/2026 9:40 PM",
+  "Delay Time": "0.00",
+  "Priority": null,
+  "Asset Location": null,
+  "Look Ahead Date": null,
+  "Sub-Asset#": null,
+  "Asset Criticality": "A",
+  "Planned": "No",
+  "Location Description": null,
+  "Stop City": null,
+  "Stop Status": null,
+  "Next Stop Customer Name": null,
+  "Dispatch Pro #": null,
+  "Stop Updated Date / Time": null,
+  "Current City": null,
+  "Current State / Province": null,
+  "Asset Business Unit": null
+}
+{
+  "WO Number": "28024734",
+  "LN": "1",
+  "WO Date / Time": "10/22/2026 9:16 PM",
+  "Asset #": "PKM.1050401",
+  "Bldg Type": "NEXT-GEN",
+  "Bldg Type Code": "NEXT-GEN",
+  "Bldg No": "8972 McCordsville, IN",
+  "Bldg No Code": "0708972",
+  "Asset ID": null,
+  "WO Status": "Closed",
+  "Standard Time": "0",
+  "SJ / PM Code": null,
+  "PM Duration": null,
+  "PM Due Date": null,
+  "Next PM Due Date": null,
+  "Repair Class": "Unplanned",
+  "Last Technician": "Nicolaou, Chris",
+  "Last Shift": "S2",
+  "WO Red Tag": "Not Red Tagged",
+  "Warranty": "Not Warrantable",
+  "WO Primary Meter": "1302",
+  "WO Primary LTD": "1302",
+  "Primary Meter Type": "Days",
+  "WO Secondary Meter": null,
+  "WO Secondary LTD": null,
+  "Secondary Meter Type": null,
+  "WO Repair Facility": "8972 McCordsville, IN",
+  "WO Repair Facility Code": "0708972",
+  "Primary RFR": "Proactive Repair",
+  "RFR": "Proactive Repair",
+  "Eq Type": "Packaging Equipment",
+  "Previous WO": null,
+  "Promise Date / Time": null,
+  "Time Until Promise Time": null,
+  "Work Order Notes": null,
+  "Engine S/N": null,
+  "Service/Repair Description": "Checking Label placement",
+  "SN / S/N": null,
+  "Technician": "Nicolaou, Chris",
+  "Technician Remarks": "No adjustment needed",
+  "Work Accomplished": "Validation / Audit",
+  "Start Date": "10/22/2026 9:16 PM",
+  "Reg Hrs": "0.1833",
+  "OT Hrs": "0",
+  "Correction": "No adjustment needed",
+  "Cause": null,
+  "Alt WO Status": null,
+  "In Service Date / Time": "10/22/2026 9:27 PM",
+  "Engine Manufacturer": null,
+  "Engine Model": null,
+  "Trans Manufacturer": null,
+  "Trans Model": null,
+  "Trans S/N": null,
+  "Document Currency": "$ US",
+  "Preferred Technician": null,
+  "Technician's Supervisor": null,
+  "Create Date / Time": "10/22/2026 8:16 PM",
+  "Create User": "Nicolaou, Chris",
+  "Update Date / Time": "10/22/2026 8:37 PM",
+  "Update User": "Baysinger, Dakota",
+  "Out Of Service Date / Time": "10/22/2026 9:16 PM",
+  "RCC Issue #": "0",
+  "RCC Supplier Code": null,
+  "RCC Supplier Name": null,
+  "Original Bldg Type": "NEXT-GEN",
+  "Original Bldg Type Code": "NEXT-GEN",
+  "Original Bldg No": "8972 McCordsville, IN",
+  "Original Bldg No Code": "0708972",
+  "Downtime": "00d 00h 11m",
+  "Down Hours": "0.18",
+  "WO Line Status": "Closed",
+  "Alt Line Status": null,
+  "Orig Customer Code": null,
+  "Orig Asset #": "PKM.1050401",
+  "Eq Manufacturer": "Packsize",
+  "Eq Model": "Packaging Machine",
+  "Eq Year": "2022",
+  "WO Repair Cost": "5.32",
+  "Warranty Agmt Manufacturer": null,
+  "WO Domicile Facility": "8972 McCordsville, IN",
+  "Eq Domicile Facility": "8972 McCordsville, IN",
+  "Completed By": "Baysinger, Dakota",
+  "Voided By": null,
+  "Repair Est Cost": "0.00",
+  "Wrk Req Ref#": null,
+  "WO Closed Date/Time": "10/22/2026 9:37 PM",
+  "Eq Cost Center": "0",
+  "Facility Division": "Maintenance",
+  "Facility Region": "NEXT-GEN",
+  "WO Last Complete Date / Time": "10/22/2026 9:37 PM",
+  "Delay Time": "0.00",
+  "Priority": null,
+  "Asset Location": null,
+  "Look Ahead Date": null,
+  "Sub-Asset#": null,
+  "Asset Criticality": "A",
+  "Planned": "No",
+  "Location Description": null,
+  "Stop City": null,
+  "Stop Status": null,
+  "Next Stop Customer Name": null,
+  "Dispatch Pro #": null,
+  "Stop Updated Date / Time": null,
+  "Current City": null,
+  "Current State / Province": null,
+  "Asset Business Unit": null
+}
+
+Distinct SJ / PM Code: {None, 'E.001.BALER.WALK', 'PACK.007.PKM'}
+Distinct WO Status: {'Closed'}
+Distinct Repair Class: {'Planned', 'Unplanned'}
+Distinct Last Shift: {'S5', 'S2', 'S1', '24 hour', '24 HOUR', 'S2A'}
+
+total rows: 153, unique WO numbers: 150

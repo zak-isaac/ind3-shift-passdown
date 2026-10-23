@@ -160,7 +160,7 @@ runs as a native Windows Scheduled Task directly on a shop-floor PC.
 - **Runs as:** `NT AUTHORITY\SYSTEM` (survives logoff, no user needs to be signed in)
 - **Triggers:** system boot, hibernate/resume, session connect
 - **Auto-restart:** every 1 minute on crash, up to 99 attempts
-- **Port:** `8765` (firewall rule opened automatically by the installer)
+- **Port:** `8766` (firewall rule opened automatically by the installer)
 - **Install script:** `install_service.ps1` — must be run **once**, as
   Administrator, from an elevated PowerShell prompt
 - **Logs:** `server.log` in the project root (stdout/stderr combined)

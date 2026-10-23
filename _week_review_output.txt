@@ -1,0 +1,706 @@
+
+##############################################################################
+# SHIFT 68  |  2026-09-14 S2  |  lead: Isaac S  |  8 WOs
+##############################################################################
+
+------------------------------------------------------------------------------
+WO #27969739  |  Asset: BALER0004  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [312]
+First logged: 2026-09-14 21:57:37  |  Last logged: 2026-09-14 21:57:37
+Conflicting: False  |  Possible duplicate: True
+
+Raw remarks (2):
+  1. change 2 wire
+  2. Assist with 2 baler wires
+
+Final report output:
+  Change 2 wire; Performed 2 baler wires.
+
+------------------------------------------------------------------------------
+WO #27969747  |  Asset: FLEX0009  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [313]
+First logged: 2026-09-14 21:57:37  |  Last logged: 2026-09-14 21:57:37
+Conflicting: False  |  Possible duplicate: True
+
+Raw remarks (2):
+  1. assisted
+  2. Had a bad brush salvaged from electric motors on bench because we don't have brushes for newer motors model 72553 is the brush part needed
+
+Final report output:
+  Had a bad brush salvaged from electric motors on bench because don't have brushes for newer motors model 72553 is the brush part needed.
+
+------------------------------------------------------------------------------
+WO #27833520  |  Asset: RTU-W-07  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [314]
+First logged: 2026-09-14 21:57:48  |  Last logged: 2026-09-14 21:57:48
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. Turned unit back on
+
+Final report output:
+  Turned unit back on.
+
+------------------------------------------------------------------------------
+WO #27969718  |  Asset: VRC0001  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [315]
+First logged: 2026-09-14 21:57:48  |  Last logged: 2026-09-14 21:57:48
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. Recalibrated each floor
+
+Final report output:
+  Recalibrated each floor.
+
+------------------------------------------------------------------------------
+WO #27969809  |  Asset: FLEX0007  |  Priority: monitor
+Techs: Isaac S, Isaac S (MST)
+Entries in group: 2  |  Entry IDs: [316, 321]
+First logged: 2026-09-14 21:57:48  |  Last logged: 2026-09-14 21:59:18
+Conflicting: False  |  Possible duplicate: True
+
+Raw remarks (2):
+  1. had to replace a bad brush on motor 4 with spare motors
+  2. Assisted with installing a new brush for the motor.
+
+Final report output:
+  Had to replace a bad brush on motor 4 with spare motors.
+
+------------------------------------------------------------------------------
+WO #27969816  |  Asset: FLEX0004  |  Priority: monitor
+Techs: Isaac S, Isaac S (MST)
+Entries in group: 2  |  Entry IDs: [317, 322]
+First logged: 2026-09-14 21:57:48  |  Last logged: 2026-09-14 21:59:18
+Conflicting: False  |  Possible duplicate: True
+
+Raw remarks (2):
+  1. Replaced lower brushes on motors 9,5,4
+  2. Assisted with installing new brushes on the flex
+
+Final report output:
+  Replaced lower brushes on motors 9,5,4; Installed new brushes on the flex.
+
+------------------------------------------------------------------------------
+WO #27969760  |  Asset: CR0009  |  Priority: monitor
+Techs: Isaac S, Isaac S (MST)
+Entries in group: 2  |  Entry IDs: [318, 320]
+First logged: 2026-09-14 21:57:59  |  Last logged: 2026-09-14 21:59:18
+Conflicting: False  |  Possible duplicate: True
+
+Raw remarks (2):
+  1. Braking: 4ft Plugging: 1ft
+  2. New load wheels added.
+
+Final report output:
+  Braking: 4ft Plugging: 1ft; New load wheels added.
+
+------------------------------------------------------------------------------
+WO #27911889  |  Asset: SCRUB0001  |  Priority: monitor
+Techs: Isaac S (MST)
+Entries in group: 1  |  Entry IDs: [319]
+First logged: 2026-09-14 21:59:18  |  Last logged: 2026-09-14 21:59:18
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. trying the fittings on the new drive motor from the old motor getting replaced.
+
+Final report output:
+  Trying the fittings on the new drive motor from the old motor getting replaced.
+
+##############################################################################
+# SHIFT 70  |  2026-09-15 S2  |  lead: Isaac S  |  8 WOs
+##############################################################################
+
+------------------------------------------------------------------------------
+WO #27873128  |  Asset: TSP0008  |  Priority: monitor
+Techs: Isaac S, Isaac S (MST)
+Entries in group: 2  |  Entry IDs: [323, 328]
+First logged: 2026-09-15 21:49:01  |  Last logged: 2026-09-15 21:49:33
+Conflicting: False  |  Possible duplicate: True
+
+Raw remarks (3):
+  1. Assist with removing info link
+  2. assist with removal of gasket
+  3. Gasket taken off from TSP0008 to be used on TSP0002. An order for a new gasket has already been placed
+
+Final report output:
+  Removed info link; Gasket taken off from the asset to be used on TSP0002. An order for a new gasket has already been placed.
+
+------------------------------------------------------------------------------
+WO #27952416  |  Asset: TSP0002  |  Priority: monitor
+Techs: Isaac S, Isaac S (MST)
+Entries in group: 2  |  Entry IDs: [324, 329]
+First logged: 2026-09-15 21:49:01  |  Last logged: 2026-09-15 21:49:33
+Conflicting: False  |  Possible duplicate: True
+
+Raw remarks (3):
+  1. retaped 1 of the threads on TSP0002
+  2. I got the gasket from TSP0008. Upon installing the stud screws. I noticed two holes needed fixing. One hole is a little wider on one side making it so the screw not to stay in position and the other hole needs rethreading.
+  3. Assist
+
+Final report output:
+  Retaped 1 of the threads on the asset; got the gasket from TSP0008. Upon installing the stud screws. Noticed two holes needed fixing. One hole is a little wider on one side making it so the screw not to stay in position and the other hole needs retreading.
+
+------------------------------------------------------------------------------
+WO #27953030  |  Asset: RC0013  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [325]
+First logged: 2026-09-15 21:49:01  |  Last logged: 2026-09-15 21:49:01
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. Performing the function test. Plugging:5 ft Braking:3 ft
+
+Final report output:
+  Performed the function test. Plugging:5 ft Braking:3 ft.
+
+------------------------------------------------------------------------------
+WO #27954462  |  Asset: RC0013  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [326]
+First logged: 2026-09-15 21:49:01  |  Last logged: 2026-09-15 21:49:01
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. Performing the function test. Plugging:5 ft Braking:3 ft
+
+Final report output:
+  Performed the function test. Plugging:5 ft Braking:3 ft.
+
+------------------------------------------------------------------------------
+WO #27968837  |  Asset: BLDG  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [327]
+First logged: 2026-09-15 21:49:01  |  Last logged: 2026-09-15 21:49:01
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. Take meter reading on all Fork Lifts.
+
+Final report output:
+  Took meter reading on all Fork Lifts.
+
+------------------------------------------------------------------------------
+WO #27971209  |  Asset: VOIDFILL0801  |  Priority: monitor
+Techs: Isaac S (MST)
+Entries in group: 1  |  Entry IDs: [330]
+First logged: 2026-09-15 21:49:33  |  Last logged: 2026-09-15 21:49:33
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. The tension head spool was threaded in way too far making the tape not to stay as needed on the head. Readjusted and now the taper is operational.
+
+Final report output:
+  The tension head spool was threaded in way too far making the tape not to stay as needed on the head. Readjusted and now the taper is operational.
+
+------------------------------------------------------------------------------
+WO #27971251  |  Asset: VOIDFILL0801  |  Priority: monitor
+Techs: Isaac S (MST)
+Entries in group: 1  |  Entry IDs: [331]
+First logged: 2026-09-15 21:49:33  |  Last logged: 2026-09-15 21:49:33
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. Taped changed and spacer added to control the spring tension. Asset is operational.
+
+Final report output:
+  Taped changed and spacer added to control the spring tension. Asset is operational.
+
+------------------------------------------------------------------------------
+WO #27971297  |  Asset: CR0003  |  Priority: monitor
+Techs: Isaac S (MST)
+Entries in group: 1  |  Entry IDs: [332]
+First logged: 2026-09-15 21:49:33  |  Last logged: 2026-09-15 21:49:33
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. Unlocked the equipment and changed for any physical damage. Asset is operational and back into service.
+
+Final report output:
+  Unlocked the equipment and changed for any physical damage. Asset is operational and back into service.
+
+##############################################################################
+# SHIFT 71  |  2026-09-16 S2  |  lead: Isaac S  |  2 WOs
+##############################################################################
+
+------------------------------------------------------------------------------
+WO #27892303  |  Asset: M2784  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [333]
+First logged: 2026-09-16 21:10:49  |  Last logged: 2026-09-16 21:10:49
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. Possible broken wire in steering colum checked for voltage there was none checked horn fuse and checked with new button and checked with new horn and no results
+
+Final report output:
+  Possible broken wire in steering column checked for voltage there was none checked horn fuse and checked with new button and checked with new horn and no results.
+
+------------------------------------------------------------------------------
+WO #27972832  |  Asset: VRC0002  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [334]
+First logged: 2026-09-16 21:10:49  |  Last logged: 2026-09-16 21:10:49
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. Pushed stuck locks back in VRC0002
+
+Final report output:
+  Pushed stuck locks back in the asset.
+
+##############################################################################
+# SHIFT 72  |  2026-09-16 S2  |  lead: Isaac S  |  6 WOs
+##############################################################################
+
+------------------------------------------------------------------------------
+WO #27873128  |  Asset: TSP0008  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [339]
+First logged: 2026-09-17 12:12:18  |  Last logged: 2026-09-17 12:12:18
+Conflicting: False  |  Possible duplicate: True
+
+Raw remarks (2):
+  1. Assist with removing info link
+  2. assist with removal of gasket
+
+Final report output:
+  Removed info link; Performed removal of gasket.
+
+------------------------------------------------------------------------------
+WO #27952416  |  Asset: TSP0002  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [340]
+First logged: 2026-09-17 12:12:18  |  Last logged: 2026-09-17 12:12:18
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. retaped 1 of the threads on TSP0002
+
+Final report output:
+  Retaped 1 of the threads on the asset.
+
+------------------------------------------------------------------------------
+WO #27971221  |  Asset: GROUNDS  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [341]
+First logged: 2026-09-17 12:12:18  |  Last logged: 2026-09-17 12:12:18
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. intstalled pole covers
+
+Final report output:
+  Installed pole covers.
+
+------------------------------------------------------------------------------
+WO #27953030  |  Asset: RC0013  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [342]
+First logged: 2026-09-17 12:12:18  |  Last logged: 2026-09-17 12:12:18
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. Performing the function test. Plugging:5 ft Braking:3 ft
+
+Final report output:
+  Performed the function test. Plugging:5 ft Braking:3 ft.
+
+------------------------------------------------------------------------------
+WO #27954462  |  Asset: RC0013  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [343]
+First logged: 2026-09-17 12:12:18  |  Last logged: 2026-09-17 12:12:18
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. Performing the function test. Plugging:5 ft Braking:3 ft
+
+Final report output:
+  Performed the function test. Plugging:5 ft Braking:3 ft.
+
+------------------------------------------------------------------------------
+WO #27968837  |  Asset: BLDG  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [344]
+First logged: 2026-09-17 12:12:18  |  Last logged: 2026-09-17 12:12:18
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. Take meter reading on all Fork Lifts.
+
+Final report output:
+  Took meter reading on all Fork Lifts.
+
+##############################################################################
+# SHIFT 73  |  2026-09-16 S2  |  lead: Isaac S  |  6 WOs
+##############################################################################
+
+------------------------------------------------------------------------------
+WO #27873128  |  Asset: TSP0008  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [345]
+First logged: 2026-09-17 12:12:52  |  Last logged: 2026-09-17 12:12:52
+Conflicting: False  |  Possible duplicate: True
+
+Raw remarks (2):
+  1. Assist with removing info link
+  2. assist with removal of gasket
+
+Final report output:
+  Removed info link; Performed removal of gasket.
+
+------------------------------------------------------------------------------
+WO #27952416  |  Asset: TSP0002  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [346]
+First logged: 2026-09-17 12:12:52  |  Last logged: 2026-09-17 12:12:52
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. retaped 1 of the threads on TSP0002
+
+Final report output:
+  Retaped 1 of the threads on the asset.
+
+------------------------------------------------------------------------------
+WO #27971221  |  Asset: GROUNDS  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [347]
+First logged: 2026-09-17 12:12:52  |  Last logged: 2026-09-17 12:12:52
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. intstalled pole covers
+
+Final report output:
+  Installed pole covers.
+
+------------------------------------------------------------------------------
+WO #27953030  |  Asset: RC0013  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [348]
+First logged: 2026-09-17 12:12:52  |  Last logged: 2026-09-17 12:12:52
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. Performing the function test. Plugging:5 ft Braking:3 ft
+
+Final report output:
+  Performed the function test. Plugging:5 ft Braking:3 ft.
+
+------------------------------------------------------------------------------
+WO #27954462  |  Asset: RC0013  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [349]
+First logged: 2026-09-17 12:12:52  |  Last logged: 2026-09-17 12:12:52
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. Performing the function test. Plugging:5 ft Braking:3 ft
+
+Final report output:
+  Performed the function test. Plugging:5 ft Braking:3 ft.
+
+------------------------------------------------------------------------------
+WO #27968837  |  Asset: BLDG  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [350]
+First logged: 2026-09-17 12:12:52  |  Last logged: 2026-09-17 12:12:52
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. Take meter reading on all Fork Lifts.
+
+Final report output:
+  Took meter reading on all Fork Lifts.
+
+##############################################################################
+# SHIFT 74  |  2026-09-17 S2  |  lead: Isaac S  |  4 WOs
+##############################################################################
+
+------------------------------------------------------------------------------
+WO #27974286  |  Asset: BALER0004  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [358]
+First logged: 2026-09-17 22:02:33  |  Last logged: 2026-09-17 22:02:33
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. Baler binding wire replaced
+
+Final report output:
+  Baler binding wire replaced.
+
+------------------------------------------------------------------------------
+WO #27974188  |  Asset: VOIDFILL0301  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [359]
+First logged: 2026-09-17 22:02:33  |  Last logged: 2026-09-17 22:02:33
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. the side  guard green belt was loose tight it back and run the machine as normal again.
+
+Final report output:
+  The side guard green belt was loose tight it back and run the machine as normal again.
+
+------------------------------------------------------------------------------
+WO #27974144  |  Asset: VOIDFILL0801  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [360]
+First logged: 2026-09-17 22:02:33  |  Last logged: 2026-09-17 22:02:33
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. paper feed got jammed up reset and recalibrated no issues
+
+Final report output:
+  Paper feed got jammed up reset and recalibrated no issues.
+
+------------------------------------------------------------------------------
+WO #27815641  |  Asset: TRKGATE0002  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [361]
+First logged: 2026-09-17 22:26:02  |  Last logged: 2026-09-17 22:26:02
+Conflicting: False  |  Possible duplicate: False
+Remarks: NONE -- honest placeholder used, AI/cleanup skipped entirely
+Placeholder summary: WO #27815641 worked on by Isaac S. No remarks recorded.
+
+##############################################################################
+# SHIFT 75  |  2026-09-18 S5  |  lead: Rapheal W  |  13 WOs
+##############################################################################
+
+------------------------------------------------------------------------------
+WO #27928539  |  Asset: PERCART0009  |  Priority: monitor
+Techs: Rapheal W (MST)
+Entries in group: 1  |  Entry IDs: [362]
+First logged: 2026-09-19 05:40:52  |  Last logged: 2026-09-19 05:40:52
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. Assisted in installing new lithium battery into percart0009. Paused for radio call for yard truck
+
+Final report output:
+  Assisted in installing new lithium battery into the asset. Paused for radio call for yard truck.
+
+------------------------------------------------------------------------------
+WO #27968193  |  Asset: M2678  |  Priority: monitor
+Techs: Rapheal W (MST)
+Entries in group: 1  |  Entry IDs: [363]
+First logged: 2026-09-19 05:40:52  |  Last logged: 2026-09-19 05:40:52
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. Accidentally created
+
+Final report output:
+  Accidentally created.
+
+------------------------------------------------------------------------------
+WO #27976682  |  Asset: M2360  |  Priority: monitor
+Techs: Rapheal W (MST)
+Entries in group: 1  |  Entry IDs: [364]
+First logged: 2026-09-19 05:40:52  |  Last logged: 2026-09-19 05:40:52
+Conflicting: True  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. During inspection notice error comm, and check engine alert on dash, Checked all fuses within both boxes located within cab,  None of the fuse were able to remove alerts from dash went to the back of the cab where an external 3rd fuse box was located , open the fuse box and notice connector cables corroded inside, remove cables and clean them thoroughly and place them into there proper position , restated yard truck and all alerts were no longer present .yard truck return back to normal operations.
+
+Final report output:
+  During inspection notice error comm, and check engine alert on dash, Checked all fuses within both boxes located within cab, None of the fuse were able to remove alerts from dash went to the back of the cab where an external 3rd fuse box was located, open the fuse box and notice connector cables corroded inside, remove cables and clean them thoroughly and place them into there proper position, restated yard truck and all alerts were no longer present.yard truck return back to normal operations.
+
+------------------------------------------------------------------------------
+WO #27976907  |  Asset: VOIDFILL0301  |  Priority: monitor
+Techs: Rapheal W (MST)
+Entries in group: 1  |  Entry IDs: [365]
+First logged: 2026-09-19 05:40:52  |  Last logged: 2026-09-19 05:40:52
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. During inspectipn notice boxes stopping before entering taper, changed the box sealing configurations from 15mm to 20mm 
+To raise the sealing level , changed bottom and top tape, restarted voidfill and monitored machine
+
+Final report output:
+  During inspection notice boxes stopping before entering taper, changed the box sealing configurations from 15mm to 20mm 
+To raise the sealing level, changed bottom and top tape, restarted voidfill and monitored machine.
+
+------------------------------------------------------------------------------
+WO #27975910  |  Asset: VOIDFILL0801  |  Priority: monitor
+Techs: Rapheal W (MST)
+Entries in group: 1  |  Entry IDs: [366]
+First logged: 2026-09-19 05:43:35  |  Last logged: 2026-09-19 05:43:35
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. Removed boxes , checked for damage, cleared queue , cleared faults ,set machine to auto & monitored
+
+Final report output:
+  Removed boxes, checked for damage, cleared queue, cleared faults, set machine to auto & monitored.
+
+------------------------------------------------------------------------------
+WO #27975920  |  Asset: VOIDFILL0201  |  Priority: monitor
+Techs: Rapheal W (MST)
+Entries in group: 1  |  Entry IDs: [367]
+First logged: 2026-09-19 05:43:35  |  Last logged: 2026-09-19 05:43:35
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. Removes the boxes from the machine & moved them to the other line, auto calibrated the head unit, cleared queue Removed tape off the taper roller,checked tention cleared faults,set to auto  & monitored
+
+Final report output:
+  Removes the boxes from the machine & moved them to the other line, auto calibrated the head unit, cleared queue Removed tape off the taper roller, checked tension cleared faults, set to auto & monitored.
+
+------------------------------------------------------------------------------
+WO #27975984  |  Asset: VOIDFILL0501  |  Priority: monitor
+Techs: Rapheal W (MST)
+Entries in group: 1  |  Entry IDs: [368]
+First logged: 2026-09-19 05:43:35  |  Last logged: 2026-09-19 05:43:35
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. At first the operator didn't have the taper inserted properly. After I adjusted it the issue the problem persisted unit l changed the tape roll & taper then the issue was solved
+
+Final report output:
+  At first the operator didn't have the taper inserted properly. After adjusted it the issue the problem persisted unit l changed the tape roll & taper then the issue was solved.
+
+------------------------------------------------------------------------------
+WO #27976681  |  Asset: VOIDFILL0401  |  Priority: monitor
+Techs: Rapheal W (MST)
+Entries in group: 1  |  Entry IDs: [369]
+First logged: 2026-09-19 05:43:35  |  Last logged: 2026-09-19 05:43:35
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. Moved the box off the line and lifted the fill head up , Refed the paper through the feeder. On screen hit "feed paper" which cleared that. There was also tape built up on the cutter blade preventing the taper to cut smoothly that I clearled off & monitored
+
+Final report output:
+  Moved the box off the line and lifted the fill head up, Refed the paper through the feeder. On screen hit "feed paper" which cleared that. There was also tape built up on the cutter blade preventing the taper to cut smoothly that cleared off & monitored.
+
+------------------------------------------------------------------------------
+WO #27975835  |  Asset: VOIDFILL0801  |  Priority: monitor
+Techs: Rapheal W (MST)
+Entries in group: 1  |  Entry IDs: [370]
+First logged: 2026-09-19 05:44:23  |  Last logged: 2026-09-19 05:44:23
+Conflicting: False  |  Possible duplicate: True
+
+Raw remarks (2):
+  1. Top tape replaced..
+  2. Issue was already adressed before I got there
+
+Final report output:
+  Top tape replaced..; Issue was already addressed before got there.
+
+------------------------------------------------------------------------------
+WO #27975913  |  Asset: CR0014  |  Priority: monitor
+Techs: Rapheal W (MST)
+Entries in group: 1  |  Entry IDs: [371]
+First logged: 2026-09-19 05:44:23  |  Last logged: 2026-09-19 05:44:23
+Conflicting: False  |  Possible duplicate: True
+
+Raw remarks (2):
+  1. Bad load wheels replaced.
+  2. braking 4 feet and plugging 4 1/2 feet
+
+Final report output:
+  Bad load wheels replaced.; braking 4 feet and plugging 4 1/2 feet.
+
+------------------------------------------------------------------------------
+WO #27975884  |  Asset: DD0142  |  Priority: monitor
+Techs: Rapheal W (MST)
+Entries in group: 1  |  Entry IDs: [372]
+First logged: 2026-09-19 05:45:57  |  Last logged: 2026-09-19 05:45:57
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. Reset breaker
+
+Final report output:
+  Reset breaker.
+
+------------------------------------------------------------------------------
+WO #27975950  |  Asset: TAPER0202  |  Priority: monitor
+Techs: Rapheal W (MST)
+Entries in group: 1  |  Entry IDs: [373]
+First logged: 2026-09-19 05:45:57  |  Last logged: 2026-09-19 05:45:57
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. replaced hardware and secured the RanPak head
+
+Final report output:
+  Replaced hardware and secured the RanPak head.
+
+------------------------------------------------------------------------------
+WO #27976725  |  Asset: BALER0004  |  Priority: monitor
+Techs: Rapheal W (MST)
+Entries in group: 1  |  Entry IDs: [374]
+First logged: 2026-09-19 05:45:57  |  Last logged: 2026-09-19 05:45:57
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. tied off and restarted the baler
+
+Final report output:
+  Tied off and restarted the baler.
+
+##############################################################################
+# SHIFT 76  |  2026-09-19 S5  |  lead: Stanley A  |  4 WOs
+##############################################################################
+
+------------------------------------------------------------------------------
+WO #27911889  |  Asset: SCRUB0001  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [375]
+First logged: 2026-09-19 18:43:09  |  Last logged: 2026-09-19 18:43:09
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. trying the fittings on the new drive motor from the old motor getting replaced.
+
+Final report output:
+  Trying the fittings on the new drive motor from the old motor getting replaced.
+
+------------------------------------------------------------------------------
+WO #27969760  |  Asset: CR0009  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [376]
+First logged: 2026-09-19 18:43:09  |  Last logged: 2026-09-19 18:43:09
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. New load wheels added.
+
+Final report output:
+  New load wheels added.
+
+------------------------------------------------------------------------------
+WO #27969809  |  Asset: FLEX0007  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [377]
+First logged: 2026-09-19 18:43:09  |  Last logged: 2026-09-19 18:43:09
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. Assisted with installing a new brush for the motor.
+
+Final report output:
+  Installed a new brush for the motor.
+
+------------------------------------------------------------------------------
+WO #27969816  |  Asset: FLEX0004  |  Priority: monitor
+Techs: Isaac S
+Entries in group: 1  |  Entry IDs: [378]
+First logged: 2026-09-19 18:43:09  |  Last logged: 2026-09-19 18:43:09
+Conflicting: False  |  Possible duplicate: False
+
+Raw remarks (1):
+  1. Assisted with installing new brushes on the flex
+
+Final report output:
+  Installed new brushes on the flex.

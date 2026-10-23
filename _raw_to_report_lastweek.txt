@@ -1,0 +1,672 @@
+
+##############################################################################
+# SHIFT 68  |  2026-09-14 S2  |  lead: Isaac S
+##############################################################################
+
+------------------------------------------------------------------------------
+WO #27969739  Asset: BALER0004  Techs: ['Isaac S']  [POSSIBLE_DUP]
+RAW entries:
+  id=312 tech='Isaac S' @2026-09-14 21:57:37
+    - change 2 wire
+    - Assist with 2 baler wires
+
+>>> REPORT OUTPUT:
+    Change 2 wire; Performed 2 baler wires.
+
+------------------------------------------------------------------------------
+WO #27969747  Asset: FLEX0009  Techs: ['Isaac S']  [POSSIBLE_DUP]
+RAW entries:
+  id=313 tech='Isaac S' @2026-09-14 21:57:37
+    - assisted
+    - Had a bad brush salvaged from electric motors on bench because we don't have brushes for newer motors model 72553 is the brush part needed
+
+>>> REPORT OUTPUT:
+    Had a bad brush salvaged from electric motors on bench because don't have brushes for newer motors model 72553 is the brush part needed.
+
+------------------------------------------------------------------------------
+WO #27833520  Asset: RTU-W-07  Techs: ['Isaac S']
+RAW entries:
+  id=314 tech='Isaac S' @2026-09-14 21:57:48
+    - Turned unit back on
+
+>>> REPORT OUTPUT:
+    Turned unit back on.
+
+------------------------------------------------------------------------------
+WO #27969718  Asset: VRC0001  Techs: ['Isaac S']
+RAW entries:
+  id=315 tech='Isaac S' @2026-09-14 21:57:48
+    - Recalibrated each floor
+
+>>> REPORT OUTPUT:
+    Recalibrated each floor.
+
+------------------------------------------------------------------------------
+WO #27969809  Asset: FLEX0007  Techs: ['Isaac S', 'Isaac S (MST)']  [POSSIBLE_DUP]
+RAW entries:
+  id=316 tech='Isaac S' @2026-09-14 21:57:48
+    - had to replace a bad brush on motor 4 with spare motors
+  id=321 tech='Isaac S (MST)' @2026-09-14 21:59:18
+    - Assisted with installing a new brush for the motor.
+
+>>> REPORT OUTPUT:
+    Had to replace a bad brush on motor 4 with spare motors.
+
+------------------------------------------------------------------------------
+WO #27969816  Asset: FLEX0004  Techs: ['Isaac S', 'Isaac S (MST)']  [POSSIBLE_DUP]
+RAW entries:
+  id=317 tech='Isaac S' @2026-09-14 21:57:48
+    - Replaced lower brushes on motors 9,5,4
+  id=322 tech='Isaac S (MST)' @2026-09-14 21:59:18
+    - Assisted with installing new brushes on the flex
+
+>>> REPORT OUTPUT:
+    Replaced lower brushes on motors 9,5,4; Installed new brushes on the flex.
+
+------------------------------------------------------------------------------
+WO #27969760  Asset: CR0009  Techs: ['Isaac S', 'Isaac S (MST)']  [POSSIBLE_DUP]
+RAW entries:
+  id=318 tech='Isaac S' @2026-09-14 21:57:59
+    - Braking: 4ft Plugging: 1ft
+  id=320 tech='Isaac S (MST)' @2026-09-14 21:59:18
+    - New load wheels added.
+
+>>> REPORT OUTPUT:
+    Braking: 4ft Plugging: 1ft; New load wheels added.
+
+------------------------------------------------------------------------------
+WO #27911889  Asset: SCRUB0001  Techs: ['Isaac S (MST)']
+RAW entries:
+  id=319 tech='Isaac S (MST)' @2026-09-14 21:59:18
+    - trying the fittings on the new drive motor from the old motor getting replaced.
+
+>>> REPORT OUTPUT:
+    Trying the fittings on the new drive motor from the old motor getting replaced.
+
+##############################################################################
+# SHIFT 70  |  2026-09-15 S2  |  lead: Isaac S
+##############################################################################
+
+------------------------------------------------------------------------------
+WO #27873128  Asset: TSP0008  Techs: ['Isaac S', 'Isaac S (MST)']  [POSSIBLE_DUP]
+RAW entries:
+  id=323 tech='Isaac S' @2026-09-15 21:49:01
+    - Assist with removing info link
+    - assist with removal of gasket
+  id=328 tech='Isaac S (MST)' @2026-09-15 21:49:33
+    - Gasket taken off from TSP0008 to be used on TSP0002. An order for a new gasket has already been placed
+
+>>> REPORT OUTPUT:
+    Removed info link; Gasket taken off from the asset to be used on TSP0002. An order for a new gasket has already been placed.
+
+------------------------------------------------------------------------------
+WO #27952416  Asset: TSP0002  Techs: ['Isaac S', 'Isaac S (MST)']  [POSSIBLE_DUP]
+RAW entries:
+  id=324 tech='Isaac S' @2026-09-15 21:49:01
+    - retaped 1 of the threads on TSP0002
+  id=329 tech='Isaac S (MST)' @2026-09-15 21:49:33
+    - I got the gasket from TSP0008. Upon installing the stud screws. I noticed two holes needed fixing. One hole is a little wider on one side making it so the screw not to stay in position and the other hole needs rethreading.
+    - Assist
+
+>>> REPORT OUTPUT:
+    Retaped 1 of the threads on the asset; got the gasket from TSP0008. Upon installing the stud screws. Noticed two holes needed fixing. One hole is a little wider on one side making it so the screw not to stay in position and the other hole needs retreading.
+
+------------------------------------------------------------------------------
+WO #27953030  Asset: RC0013  Techs: ['Isaac S']
+RAW entries:
+  id=325 tech='Isaac S' @2026-09-15 21:49:01
+    - Performing the function test. Plugging:5 ft Braking:3 ft
+
+>>> REPORT OUTPUT:
+    Performed the function test. Plugging:5 ft Braking:3 ft.
+
+------------------------------------------------------------------------------
+WO #27954462  Asset: RC0013  Techs: ['Isaac S']
+RAW entries:
+  id=326 tech='Isaac S' @2026-09-15 21:49:01
+    - Performing the function test. Plugging:5 ft Braking:3 ft
+
+>>> REPORT OUTPUT:
+    Performed the function test. Plugging:5 ft Braking:3 ft.
+
+------------------------------------------------------------------------------
+WO #27968837  Asset: BLDG  Techs: ['Isaac S']
+RAW entries:
+  id=327 tech='Isaac S' @2026-09-15 21:49:01
+    - Take meter reading on all Fork Lifts.
+
+>>> REPORT OUTPUT:
+    Took meter reading on all Fork Lifts.
+
+------------------------------------------------------------------------------
+WO #27971209  Asset: VOIDFILL0801  Techs: ['Isaac S (MST)']
+RAW entries:
+  id=330 tech='Isaac S (MST)' @2026-09-15 21:49:33
+    - The tension head spool was threaded in way too far making the tape not to stay as needed on the head. Readjusted and now the taper is operational.
+
+>>> REPORT OUTPUT:
+    The tension head spool was threaded in way too far making the tape not to stay as needed on the head. Readjusted and now the taper is operational.
+
+------------------------------------------------------------------------------
+WO #27971251  Asset: VOIDFILL0801  Techs: ['Isaac S (MST)']
+RAW entries:
+  id=331 tech='Isaac S (MST)' @2026-09-15 21:49:33
+    - Taped changed and spacer added to control the spring tension. Asset is operational.
+
+>>> REPORT OUTPUT:
+    Taped changed and spacer added to control the spring tension. Asset is operational.
+
+------------------------------------------------------------------------------
+WO #27971297  Asset: CR0003  Techs: ['Isaac S (MST)']
+RAW entries:
+  id=332 tech='Isaac S (MST)' @2026-09-15 21:49:33
+    - Unlocked the equipment and changed for any physical damage. Asset is operational and back into service.
+
+>>> REPORT OUTPUT:
+    Unlocked the equipment and changed for any physical damage. Asset is operational and back into service.
+
+##############################################################################
+# SHIFT 71  |  2026-09-16 S2  |  lead: Isaac S
+##############################################################################
+
+------------------------------------------------------------------------------
+WO #27892303  Asset: M2784  Techs: ['Isaac S']
+RAW entries:
+  id=333 tech='Isaac S' @2026-09-16 21:10:49
+    - Possible broken wire in steering colum checked for voltage there was none checked horn fuse and checked with new button and checked with new horn and no results
+
+>>> REPORT OUTPUT:
+    Possible broken wire in steering column checked for voltage there was none checked horn fuse and checked with new button and checked with new horn and no results.
+
+------------------------------------------------------------------------------
+WO #27972832  Asset: VRC0002  Techs: ['Isaac S']
+RAW entries:
+  id=334 tech='Isaac S' @2026-09-16 21:10:49
+    - Pushed stuck locks back in VRC0002
+
+>>> REPORT OUTPUT:
+    Pushed stuck locks back in the asset.
+
+##############################################################################
+# SHIFT 72  |  2026-09-16 S2  |  lead: Isaac S
+##############################################################################
+
+------------------------------------------------------------------------------
+WO #27873128  Asset: TSP0008  Techs: ['Isaac S']  [POSSIBLE_DUP]
+RAW entries:
+  id=339 tech='Isaac S' @2026-09-17 12:12:18
+    - Assist with removing info link
+    - assist with removal of gasket
+
+>>> REPORT OUTPUT:
+    Removed info link; Performed removal of gasket.
+
+------------------------------------------------------------------------------
+WO #27952416  Asset: TSP0002  Techs: ['Isaac S']
+RAW entries:
+  id=340 tech='Isaac S' @2026-09-17 12:12:18
+    - retaped 1 of the threads on TSP0002
+
+>>> REPORT OUTPUT:
+    Retaped 1 of the threads on the asset.
+
+------------------------------------------------------------------------------
+WO #27971221  Asset: GROUNDS  Techs: ['Isaac S']
+RAW entries:
+  id=341 tech='Isaac S' @2026-09-17 12:12:18
+    - intstalled pole covers
+
+>>> REPORT OUTPUT:
+    Installed pole covers.
+
+------------------------------------------------------------------------------
+WO #27953030  Asset: RC0013  Techs: ['Isaac S']
+RAW entries:
+  id=342 tech='Isaac S' @2026-09-17 12:12:18
+    - Performing the function test. Plugging:5 ft Braking:3 ft
+
+>>> REPORT OUTPUT:
+    Performed the function test. Plugging:5 ft Braking:3 ft.
+
+------------------------------------------------------------------------------
+WO #27954462  Asset: RC0013  Techs: ['Isaac S']
+RAW entries:
+  id=343 tech='Isaac S' @2026-09-17 12:12:18
+    - Performing the function test. Plugging:5 ft Braking:3 ft
+
+>>> REPORT OUTPUT:
+    Performed the function test. Plugging:5 ft Braking:3 ft.
+
+------------------------------------------------------------------------------
+WO #27968837  Asset: BLDG  Techs: ['Isaac S']
+RAW entries:
+  id=344 tech='Isaac S' @2026-09-17 12:12:18
+    - Take meter reading on all Fork Lifts.
+
+>>> REPORT OUTPUT:
+    Took meter reading on all Fork Lifts.
+
+##############################################################################
+# SHIFT 73  |  2026-09-16 S2  |  lead: Isaac S
+##############################################################################
+
+------------------------------------------------------------------------------
+WO #27873128  Asset: TSP0008  Techs: ['Isaac S']  [POSSIBLE_DUP]
+RAW entries:
+  id=345 tech='Isaac S' @2026-09-17 12:12:52
+    - Assist with removing info link
+    - assist with removal of gasket
+
+>>> REPORT OUTPUT:
+    Removed info link; Performed removal of gasket.
+
+------------------------------------------------------------------------------
+WO #27952416  Asset: TSP0002  Techs: ['Isaac S']
+RAW entries:
+  id=346 tech='Isaac S' @2026-09-17 12:12:52
+    - retaped 1 of the threads on TSP0002
+
+>>> REPORT OUTPUT:
+    Retaped 1 of the threads on the asset.
+
+------------------------------------------------------------------------------
+WO #27971221  Asset: GROUNDS  Techs: ['Isaac S']
+RAW entries:
+  id=347 tech='Isaac S' @2026-09-17 12:12:52
+    - intstalled pole covers
+
+>>> REPORT OUTPUT:
+    Installed pole covers.
+
+------------------------------------------------------------------------------
+WO #27953030  Asset: RC0013  Techs: ['Isaac S']
+RAW entries:
+  id=348 tech='Isaac S' @2026-09-17 12:12:52
+    - Performing the function test. Plugging:5 ft Braking:3 ft
+
+>>> REPORT OUTPUT:
+    Performed the function test. Plugging:5 ft Braking:3 ft.
+
+------------------------------------------------------------------------------
+WO #27954462  Asset: RC0013  Techs: ['Isaac S']
+RAW entries:
+  id=349 tech='Isaac S' @2026-09-17 12:12:52
+    - Performing the function test. Plugging:5 ft Braking:3 ft
+
+>>> REPORT OUTPUT:
+    Performed the function test. Plugging:5 ft Braking:3 ft.
+
+------------------------------------------------------------------------------
+WO #27968837  Asset: BLDG  Techs: ['Isaac S']
+RAW entries:
+  id=350 tech='Isaac S' @2026-09-17 12:12:52
+    - Take meter reading on all Fork Lifts.
+
+>>> REPORT OUTPUT:
+    Took meter reading on all Fork Lifts.
+
+##############################################################################
+# SHIFT 74  |  2026-09-17 S2  |  lead: Isaac S
+##############################################################################
+
+------------------------------------------------------------------------------
+WO #27974286  Asset: BALER0004  Techs: ['Isaac S']
+RAW entries:
+  id=358 tech='Isaac S' @2026-09-17 22:02:33
+    - Baler binding wire replaced
+
+>>> REPORT OUTPUT:
+    Baler binding wire replaced.
+
+------------------------------------------------------------------------------
+WO #27974188  Asset: VOIDFILL0301  Techs: ['Isaac S']
+RAW entries:
+  id=359 tech='Isaac S' @2026-09-17 22:02:33
+    - the side  guard green belt was loose tight it back and run the machine as normal again.
+
+>>> REPORT OUTPUT:
+    The side guard green belt was loose tight it back and run the machine as normal again.
+
+------------------------------------------------------------------------------
+WO #27974144  Asset: VOIDFILL0801  Techs: ['Isaac S']
+RAW entries:
+  id=360 tech='Isaac S' @2026-09-17 22:02:33
+    - paper feed got jammed up reset and recalibrated no issues
+
+>>> REPORT OUTPUT:
+    Paper feed got jammed up reset and recalibrated no issues.
+
+------------------------------------------------------------------------------
+WO #27815641  Asset: TRKGATE0002  Techs: ['Isaac S']
+RAW entries:
+  id=361 tech='Isaac S' @2026-09-17 22:26:02
+
+>>> REPORT OUTPUT: (no real remarks -- honest placeholder, AI/cleanup skipped)
+    WO #27815641 worked on by Isaac S. No remarks recorded.
+
+##############################################################################
+# SHIFT 75  |  2026-09-18 S5  |  lead: Rapheal W
+##############################################################################
+
+------------------------------------------------------------------------------
+WO #27928539  Asset: PERCART0009  Techs: ['Rapheal W (MST)']
+RAW entries:
+  id=362 tech='Rapheal W (MST)' @2026-09-19 05:40:52
+    - Assisted in installing new lithium battery into percart0009. Paused for radio call for yard truck
+
+>>> REPORT OUTPUT:
+    Assisted in installing new lithium battery into the asset. Paused for radio call for yard truck.
+
+------------------------------------------------------------------------------
+WO #27968193  Asset: M2678  Techs: ['Rapheal W (MST)']
+RAW entries:
+  id=363 tech='Rapheal W (MST)' @2026-09-19 05:40:52
+    - Accidentally created
+
+>>> REPORT OUTPUT:
+    Accidentally created.
+
+------------------------------------------------------------------------------
+WO #27976682  Asset: M2360  Techs: ['Rapheal W (MST)']  [CONFLICTING]
+RAW entries:
+  id=364 tech='Rapheal W (MST)' @2026-09-19 05:40:52
+    - During inspection notice error comm, and check engine alert on dash, Checked all fuses within both boxes located within cab,  None of the fuse were able to remove alerts from dash went to the back of the cab where an external 3rd fuse box was located , open the fuse box and notice connector cables corroded inside, remove cables and clean them thoroughly and place them into there proper position , restated yard truck and all alerts were no longer present .yard truck return back to normal operations.
+
+>>> REPORT OUTPUT:
+    During inspection notice error comm, and check engine alert on dash, Checked all fuses within both boxes located within cab, None of the fuse were able to remove alerts from dash went to the back of the cab where an external 3rd fuse box was located, open the fuse box and notice connector cables corroded inside, remove cables and clean them thoroughly and place them into there proper position, restated yard truck and all alerts were no longer present.yard truck return back to normal operations.
+
+------------------------------------------------------------------------------
+WO #27976907  Asset: VOIDFILL0301  Techs: ['Rapheal W (MST)']
+RAW entries:
+  id=365 tech='Rapheal W (MST)' @2026-09-19 05:40:52
+    - During inspectipn notice boxes stopping before entering taper, changed the box sealing configurations from 15mm to 20mm 
+To raise the sealing level , changed bottom and top tape, restarted voidfill and monitored machine
+
+>>> REPORT OUTPUT:
+    During inspection notice boxes stopping before entering taper, changed the box sealing configurations from 15mm to 20mm 
+To raise the sealing level, changed bottom and top tape, restarted voidfill and monitored machine.
+
+------------------------------------------------------------------------------
+WO #27975910  Asset: VOIDFILL0801  Techs: ['Rapheal W (MST)']
+RAW entries:
+  id=366 tech='Rapheal W (MST)' @2026-09-19 05:43:35
+    - Removed boxes , checked for damage, cleared queue , cleared faults ,set machine to auto & monitored
+
+>>> REPORT OUTPUT:
+    Removed boxes, checked for damage, cleared queue, cleared faults, set machine to auto & monitored.
+
+------------------------------------------------------------------------------
+WO #27975920  Asset: VOIDFILL0201  Techs: ['Rapheal W (MST)']
+RAW entries:
+  id=367 tech='Rapheal W (MST)' @2026-09-19 05:43:35
+    - Removes the boxes from the machine & moved them to the other line, auto calibrated the head unit, cleared queue Removed tape off the taper roller,checked tention cleared faults,set to auto  & monitored
+
+>>> REPORT OUTPUT:
+    Removes the boxes from the machine & moved them to the other line, auto calibrated the head unit, cleared queue Removed tape off the taper roller, checked tension cleared faults, set to auto & monitored.
+
+------------------------------------------------------------------------------
+WO #27975984  Asset: VOIDFILL0501  Techs: ['Rapheal W (MST)']
+RAW entries:
+  id=368 tech='Rapheal W (MST)' @2026-09-19 05:43:35
+    - At first the operator didn't have the taper inserted properly. After I adjusted it the issue the problem persisted unit l changed the tape roll & taper then the issue was solved
+
+>>> REPORT OUTPUT:
+    At first the operator didn't have the taper inserted properly. After adjusted it the issue the problem persisted unit l changed the tape roll & taper then the issue was solved.
+
+------------------------------------------------------------------------------
+WO #27976681  Asset: VOIDFILL0401  Techs: ['Rapheal W (MST)']
+RAW entries:
+  id=369 tech='Rapheal W (MST)' @2026-09-19 05:43:35
+    - Moved the box off the line and lifted the fill head up , Refed the paper through the feeder. On screen hit "feed paper" which cleared that. There was also tape built up on the cutter blade preventing the taper to cut smoothly that I clearled off & monitored
+
+>>> REPORT OUTPUT:
+    Moved the box off the line and lifted the fill head up, Refed the paper through the feeder. On screen hit "feed paper" which cleared that. There was also tape built up on the cutter blade preventing the taper to cut smoothly that cleared off & monitored.
+
+------------------------------------------------------------------------------
+WO #27975835  Asset: VOIDFILL0801  Techs: ['Rapheal W (MST)']  [POSSIBLE_DUP]
+RAW entries:
+  id=370 tech='Rapheal W (MST)' @2026-09-19 05:44:23
+    - Top tape replaced..
+    - Issue was already adressed before I got there
+
+>>> REPORT OUTPUT:
+    Top tape replaced..; Issue was already addressed before got there.
+
+------------------------------------------------------------------------------
+WO #27975913  Asset: CR0014  Techs: ['Rapheal W (MST)']  [POSSIBLE_DUP]
+RAW entries:
+  id=371 tech='Rapheal W (MST)' @2026-09-19 05:44:23
+    - Bad load wheels replaced.
+    - braking 4 feet and plugging 4 1/2 feet
+
+>>> REPORT OUTPUT:
+    Bad load wheels replaced.; braking 4 feet and plugging 4 1/2 feet.
+
+------------------------------------------------------------------------------
+WO #27975884  Asset: DD0142  Techs: ['Rapheal W (MST)']
+RAW entries:
+  id=372 tech='Rapheal W (MST)' @2026-09-19 05:45:57
+    - Reset breaker
+
+>>> REPORT OUTPUT:
+    Reset breaker.
+
+------------------------------------------------------------------------------
+WO #27975950  Asset: TAPER0202  Techs: ['Rapheal W (MST)']
+RAW entries:
+  id=373 tech='Rapheal W (MST)' @2026-09-19 05:45:57
+    - replaced hardware and secured the RanPak head
+
+>>> REPORT OUTPUT:
+    Replaced hardware and secured the RanPak head.
+
+------------------------------------------------------------------------------
+WO #27976725  Asset: BALER0004  Techs: ['Rapheal W (MST)']
+RAW entries:
+  id=374 tech='Rapheal W (MST)' @2026-09-19 05:45:57
+    - tied off and restarted the baler
+
+>>> REPORT OUTPUT:
+    Tied off and restarted the baler.
+
+##############################################################################
+# SHIFT 77  |  2026-09-19 S5  |  lead: Rapheal W
+##############################################################################
+
+------------------------------------------------------------------------------
+WO #27977179  Asset: VOIDFILL0201  Techs: ['Rapheal W (MST)']
+RAW entries:
+  id=382 tech='Rapheal W (MST)' @2026-09-20 04:12:34
+    - MDR under the fillhead was not functioning finally got the wire splice that RanPak put in to connect, They were supposed to have come out and replace that wire harness
+
+>>> REPORT OUTPUT:
+    MDR under the billhead was not functioning finally got the wire splice that RanPak put in to connect, They were supposed to have come out and replace that wire harness.
+
+------------------------------------------------------------------------------
+WO #27977214  Asset: VOIDFILL0401  Techs: ['Rapheal W (MST)']
+RAW entries:
+  id=383 tech='Rapheal W (MST)' @2026-09-20 04:12:34
+    - Checked the tape heads and cleaned off the tape build up from the teeth then observed several boxes found that the majority of the issues are the pickers are not packing the boxes correctly and the packsize boxes are a problem with hanging cardboard and weak fold creases
+
+>>> REPORT OUTPUT:
+    Checked the tape heads and cleaned off the tape build up from the teeth then observed several boxes found that the majority of the issues are the pickers are not packing the boxes correctly and the backside boxes are a problem with hanging cardboard and weak fold creases.
+
+------------------------------------------------------------------------------
+WO #27977255  Asset: BALER0004  Techs: ['Rapheal W (MST)']
+RAW entries:
+  id=384 tech='Rapheal W (MST)' @2026-09-20 04:12:34
+    - Tied off the wire and routed the non tie side correctly through the pulley
+
+>>> REPORT OUTPUT:
+    Tied off the wire and routed the non tie side correctly through the pulley.
+
+------------------------------------------------------------------------------
+WO #27977276  Asset: VOIDFILL0701  Techs: ['Rapheal W (MST)']
+RAW entries:
+  id=385 tech='Rapheal W (MST)' @2026-09-20 04:12:34
+    - Checked the tape head and found the blade pad missing causing tape to build up and not cut, switched out the tape head  also found the bottom tape head not completely seated into its mounting causing fault after fault, seated the tapehead correctly, after restarting some boxes would over travel under the fill head causing a jam, re-calibrated the tower, fill head and side guides
+
+>>> REPORT OUTPUT:
+    Checked the tape head and found the blade pad missing causing tape to build up and not cut, switched out the tape head also found the bottom tape head not completely seated into its mounting causing fault after fault, seated the tapered correctly, after restarting some boxes would over travel under the fill head causing a jam, re-calibrated the tower, fill head and side guides.
+
+------------------------------------------------------------------------------
+WO #27977194  Asset: VOIDFILL1101  Techs: ['Rapheal W (MST)']
+RAW entries:
+  id=386 tech='Rapheal W (MST)' @2026-09-20 04:15:55
+    - Adjusting cutting blade and changing tape.
+
+>>> REPORT OUTPUT:
+    Adjusted cutting blade and changing tape.
+
+------------------------------------------------------------------------------
+WO #27977205  Asset: VOIDFILL0901  Techs: ['Rapheal W (MST)']  [POSSIBLE_DUP]
+RAW entries:
+  id=387 tech='Rapheal W (MST)' @2026-09-20 04:17:20
+    - Tape replaced
+    - Tape replaced.
+
+>>> REPORT OUTPUT:
+    Taped replaced.
+
+------------------------------------------------------------------------------
+WO #27977216  Asset: VOIDFILL0501  Techs: ['Rapheal W (MST)']
+RAW entries:
+  id=388 tech='Rapheal W (MST)' @2026-09-20 04:17:20
+    - Adjustment and cleaning.
+
+>>> REPORT OUTPUT:
+    Adjustment and cleaning.
+
+------------------------------------------------------------------------------
+WO #27977268  Asset: BALER0003  Techs: ['Rapheal W (MST)']
+RAW entries:
+  id=389 tech='Rapheal W (MST)' @2026-09-20 04:17:20
+    - Binding wires replaced.
+
+>>> REPORT OUTPUT:
+    Binding wires replaced.
+
+------------------------------------------------------------------------------
+WO #27978054  Asset: VOIDFILL0101  Techs: ['Rapheal W (MST)']
+RAW entries:
+  id=390 tech='Rapheal W (MST)' @2026-09-20 04:17:20
+    - Clean and adjust.
+
+>>> REPORT OUTPUT:
+    Cleaned and adjust.
+
+------------------------------------------------------------------------------
+WO #27978314  Asset: BALER0004  Techs: ['Rapheal W (MST)']
+RAW entries:
+  id=391 tech='Rapheal W (MST)' @2026-09-20 04:17:20
+    - Binding wire replaced.
+
+>>> REPORT OUTPUT:
+    Binding wire replaced.
+
+##############################################################################
+# SHIFT 78  |  2026-09-20 S4  |  lead: Alexander C
+##############################################################################
+
+------------------------------------------------------------------------------
+WO #27903588  Asset: VRC0004  Techs: ['Alexander C (MST)']
+RAW entries:
+  id=392 tech='Alexander C (MST)' @2026-09-20 17:53:04
+    - Troubleshooting from the PLC and found that we have a constant 24vdc from output 0 even when the plc isn't indicating that it's sending power. Tested the other floors and the 24vdc was only present when the platform was at the corresponding floor. I ohmed the relay and found the resistance was constant when it should have been fluctuating so I replaced that relay card and tested the VRC then RTS. (The CompactLogix card faulted i had to flip between run and program a couple of times to clear the fault.)
+
+>>> REPORT OUTPUT:
+    Troubleshooting from the PLC and found that have a constant 24vic from output 0 even when the plc isn't indicating that it's sending power. Tested the other floors and the 24vic was only present when the platform was at the corresponding floor. Ahmed the relay and found the resistance was constant when it should have been fluctuating so replaced that relay card and tested the VRC then returned to service. (The CompactLogix card faulted had to flip between run and program a couple of times to clear the fault.).
+
+------------------------------------------------------------------------------
+WO #27972624  Asset: GROUNDS  Techs: ['Alexander C (MST)']
+RAW entries:
+  id=393 tech='Alexander C (MST)' @2026-09-20 17:53:04
+    - Checking on the gate, found the push bar was misaligned I realigned it and tested it, it is now working normally
+
+>>> REPORT OUTPUT:
+    Checked on the gate, found the push bar was misaligned realigned it and tested it, it is now working normally.
+
+------------------------------------------------------------------------------
+WO #27978363  Asset: VOIDFILL0301  Techs: ['Alexander C (MST)']
+RAW entries:
+  id=394 tech='Alexander C (MST)' @2026-09-20 17:53:04
+    - I found the X16 fill head photoeye out of alignment I realigned it cleared the fault and RTS
+
+>>> REPORT OUTPUT:
+    Found the X16 fill head phooey out of alignment realigned it cleared the fault and returned to service.
+
+------------------------------------------------------------------------------
+WO #27978366  Asset: VOIDFILL1101  Techs: ['Alexander C (MST)']
+RAW entries:
+  id=395 tech='Alexander C (MST)' @2026-09-20 17:53:04
+    - Associate stated the boxes were stopping between the DT and the voidfill, i monitored 30-40 cases run with 2 issues both being tapehead issues I cleaned the blade on the top tapehead cleared the faults and RTS
+
+>>> REPORT OUTPUT:
+    Associate stated the boxes were stopping between the DT and the voidfill, monitored 30-40 cases run with 2 issues both being tapered issues cleaned the blade on the top tapered cleared the faults and returned to service.
+
+------------------------------------------------------------------------------
+WO #27978374  Asset: VOIDFILL1001  Techs: ['Alexander C (MST)']
+RAW entries:
+  id=396 tech='Alexander C (MST)' @2026-09-20 17:53:04
+    - Found box not gripped properly fault, i removed the box cleared the fault and monitored 30 cases run without issue then I had multiple paper jam issues and i found the paper cart out of its slot causing the paper to run offset to the rollers causing tearing. I reset the paper cart and RTS.
+
+>>> REPORT OUTPUT:
+    Found box not gripped properly fault, removed the box cleared the fault and monitored 30 cases run without issue then had multiple paper jam issues and found the paper cart out of its slot causing the paper to run offset to the rollers causing tearing. Reset the paper cart and returned to service.
+
+------------------------------------------------------------------------------
+WO #27978391  Asset: VOIDFILL0501  Techs: ['Alexander C (MST)']
+RAW entries:
+  id=397 tech='Alexander C (MST)' @2026-09-20 17:53:04
+    - I verified all the photo eyes were aligned then i found a fault on the barcode scanner so i powercycled it and restarted the DT then boxes started processing correctly I monitored the machine for a while then RTS
+
+>>> REPORT OUTPUT:
+    Verified all the photo eyes were aligned then found a fault on the arcade scanner so powercycled it and restarted the DT then boxes started processing correctly monitored the machine for a while then returned to service.
+
+------------------------------------------------------------------------------
+WO #27978433  Asset: VOIDFILL0601  Techs: ['Alexander C (MST)']
+RAW entries:
+  id=398 tech='Alexander C (MST)' @2026-09-20 17:53:04
+    - I replaced the worn wheels. I then performed a function test on the machine which passed and RTS
+
+>>> REPORT OUTPUT:
+    Replaced the worn wheels. Then performed a function test on the machine which passed and returned to service.
+
+------------------------------------------------------------------------------
+WO #27978453  Asset: VOIDFILL0101  Techs: ['Alexander C (MST)']  [CONFLICTING]
+RAW entries:
+  id=399 tech='Alexander C (MST)' @2026-09-20 17:53:04
+    - Upon arrival every box we ran would clear the machine but then we would get "Taper fault please press reset all" when it exited the taper, after some troubleshooting we started checking relays I pulled the safety relay in the taper PLC Cabinet which caused a "reset clearlink breaker" we reset the fault after that and ran a few boxes but then the folding area belts stopped running so we checked the relay for them and found it burnt so we replaced it. We are now waiting on knapp to finish a repair on the exit line before testing 12:45. We tested the equipment and it is
+
+>>> REPORT OUTPUT:
+    Upon arrival every box ran would clear the machine but then would get "Taper fault please press reset all" when it exited the taper, after some troubleshooting started checking relays pulled the safety relay in the taper PLC Cabinet which caused a "reset clearing breaker" reset the fault after that and ran a few boxes but then the folding area belts stopped running so checked the relay for them and found it burnt so replaced it. Are now waiting on knapp to finish a repair on the exit line before testing 12:45. Tested the equipment and it is.
+
+------------------------------------------------------------------------------
+WO #27978485  Asset: BALER0004  Techs: ['Alexander C (MST)']
+RAW entries:
+  id=400 tech='Alexander C (MST)' @2026-09-20 17:53:04
+    - Knapp was clearing a jam and found a photoeye out of alignment they readjusted it then got the fault, i switched it to hand mode reset the fault then switched it back to auto and RTS
+
+>>> REPORT OUTPUT:
+    Knapp was clearing a jam and found a phooey out of alignment they readjusted it then got the fault, switched it to hand mode reset the fault then switched it back to auto and returned to service.
+
+##############################################################################
+# SHIFT 79  |  2026-09-20 S5  |  lead: Len Ward
+##############################################################################
+
+------------------------------------------------------------------------------
+WO #27978688  Asset: VOIDFILL0601  Techs: ['Len Ward (MST)']
+RAW entries:
+  id=401 tech='Len Ward (MST)' @2026-09-21 05:43:20
+    - Replaced motor belt in head unit for the paper rollors
+
+>>> REPORT OUTPUT:
+    Replaced motor belt in head unit for the paper rollers.
+
+------------------------------------------------------------------------------
+WO #27978674  Asset: VOIDFILL0501  Techs: ['Len Ward (MST)']
+RAW entries:
+  id=402 tech='Len Ward (MST)' @2026-09-21 05:43:33
+    - Taper and blade Readjusted.
+
+>>> REPORT OUTPUT:
+    Taper and blade Readjusted.

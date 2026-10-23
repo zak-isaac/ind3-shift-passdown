@@ -1,0 +1,17 @@
+FROM C:\Users\ins0002\Downloads\gemma-3n-E2B-it-Q4_K_M.gguf
+
+TEMPLATE """{{ if .System }}<start_of_turn>user
+{{ .System }}
+
+{{ .Prompt }}<end_of_turn>
+<start_of_turn>model
+{{ else }}<start_of_turn>user
+{{ .Prompt }}<end_of_turn>
+<start_of_turn>model
+{{ end }}"""
+
+PARAMETER stop "<end_of_turn>"
+PARAMETER stop "<start_of_turn>"
+PARAMETER num_ctx 8192
+PARAMETER num_predict 1024
+PARAMETER temperature 0.3

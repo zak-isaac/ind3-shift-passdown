@@ -1,0 +1,113 @@
+Repeatability + Factual-Accuracy Test Report
+Model: gemma3n-e2b (confirmed via `ollama list` before running)
+gemma4:e4b: BLOCKED -- Ollama 0.9.4 has no 'gemma4' architecture support
+temperature=0.0  seed=42  threads=unchanged (default)
+Runs per case: 3
+==============================================================================
+
+##############################################################################
+# CASE: complex_multistep_with_complication
+# Asset: VOIDFILL0201  WO#: 27966514
+# ORIGINAL INPUT: ["The bottom tape encountered issues due to excessive tension which caused it to move towards the tape head because we couldn't reduce any further as the tensioner nut reached its lowest setting -- so after removing and cleaning up both M504 and M507 PEs, I found that only one was misaligned. After adjusting just this faulty PE back into alignment (M504), unfortunately another sensor got damaged in the process, meanwhile I've temporarily fixed everything with some double-sided tape until we can get a replacement for it.", 'Replaced taper & monitored.']
+##############################################################################
+
+--- Run 1 ---
+validation_result=True  fallback_result=False
+asset_id='VOIDFILL0201'
+actions_performed=['The bottom tape encountered issues due to excessive tension', 'The tensioner nut reached its lowest setting', 'Both M504 and M507 PEs were removed and cleaned up', 'One PE was found to be misaligned', 'The faulty PE (M504) was adjusted back into alignment', 'Double-sided tape was used to temporarily fix everything']
+unresolved_issues=['Another sensor got damaged']
+returned_to_service=None
+narrative="The bottom tape encountered issues due to excessive tension which caused it to move towards the tape head because we couldn't reduce any further as the tensioner nut reached its lowest setting. So after removing and cleaning up both M504 and M507 PEs, it was found that only one was misaligned. After adjusting just this faulty PE (M504) back into alignment, unfortunately another sensor got damaged in the process, meanwhile I've temporarily fixed everything with some double-sided tape until we can get a replacement for it."
+missing_facts=[]
+invented_facts=[]
+corrected_fields (model disagreed, deterministic value used): ['returned_to_service: model guessed False with no explicit supporting source text -- overwritten with null (source never states equipment status)']
+
+--- Run 2 ---
+validation_result=False  fallback_result=True
+asset_id='VOIDFILL0201'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=None
+narrative="The bottom tape encountered issues due to excessive tension which caused it to move towards the tape head because we couldn't reduce any further as the tensioner nut reached its lowest setting -- so after removing and cleaning up both M504 and M507 PEs, I found that only one was misaligned. After adjusting just this faulty PE back into alignment (M504), unfortunately another sensor got damaged in the process, meanwhile I've temporarily fixed everything with some double-sided tape until we can get a replacement for it. | Replaced taper & monitored."
+missing_facts=[]
+invented_facts=[]
+corrected_fields (model disagreed, deterministic value used): []
+
+--- Run 3 ---
+validation_result=True  fallback_result=False
+asset_id='VOIDFILL0201'
+actions_performed=['The bottom tape encountered issues due to excessive tension', 'The tensioner nut reached its lowest setting', 'Both M504 and M507 PEs were removed and cleaned up', 'One PE was found to be misaligned', 'The faulty PE (M504) was adjusted back into alignment', 'Double-sided tape was used to temporarily fix everything']
+unresolved_issues=['Another sensor got damaged']
+returned_to_service=None
+narrative="The bottom tape encountered issues due to excessive tension which caused it to move towards the tape head because we couldn't reduce any further as the tensioner nut reached its lowest setting. So after removing and cleaning up both M504 and M507 PEs, it was found that only one was misaligned. After adjusting just this faulty PE (M504) back into alignment, unfortunately another sensor got damaged in the process, meanwhile I've temporarily fixed everything with some double-sided tape until we can get a replacement for it."
+missing_facts=[]
+invented_facts=[]
+corrected_fields (model disagreed, deterministic value used): ['returned_to_service: model guessed False with no explicit supporting source text -- overwritten with null (source never states equipment status)']
+
+--- Consistency summary for complex_multistep_with_complication ---
+Exact-output consistency (runs 2-10 byte-identical to run 1): 1/2
+Functional consistency: VARIATION in 1 run(s):
+  Run 2 differs from Run 1:
+    - valid: True vs False
+    - fallback_used: False vs True
+    - actions_performed: ['The bottom tape encountered issues due to excessive tension', 'The tensioner nut reached its lowest setting', 'Both M504 and M507 PEs were removed and cleaned up', 'One PE was found to be misaligned', 'The faulty PE (M504) was adjusted back into alignment', 'Double-sided tape was used to temporarily fix everything'] vs []
+    - unresolved_issues: ['Another sensor got damaged'] vs []
+    - narrative content differs: only in run A={'(m504)', 'setting.', 'alignment,'} only in run B={'|', '&', '(m504),', 'monitored.', 'replaced', 'taper', '--', 'alignment', 'setting', 'i'}
+Any invented facts across any run: False
+Any missing facts across any run: False
+Fallback triggered on any run: True
+
+>>> FINAL PASS/FAIL for complex_multistep_with_complication: FAIL
+
+##############################################################################
+# CASE: unclear_incomplete_remark
+# Asset: TSP0004  WO#: 27833999
+# ORIGINAL INPUT: ['thing on left side making noise checked couldnt find issue']
+##############################################################################
+
+--- Run 1 ---
+validation_result=False  fallback_result=True
+asset_id='TSP0004'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=None
+narrative='thing on left side making noise checked couldnt find issue'
+missing_facts=[]
+invented_facts=["unrecognized new word(s): ['not']"]
+corrected_fields (model disagreed, deterministic value used): []
+
+--- Run 2 ---
+validation_result=False  fallback_result=True
+asset_id='TSP0004'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=None
+narrative='thing on left side making noise checked couldnt find issue'
+missing_facts=[]
+invented_facts=["unrecognized new word(s): ['not']"]
+corrected_fields (model disagreed, deterministic value used): []
+
+--- Run 3 ---
+validation_result=False  fallback_result=True
+asset_id='TSP0004'
+actions_performed=[]
+unresolved_issues=[]
+returned_to_service=None
+narrative='thing on left side making noise checked couldnt find issue'
+missing_facts=[]
+invented_facts=["unrecognized new word(s): ['not']"]
+corrected_fields (model disagreed, deterministic value used): []
+
+--- Consistency summary for unclear_incomplete_remark ---
+Exact-output consistency (runs 2-10 byte-identical to run 1): 2/2
+Functional consistency: STABLE across all 10 runs
+Any invented facts across any run: True
+Any missing facts across any run: False
+Fallback triggered on any run: True
+
+>>> FINAL PASS/FAIL for unclear_incomplete_remark: FAIL
+
+==============================================================================
+OVERALL: ONE OR MORE CASES FAILED
+_USE_AI in ai_rewriter.py: UNCHANGED (still disabled, per instruction)
+==============================================================================

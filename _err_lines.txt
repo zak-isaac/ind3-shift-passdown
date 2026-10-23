@@ -1,0 +1,41 @@
+66:INFO:     10.239.69.183:50150 - "POST /shift/request-ot HTTP/1.1" 500 Internal Server Error
+67:ERROR:    Exception in ASGI application
+68:Traceback (most recent call last):
+127:UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 37: character maps to <undefined>
+128:INFO:     10.239.69.183:61753 - "POST /shift/request-ot HTTP/1.1" 500 Internal Server Error
+129:ERROR:    Exception in ASGI application
+130:Traceback (most recent call last):
+189:UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 37: character maps to <undefined>
+446535:[ai_rewriter] Ollama unreachable: [WinError 10061] No connection could be made because the target machine actively refused it
+447856:[ai_rewriter] Ollama unreachable: [WinError 10061] No connection could be made because the target machine actively refused it
+453425:[ai_rewriter] Ollama unreachable: [WinError 10061] No connection could be made because the target machine actively refused it
+600558:[ai_rewriter] Ollama unreachable: [WinError 10061] No connection could be made because the target machine actively refused it
+601956:Traceback (most recent call last):
+601986:OSError: [WinError 121] The semaphore timeout period has expired
+602775:Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+602777:Traceback (most recent call last):
+602784:ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+605350:Traceback (most recent call last):
+605380:OSError: [WinError 121] The semaphore timeout period has expired
+606339:Traceback (most recent call last):
+606369:OSError: [WinError 121] The semaphore timeout period has expired
+608909:Traceback (most recent call last):
+608939:OSError: [WinError 121] The semaphore timeout period has expired
+609477:[ai_rewriter] Error: Server error '500 Internal Server Error' for url 'http://localhost:11434/api/generate'
+609523:[ai_rewriter] Error: Server error '500 Internal Server Error' for url 'http://localhost:11434/api/generate'
+609525:[ai_rewriter] Error: Server error '500 Internal Server Error' for url 'http://localhost:11434/api/generate'
+609537:[ai_rewriter] Error: Server error '500 Internal Server Error' for url 'http://localhost:11434/api/generate'
+609539:[ai_rewriter] Error: Server error '500 Internal Server Error' for url 'http://localhost:11434/api/generate'
+609547:[ai_rewriter] Error: Server error '500 Internal Server Error' for url 'http://localhost:11434/api/generate'
+1353521:[ai_rewriter] Ollama unreachable: [WinError 10061] No connection could be made because the target machine actively refused it
+1353542:[ai_rewriter] Ollama unreachable: [WinError 10061] No connection could be made because the target machine actively refused it
+1355219:Traceback (most recent call last):
+1355249:OSError: [WinError 121] The semaphore timeout period has expired
+1356558:Traceback (most recent call last):
+1356588:OSError: [WinError 121] The semaphore timeout period has expired
+1357521:Traceback (most recent call last):
+1357551:OSError: [WinError 121] The semaphore timeout period has expired
+1357754:Traceback (most recent call last):
+1357784:OSError: [WinError 121] The semaphore timeout period has expired
+1357895:Traceback (most recent call last):
+1357925:OSError: [WinError 121] The semaphore timeout period has expired

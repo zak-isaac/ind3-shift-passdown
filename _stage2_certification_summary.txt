@@ -1,0 +1,60 @@
+==============================================================================
+STAGE 2 FINAL CERTIFICATION REPORT
+Model: gemma3n-e2b  temperature=0.0  seed=42
+gemma4:e4b: BLOCKED -- Ollama 0.9.4 has no 'gemma4' architecture support
+_USE_AI in ai_rewriter.py: UNCHANGED (still disabled)
+RTS placeholder classifier unit tests: EXCLUDED from this certification (live in the permanent unit-test suite instead)
+==============================================================================
+
+1. Total model calls:                80
+2. AI rewrites accepted:              50  (62.5%)
+3. Safe fallbacks:                    30  (37.5%)
+4. End-to-end safety passes:          80/80  (100.0%)
+5. Fabrications detected (caught):    30
+6. Fabrications that escaped:         0  (0 -- meets requirement)
+7. Asset-identity mismatches:
+     attempted by model (all corrected): 0
+     survived into final output:         0  (0 -- meets requirement)
+8. RTS deterministic corrections:     20  (model disagreed with source-derived value; final output always used the deterministic value, so RTS correctness is 100% by construction)
+9. Exact-output consistency:          72/72 repeat-runs byte-identical to their case's first run (8/8 cases fully byte-identical across all 10 runs)
+10. Functional consistency:           8/8 cases stable (no run diverged in meaning from that case's first run)
+11. Average generation time:          89.3s/call  (total wall time 119.1 min for 80 calls)
+
+12. Per-case results:
+------------------------------------------------------------------------------
+  simple_one_liner (VRC0001, WO#27969718):
+      accepted=10/10  fallback=0/10  fabrications_escaped=0  asset_mismatches_survived=0  rts_values_seen=[None]
+      functional_consistency=STABLE  exact_consistency=9/9
+  multi_tech_same_event_dedup (FLEX0007, WO#27969809):
+      accepted=0/10  fallback=10/10  fabrications_escaped=0  asset_mismatches_survived=0  rts_values_seen=[None]
+      functional_consistency=STABLE  exact_consistency=9/9
+  multi_tech_unique_work_preserved (FLEX0004, WO#27969816):
+      accepted=10/10  fallback=0/10  fabrications_escaped=0  asset_mismatches_survived=0  rts_values_seen=[None]
+      functional_consistency=STABLE  exact_consistency=9/9
+  complex_multistep_with_complication (VOIDFILL0201, WO#27966514):
+      accepted=0/10  fallback=10/10  fabrications_escaped=0  asset_mismatches_survived=0  rts_values_seen=[None]
+      functional_consistency=STABLE  exact_consistency=9/9
+  explicit_returned_to_service (VOIDFILL0501, WO#27965717):
+      accepted=10/10  fallback=0/10  fabrications_escaped=0  asset_mismatches_survived=0  rts_values_seen=[True]
+      functional_consistency=STABLE  exact_consistency=9/9
+  void_rule_vague_participation (CR0007, WO#27932929):
+      accepted=10/10  fallback=0/10  fabrications_escaped=0  asset_mismatches_survived=0  rts_values_seen=[None]
+      functional_consistency=STABLE  exact_consistency=9/9
+  unclear_incomplete_remark (TSP0004, WO#27833999):
+      accepted=10/10  fallback=0/10  fabrications_escaped=0  asset_mismatches_survived=0  rts_values_seen=[None]
+      functional_consistency=STABLE  exact_consistency=9/9
+  misspelled_remark (BALER0002, WO#27965956):
+      accepted=0/10  fallback=10/10  fabrications_escaped=0  asset_mismatches_survived=0  rts_values_seen=[None]
+      functional_consistency=STABLE  exact_consistency=9/9
+------------------------------------------------------------------------------
+
+CERTIFICATION REQUIREMENTS CHECK:
+  [PASS] 0 fabrications escape validation
+  [PASS] 100% correct asset identity in final output
+  [PASS] 100% correct RTS status in final output
+  [PASS] 100% complete fallback resets
+  [PASS] 100% end-to-end safe outcomes
+
+CERTIFICATION RESULT: ALL REQUIREMENTS MET
+_USE_AI remains DISABLED -- not changed by this script. Report is for review only.
+==============================================================================

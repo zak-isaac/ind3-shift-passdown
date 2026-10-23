@@ -23,7 +23,7 @@ echo.
 
 :: ── Config ────────────────────────────────────────────────
 set INSTALL_DIR=C:\IND3Passdown
-set PORT=8765
+set PORT=8766
 set SOURCE=%~dp0
 set STARTUP=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup
 

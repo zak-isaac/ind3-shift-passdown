@@ -1,0 +1,9 @@
+Okay, here's a summary of the recurring issues:
+
+*   **Baler Issues:** Frequent baler binding wire replacements and issues with wire routing.
+*   **Voidfill Problems:** Common issues include tape head problems (blade pad missing, tape build-up), box gripping problems, paper feed jams, and misalignment of photoeyes/barcode scanners.
+*   **Fork Lift Issues:**  Frequent meter readings and some electrical troubleshooting (fuses, corroded connectors).
+*   **Other:**  Pole covers installation, gate misalignment, and general equipment checks.
+
+
+

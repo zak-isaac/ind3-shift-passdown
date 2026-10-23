@@ -12,9 +12,9 @@ HOW TO INSTALL (No admin rights needed):
     Share it with your team                          
                                                        
 Access the app (replace IP with shop PC IP):          
-  Home:   http://SHOP-IP:8765/                        
-  Lead:   http://SHOP-IP:8765/lead                    
-  Tech:   http://SHOP-IP:8765/tech                    
+  Home:   http://SHOP-IP:8766/                        
+  Lead:   http://SHOP-IP:8766/lead                    
+  Tech:   http://SHOP-IP:8766/tech                    
                                                        
 To UNINSTALL:                                         
   Delete startup: %APPDATA%\...\Startup\IND3PassdownServer.vbs 

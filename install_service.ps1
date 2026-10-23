@@ -67,20 +67,20 @@ Register-ScheduledTask `
     -Xml      $Xml.OuterXml `
     -Force | Out-Null
 
-# Open port 8765 in Windows Firewall so other laptops on the LAN can reach the tool
-$FwRuleName = "IND3 Passdown Server (8765)"
+# Open port 8766 in Windows Firewall so other laptops on the LAN can reach the tool
+$FwRuleName = "IND3 Passdown Server (8766)"
 if (-not (Get-NetFirewallRule -DisplayName $FwRuleName -ErrorAction SilentlyContinue)) {
     New-NetFirewallRule `
         -DisplayName $FwRuleName `
         -Direction   Inbound `
         -Protocol    TCP `
-        -LocalPort   8765 `
+        -LocalPort   8766 `
         -Action      Allow `
         -Profile     Any `
-        -Description "LAN access to IND3 Reliability Passdown on port 8765" | Out-Null
-    Write-Host "  Firewall rule created for port 8765" -ForegroundColor Yellow
+        -Description "LAN access to IND3 Reliability Passdown on port 8766" | Out-Null
+    Write-Host "  Firewall rule created for port 8766" -ForegroundColor Yellow
 } else {
-    Write-Host "  Firewall rule already exists for port 8765" -ForegroundColor Gray
+    Write-Host "  Firewall rule already exists for port 8766" -ForegroundColor Gray
 }
 
 # Start it immediately
@@ -102,8 +102,8 @@ Write-Host "  Restarts   : every 1 min on crash (up to 99x)"
 Write-Host "  State now  : $State" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  Access URLs:" -ForegroundColor White
-Write-Host "    This PC   : http://localhost:8765" -ForegroundColor Cyan
-Write-Host "    Other PCs : http://${MyIP}:8765" -ForegroundColor Cyan
+Write-Host "    This PC   : http://localhost:8766" -ForegroundColor Cyan
+Write-Host "    Other PCs : http://${MyIP}:8766" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  Log file   : $ProjectDir\server.log"
 Write-Host ""

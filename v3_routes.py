@@ -978,6 +978,8 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             skipped_parts.append(f"{stats['not_closed']} not yet closed")
         if stats.get("outside_shift"):
             skipped_parts.append(f"{stats['outside_shift']} outside this shift's time window")
+        if stats.get("ambiguous_shift"):
+            skipped_parts.append(f"{stats['ambiguous_shift']} flagged for MST review (timestamps don't clearly establish the shift)")
         if skipped_parts:
             notice += " Skipped " + " and ".join(skipped_parts) + " (not counted as happenings)."
         from urllib.parse import quote

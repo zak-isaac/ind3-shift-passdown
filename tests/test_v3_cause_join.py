@@ -42,10 +42,11 @@ def _xlsx_bytes(headers: list[str], rows: list[list]) -> bytes:
 
 def test_v3_cetaris_wo_number_matches_cause_file_for_numeric_cells():
     timecard_xlsx = _xlsx_bytes(
-        ["WO Number", "Asset #", "WO Status", "Primary RFR", "Service/Repair Description",
-         "Technician", "Technician Remarks", "Start Date"],
-        [[28017126, "TRKGATE0002", "Closed", "Breakdown", "Gate won't open",
-          "Smith, John", "Replaced sensor", "10/20/2026 08:00 AM"]],
+        ["WO Number", "Asset ID", "Asset #", "WO Status", "SJ / PM Code", "Repair Class",
+         "Last Shift", "Service/Repair Description", "Technician", "Technician Remarks",
+         "Cause", "Start Date", "WO Closed Date/Time", "Primary RFR"],
+        [[28017126, None, "TRKGATE0002", "Closed", None, "Unplanned", "S2", "Gate won't open",
+          "Smith, John", "Replaced sensor", None, "10/20/2026 08:00 AM", "10/20/2026 09:00 AM", "Breakdown"]],
     )
     cause_xlsx = _xlsx_bytes(
         ["WO Number", "Repair Description"],
@@ -85,10 +86,11 @@ def test_cause_file_upload_joins_into_workspace_happenings(client_and_shift):
     must surface the cause text in the workspace -- in either upload order."""
     client, sid = client_and_shift
     timecard_xlsx = _xlsx_bytes(
-        ["WO Number", "Asset #", "WO Status", "Primary RFR", "Service/Repair Description",
-         "Technician", "Technician Remarks", "Start Date"],
-        [[28017126, "TRKGATE0002", "Closed", "Breakdown", "Gate won't open",
-          "Smith, John", "Replaced sensor", "2026-10-20 08:00:00"]],
+        ["WO Number", "Asset ID", "Asset #", "WO Status", "SJ / PM Code", "Repair Class",
+         "Last Shift", "Service/Repair Description", "Technician", "Technician Remarks",
+         "Cause", "Start Date", "WO Closed Date/Time", "Primary RFR"],
+        [[28017126, None, "TRKGATE0002", "Closed", None, "Unplanned", "S2", "Gate won't open",
+          "Smith, John", "Replaced sensor", None, "2026-10-20 08:00:00", "2026-10-20 09:00:00", "Breakdown"]],
     )
     cause_xlsx = _xlsx_bytes(["WO Number", "Repair Description"], [[28017126, "Sensor failure"]])
 

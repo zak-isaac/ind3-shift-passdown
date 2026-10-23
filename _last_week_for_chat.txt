@@ -1,0 +1,68 @@
+[2026-09-14 S2] BALER0004: change 2 wire Assist with 2 baler wires
+[2026-09-14 S2] FLEX0009: assisted Had a bad brush salvaged from electric motors on bench because we don't have brushes for newer motors model 72553 is the brush part needed
+[2026-09-14 S2] RTU-W-07: Turned unit back on
+[2026-09-14 S2] VRC0001: Recalibrated each floor
+[2026-09-14 S2] FLEX0007: had to replace a bad brush on motor 4 with spare motors Assisted with installing a new brush for the motor.
+[2026-09-14 S2] FLEX0004: Replaced lower brushes on motors 9,5,4 Assisted with installing new brushes on the flex
+[2026-09-14 S2] CR0009: Braking: 4ft Plugging: 1ft New load wheels added.
+[2026-09-14 S2] SCRUB0001: trying the fittings on the new drive motor from the old motor getting replaced.
+[2026-09-15 S2] TSP0008: Assist with removing info link assist with removal of gasket Gasket taken off from TSP0008 to be used on TSP0002. An order for a new gasket has already been placed
+[2026-09-15 S2] TSP0002: retaped 1 of the threads on TSP0002 I got the gasket from TSP0008. Upon installing the stud screws. I noticed two holes needed fixing. One hole is a little wider on one side making it so the screw not to stay in position and the other hole needs rethreading. Assist
+[2026-09-15 S2] RC0013: Performing the function test. Plugging:5 ft Braking:3 ft
+[2026-09-15 S2] RC0013: Performing the function test. Plugging:5 ft Braking:3 ft
+[2026-09-15 S2] BLDG: Take meter reading on all Fork Lifts.
+[2026-09-15 S2] VOIDFILL0801: The tension head spool was threaded in way too far making the tape not to stay as needed on the head. Readjusted and now the taper is operational.
+[2026-09-15 S2] VOIDFILL0801: Taped changed and spacer added to control the spring tension. Asset is operational.
+[2026-09-15 S2] CR0003: Unlocked the equipment and changed for any physical damage. Asset is operational and back into service.
+[2026-09-16 S2] M2784: Possible broken wire in steering colum checked for voltage there was none checked horn fuse and checked with new button and checked with new horn and no results
+[2026-09-16 S2] VRC0002: Pushed stuck locks back in VRC0002
+[2026-09-16 S2] TSP0008: Assist with removing info link assist with removal of gasket
+[2026-09-16 S2] TSP0002: retaped 1 of the threads on TSP0002
+[2026-09-16 S2] GROUNDS: intstalled pole covers
+[2026-09-16 S2] RC0013: Performing the function test. Plugging:5 ft Braking:3 ft
+[2026-09-16 S2] RC0013: Performing the function test. Plugging:5 ft Braking:3 ft
+[2026-09-16 S2] BLDG: Take meter reading on all Fork Lifts.
+[2026-09-16 S2] TSP0008: Assist with removing info link assist with removal of gasket
+[2026-09-16 S2] TSP0002: retaped 1 of the threads on TSP0002
+[2026-09-16 S2] GROUNDS: intstalled pole covers
+[2026-09-16 S2] RC0013: Performing the function test. Plugging:5 ft Braking:3 ft
+[2026-09-16 S2] RC0013: Performing the function test. Plugging:5 ft Braking:3 ft
+[2026-09-16 S2] BLDG: Take meter reading on all Fork Lifts.
+[2026-09-17 S2] BALER0004: Baler binding wire replaced
+[2026-09-17 S2] VOIDFILL0301: the side  guard green belt was loose tight it back and run the machine as normal again.
+[2026-09-17 S2] VOIDFILL0801: paper feed got jammed up reset and recalibrated no issues
+[2026-09-18 S5] PERCART0009: Assisted in installing new lithium battery into percart0009. Paused for radio call for yard truck
+[2026-09-18 S5] M2678: Accidentally created
+[2026-09-18 S5] M2360: During inspection notice error comm, and check engine alert on dash, Checked all fuses within both boxes located within cab,  None of the fuse were able to remove alerts from dash went to the back of the cab where an external 3rd fuse box was located , open the fuse box and notice connector cables corroded inside, remove cables and clean them thoroughly and place them into there proper position , restated yard truck and all alerts were no longer present .yard truck return back to normal operations.
+[2026-09-18 S5] VOIDFILL0301: During inspectipn notice boxes stopping before entering taper, changed the box sealing configurations from 15mm to 20mm 
+To raise the sealing level , changed bottom and top tape, restarted voidfill and monitored machine
+[2026-09-18 S5] VOIDFILL0801: Removed boxes , checked for damage, cleared queue , cleared faults ,set machine to auto & monitored
+[2026-09-18 S5] VOIDFILL0201: Removes the boxes from the machine & moved them to the other line, auto calibrated the head unit, cleared queue Removed tape off the taper roller,checked tention cleared faults,set to auto  & monitored
+[2026-09-18 S5] VOIDFILL0501: At first the operator didn't have the taper inserted properly. After I adjusted it the issue the problem persisted unit l changed the tape roll & taper then the issue was solved
+[2026-09-18 S5] VOIDFILL0401: Moved the box off the line and lifted the fill head up , Refed the paper through the feeder. On screen hit "feed paper" which cleared that. There was also tape built up on the cutter blade preventing the taper to cut smoothly that I clearled off & monitored
+[2026-09-18 S5] VOIDFILL0801: Top tape replaced.. Issue was already adressed before I got there
+[2026-09-18 S5] CR0014: Bad load wheels replaced. braking 4 feet and plugging 4 1/2 feet
+[2026-09-18 S5] DD0142: Reset breaker
+[2026-09-18 S5] TAPER0202: replaced hardware and secured the RanPak head
+[2026-09-18 S5] BALER0004: tied off and restarted the baler
+[2026-09-19 S5] VOIDFILL0201: MDR under the fillhead was not functioning finally got the wire splice that RanPak put in to connect, They were supposed to have come out and replace that wire harness
+[2026-09-19 S5] VOIDFILL0401: Checked the tape heads and cleaned off the tape build up from the teeth then observed several boxes found that the majority of the issues are the pickers are not packing the boxes correctly and the packsize boxes are a problem with hanging cardboard and weak fold creases
+[2026-09-19 S5] BALER0004: Tied off the wire and routed the non tie side correctly through the pulley
+[2026-09-19 S5] VOIDFILL0701: Checked the tape head and found the blade pad missing causing tape to build up and not cut, switched out the tape head  also found the bottom tape head not completely seated into its mounting causing fault after fault, seated the tapehead correctly, after restarting some boxes would over travel under the fill head causing a jam, re-calibrated the tower, fill head and side guides
+[2026-09-19 S5] VOIDFILL1101: Adjusting cutting blade and changing tape.
+[2026-09-19 S5] VOIDFILL0901: Tape replaced Tape replaced.
+[2026-09-19 S5] VOIDFILL0501: Adjustment and cleaning.
+[2026-09-19 S5] BALER0003: Binding wires replaced.
+[2026-09-19 S5] VOIDFILL0101: Clean and adjust.
+[2026-09-19 S5] BALER0004: Binding wire replaced.
+[2026-09-20 S4] VRC0004: Troubleshooting from the PLC and found that we have a constant 24vdc from output 0 even when the plc isn't indicating that it's sending power. Tested the other floors and the 24vdc was only present when the platform was at the corresponding floor. I ohmed the relay and found the resistance was constant when it should have been fluctuating so I replaced that relay card and tested the VRC then RTS. (The CompactLogix card faulted i had to flip between run and program a couple of times to clear the fault.)
+[2026-09-20 S4] GROUNDS: Checking on the gate, found the push bar was misaligned I realigned it and tested it, it is now working normally
+[2026-09-20 S4] VOIDFILL0301: I found the X16 fill head photoeye out of alignment I realigned it cleared the fault and RTS
+[2026-09-20 S4] VOIDFILL1101: Associate stated the boxes were stopping between the DT and the voidfill, i monitored 30-40 cases run with 2 issues both being tapehead issues I cleaned the blade on the top tapehead cleared the faults and RTS
+[2026-09-20 S4] VOIDFILL1001: Found box not gripped properly fault, i removed the box cleared the fault and monitored 30 cases run without issue then I had multiple paper jam issues and i found the paper cart out of its slot causing the paper to run offset to the rollers causing tearing. I reset the paper cart and RTS.
+[2026-09-20 S4] VOIDFILL0501: I verified all the photo eyes were aligned then i found a fault on the barcode scanner so i powercycled it and restarted the DT then boxes started processing correctly I monitored the machine for a while then RTS
+[2026-09-20 S4] VOIDFILL0601: I replaced the worn wheels. I then performed a function test on the machine which passed and RTS
+[2026-09-20 S4] VOIDFILL0101: Upon arrival every box we ran would clear the machine but then we would get "Taper fault please press reset all" when it exited the taper, after some troubleshooting we started checking relays I pulled the safety relay in the taper PLC Cabinet which caused a "reset clearlink breaker" we reset the fault after that and ran a few boxes but then the folding area belts stopped running so we checked the relay for them and found it burnt so we replaced it. We are now waiting on knapp to finish a repair on the exit line before testing 12:45. We tested the equipment and it is
+[2026-09-20 S4] BALER0004: Knapp was clearing a jam and found a photoeye out of alignment they readjusted it then got the fault, i switched it to hand mode reset the fault then switched it back to auto and RTS
+[2026-09-20 S5] VOIDFILL0601: Replaced motor belt in head unit for the paper rollors
+[2026-09-20 S5] VOIDFILL0501: Taper and blade Readjusted.

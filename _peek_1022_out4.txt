@@ -1,0 +1,26 @@
+Planned rows: 9  Unplanned rows: 144
+Rows with SJ/PM Code populated: 9
+Planned AND SJ-populated: 9
+Planned but NO SJ code: 0
+SJ-populated but NOT planned: 0
+
+--- Primary RFR / RFR / Work Accomplished for PM rows (SJ populated) ---
+{"WO Number": "28023939", "Primary RFR": "Preventive Maintenance", "RFR": "Preventive Maintenance", "Work Accomplished": "Prev Maintenance", "Repair Class": "Planned", "WO Status": "Closed", "WO Closed Date/Time": "10/22/2026 3:01 PM", "Start Date": "10/22/2026 2:27 PM", "Cause": null}
+{"WO Number": "28023596", "Primary RFR": "Preventive Maintenance", "RFR": "Preventive Maintenance", "Work Accomplished": "Prev Maintenance", "Repair Class": "Planned", "WO Status": "Closed", "WO Closed Date/Time": "10/22/2026 8:06 AM", "Start Date": "10/22/2026 7:31 AM", "Cause": null}
+{"WO Number": "28023465", "Primary RFR": "Preventive Maintenance", "RFR": "Preventive Maintenance", "Work Accomplished": "Prev Maintenance", "Repair Class": "Planned", "WO Status": "Closed", "WO Closed Date/Time": "10/22/2026 7:17 AM", "Start Date": "10/22/2026 7:14 AM", "Cause": null}
+{"WO Number": "28023476", "Primary RFR": "Preventive Maintenance", "RFR": "Preventive Maintenance", "Work Accomplished": "Prev Maintenance", "Repair Class": "Planned", "WO Status": "Closed", "WO Closed Date/Time": "10/22/2026 11:16 AM", "Start Date": "10/22/2026 10:57 AM", "Cause": null}
+{"WO Number": "28023499", "Primary RFR": "Preventive Maintenance", "RFR": "Preventive Maintenance", "Work Accomplished": "Prev Maintenance", "Repair Class": "Planned", "WO Status": "Closed", "WO Closed Date/Time": "10/22/2026 6:03 AM", "Start Date": "10/22/2026 5:08 AM", "Cause": null}
+{"WO Number": "28023560", "Primary RFR": "Preventive Maintenance", "RFR": "Preventive Maintenance", "Work Accomplished": "Prev Maintenance", "Repair Class": "Planned", "WO Status": "Closed", "WO Closed Date/Time": "10/22/2026 9:35 AM", "Start Date": "10/22/2026 6:28 AM", "Cause": null}
+{"WO Number": "28023560", "Primary RFR": "Preventive Maintenance", "RFR": "Preventive Maintenance", "Work Accomplished": "Prev Maintenance", "Repair Class": "Planned", "WO Status": "Closed", "WO Closed Date/Time": "10/22/2026 9:35 AM", "Start Date": "10/22/2026 9:12 AM", "Cause": null}
+{"WO Number": "28023349", "Primary RFR": "Preventive Maintenance", "RFR": "Preventive Maintenance", "Work Accomplished": "Prev Maintenance", "Repair Class": "Planned", "WO Status": "Closed", "WO Closed Date/Time": "10/22/2026 7:30 AM", "Start Date": "10/22/2026 6:51 AM", "Cause": null}
+{"WO Number": "28023251", "Primary RFR": "Preventive Maintenance", "RFR": "Preventive Maintenance", "Work Accomplished": "Prev Maintenance", "Repair Class": "Planned", "WO Status": "Closed", "WO Closed Date/Time": "10/22/2026 3:33 PM", "Start Date": "10/22/2026 3:01 PM", "Cause": null}
+
+Distinct Primary RFR overall: ['Found During PM', 'Preventive Maintenance', 'Proactive Repair', 'Process Interruption', 'Work Request']
+Distinct Work Accomplished overall: ['Accidental Damage', 'Adjusted', 'Alarm / Fault (Ignition/Visual Tool)', 'Component Failure', 'Contamination/Buildup', 'Jam', 'Manager Task', 'Operations Process Interruption', 'Prev Maintenance', 'Validation / Audit', 'Wrk Req/Project or Induct/Install']
+
+Rows with Asset ID populated: 21
+  {"WO Number": "28024686", "Asset ID": "BAG0014", "Asset #": "BAG0014"}
+  {"WO Number": "28024614", "Asset ID": "BLDG", "Asset #": "BLDG"}
+  {"WO Number": "28024606", "Asset ID": "VOIDFILL", "Asset #": "VOIDFILL0401"}
+  {"WO Number": "28024596", "Asset ID": "SCRUB0002", "Asset #": "SCRUB0002"}
+  {"WO Number": "28024594", "Asset ID": "VOIDFILL", "Asset #": "VOIDFILL0501"}

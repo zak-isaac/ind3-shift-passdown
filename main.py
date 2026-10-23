@@ -636,7 +636,7 @@ async def home(request: Request, error: str = ""):
 @app.get("/share", response_class=HTMLResponse)
 async def share_page(request: Request):
     shift = db.get_active_shift()
-    host = f"{_local_ip()}:8765"
+    host = f"{_local_ip()}:8766"
     return templates.TemplateResponse(
         request, "share.html", {"shift": shift, "host": host}
     )
@@ -2907,7 +2907,7 @@ async def print_report(request: Request):
 @app.get("/print-qr", response_class=HTMLResponse)
 async def print_qr(request: Request):
     shift = db.get_active_shift()
-    host = f"{_local_ip()}:8765"
+    host = f"{_local_ip()}:8766"
     return templates.TemplateResponse(
         request, "print_qr.html", {"shift": shift, "host": host}
     )

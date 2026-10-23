@@ -1,0 +1,326 @@
+Repeatability + Factual-Accuracy Test Report
+Model: gemma3n-e2b (confirmed via `ollama list` before running)
+gemma4:e4b: BLOCKED -- Ollama 0.9.4 has no 'gemma4' architecture support
+temperature=0.0  seed=42  threads=unchanged (default)
+Runs per case: 3
+==============================================================================
+
+##############################################################################
+# CASE: multi_tech_same_event_dedup
+# Asset: FLEX0007  WO#: 27969809
+# ORIGINAL INPUT: ['had to replace a bad brush on motor 4 with spare motors', 'Assisted with installing a new brush for the motor.']
+##############################################################################
+
+--- Run 1 ---
+validation_result=False  fallback_result=True
+asset_id='FLEX0007'
+actions_performed=['Replaced a bad brush on motor 4 with a spare motor']
+unresolved_issues=[]
+returned_to_service=True
+narrative='had to replace a bad brush on motor 4 with spare motors | Assisted with installing a new brush for the motor.'
+missing_facts=[]
+invented_facts=['returned_to_service=True inferred with no explicit supporting source text (source never states equipment status)', "unrecognized new word(s): ['completed']"]
+
+--- Run 2 ---
+validation_result=False  fallback_result=True
+asset_id='FLEX0007'
+actions_performed=['Replaced a bad brush on motor 4 with a spare motor']
+unresolved_issues=[]
+returned_to_service=True
+narrative='had to replace a bad brush on motor 4 with spare motors | Assisted with installing a new brush for the motor.'
+missing_facts=[]
+invented_facts=['returned_to_service=True inferred with no explicit supporting source text (source never states equipment status)', "unrecognized new word(s): ['completed']"]
+
+--- Run 3 ---
+validation_result=False  fallback_result=True
+asset_id='FLEX0007'
+actions_performed=['Replaced a bad brush on motor 4 with a spare motor']
+unresolved_issues=[]
+returned_to_service=True
+narrative='had to replace a bad brush on motor 4 with spare motors | Assisted with installing a new brush for the motor.'
+missing_facts=[]
+invented_facts=['returned_to_service=True inferred with no explicit supporting source text (source never states equipment status)', "unrecognized new word(s): ['completed']"]
+
+--- Consistency summary for multi_tech_same_event_dedup ---
+Exact-output consistency (runs 2-10 byte-identical to run 1): 2/2
+Functional consistency: STABLE across all 10 runs
+Any invented facts across any run: True
+Any missing facts across any run: False
+Fallback triggered on any run: True
+
+>>> FINAL PASS/FAIL for multi_tech_same_event_dedup: FAIL
+
+##############################################################################
+# CASE: multi_tech_unique_work_preserved
+# Asset: FLEX0004  WO#: 27969816
+# ORIGINAL INPUT: ['Replaced lower brushes on motors 9,5,4', 'Assisted with installing new brushes on the flex']
+##############################################################################
+
+--- Run 1 ---
+validation_result=True  fallback_result=False
+asset_id='FLEX0004'
+actions_performed=['Replaced lower brushes on motors 9, 5, 4', 'Installed new brushes on the flex']
+unresolved_issues=[]
+returned_to_service=None
+narrative='Lower brushes were replaced on motors 9, 5, and 4. New brushes were installed on the flex.'
+missing_facts=[]
+invented_facts=[]
+
+--- Run 2 ---
+validation_result=True  fallback_result=False
+asset_id='FLEX0004'
+actions_performed=['Replaced lower brushes on motors 9, 5, 4', 'Installed new brushes on the flex']
+unresolved_issues=[]
+returned_to_service=None
+narrative='Lower brushes were replaced on motors 9, 5, and 4. New brushes were installed on the flex.'
+missing_facts=[]
+invented_facts=[]
+
+--- Run 3 ---
+validation_result=True  fallback_result=False
+asset_id='FLEX0004'
+actions_performed=['Replaced lower brushes on motors 9, 5, 4', 'Installed new brushes on the flex']
+unresolved_issues=[]
+returned_to_service=None
+narrative='Lower brushes were replaced on motors 9, 5, and 4. New brushes were installed on the flex.'
+missing_facts=[]
+invented_facts=[]
+
+--- Consistency summary for multi_tech_unique_work_preserved ---
+Exact-output consistency (runs 2-10 byte-identical to run 1): 2/2
+Functional consistency: STABLE across all 10 runs
+Any invented facts across any run: False
+Any missing facts across any run: False
+Fallback triggered on any run: False
+
+>>> FINAL PASS/FAIL for multi_tech_unique_work_preserved: PASS
+
+##############################################################################
+# CASE: complex_multistep_with_complication
+# Asset: VOIDFILL0201  WO#: 27966514
+# ORIGINAL INPUT: ["The bottom tape encountered issues due to excessive tension which caused it to move towards the tape head because we couldn't reduce any further as the tensioner nut reached its lowest setting -- so after removing and cleaning up both M504 and M507 PEs, I found that only one was misaligned. After adjusting just this faulty PE back into alignment (M504), unfortunately another sensor got damaged in the process, meanwhile I've temporarily fixed everything with some double-sided tape until we can get a replacement for it.", 'Replaced taper & monitored.']
+##############################################################################
+
+--- Run 1 ---
+validation_result=False  fallback_result=True
+asset_id='VOIDFILL0201'
+actions_performed=['The bottom tape encountered issues due to excessive tension', 'The tensioner nut reached its lowest setting', 'Both M504 and M507 PEs were removed and cleaned up', 'One PE was found to be misaligned', 'The faulty PE (M504) was adjusted back into alignment', 'Double-sided tape was used to temporarily fix everything']
+unresolved_issues=['Another sensor got damaged']
+returned_to_service=False
+narrative="The bottom tape encountered issues due to excessive tension which caused it to move towards the tape head because we couldn't reduce any further as the tensioner nut reached its lowest setting -- so after removing and cleaning up both M504 and M507 PEs, I found that only one was misaligned. After adjusting just this faulty PE back into alignment (M504), unfortunately another sensor got damaged in the process, meanwhile I've temporarily fixed everything with some double-sided tape until we can get a replacement for it. | Replaced taper & monitored."
+missing_facts=[]
+invented_facts=['returned_to_service=False inferred with no explicit supporting source text (source never states equipment status)']
+
+--- Run 2 ---
+validation_result=False  fallback_result=True
+asset_id='VOIDFILL0201'
+actions_performed=['The bottom tape encountered issues due to excessive tension', 'The tensioner nut reached its lowest setting', 'Both M504 and M507 PEs were removed and cleaned up', 'One PE was found to be misaligned', 'The faulty PE (M504) was adjusted back into alignment', 'Double-sided tape was used to temporarily fix everything']
+unresolved_issues=['Another sensor got damaged']
+returned_to_service=False
+narrative="The bottom tape encountered issues due to excessive tension which caused it to move towards the tape head because we couldn't reduce any further as the tensioner nut reached its lowest setting -- so after removing and cleaning up both M504 and M507 PEs, I found that only one was misaligned. After adjusting just this faulty PE back into alignment (M504), unfortunately another sensor got damaged in the process, meanwhile I've temporarily fixed everything with some double-sided tape until we can get a replacement for it. | Replaced taper & monitored."
+missing_facts=[]
+invented_facts=['returned_to_service=False inferred with no explicit supporting source text (source never states equipment status)']
+
+--- Run 3 ---
+validation_result=False  fallback_result=True
+asset_id='VOIDFILL0201'
+actions_performed=['The bottom tape encountered issues due to excessive tension', 'The tensioner nut reached its lowest setting', 'Both M504 and M507 PEs were removed and cleaned up', 'One PE was found to be misaligned', 'The faulty PE (M504) was adjusted back into alignment', 'Double-sided tape was used to temporarily fix everything']
+unresolved_issues=['Another sensor got damaged']
+returned_to_service=False
+narrative="The bottom tape encountered issues due to excessive tension which caused it to move towards the tape head because we couldn't reduce any further as the tensioner nut reached its lowest setting -- so after removing and cleaning up both M504 and M507 PEs, I found that only one was misaligned. After adjusting just this faulty PE back into alignment (M504), unfortunately another sensor got damaged in the process, meanwhile I've temporarily fixed everything with some double-sided tape until we can get a replacement for it. | Replaced taper & monitored."
+missing_facts=[]
+invented_facts=['returned_to_service=False inferred with no explicit supporting source text (source never states equipment status)']
+
+--- Consistency summary for complex_multistep_with_complication ---
+Exact-output consistency (runs 2-10 byte-identical to run 1): 2/2
+Functional consistency: STABLE across all 10 runs
+Any invented facts across any run: True
+Any missing facts across any run: False
+Fallback triggered on any run: True
+
+>>> FINAL PASS/FAIL for complex_multistep_with_complication: FAIL
+
+##############################################################################
+# CASE: explicit_returned_to_service
+# Asset: VOIDFILL0501  WO#: 27965717
+# ORIGINAL INPUT: ['Calibrated both closers. Asset is operational now.']
+##############################################################################
+
+--- Run 1 ---
+validation_result=True  fallback_result=False
+asset_id='VOIDFILL0501'
+actions_performed=['Calibrated both closers']
+unresolved_issues=[]
+returned_to_service=True
+narrative='Calibrated both closers. The asset is operational now.'
+missing_facts=[]
+invented_facts=[]
+
+--- Run 2 ---
+validation_result=True  fallback_result=False
+asset_id='VOIDFILL0501'
+actions_performed=['Calibrated both closers']
+unresolved_issues=[]
+returned_to_service=True
+narrative='Calibrated both closers. The asset is operational now.'
+missing_facts=[]
+invented_facts=[]
+
+--- Run 3 ---
+validation_result=True  fallback_result=False
+asset_id='VOIDFILL0501'
+actions_performed=['Calibrated both closers']
+unresolved_issues=[]
+returned_to_service=True
+narrative='Calibrated both closers. The asset is operational now.'
+missing_facts=[]
+invented_facts=[]
+
+--- Consistency summary for explicit_returned_to_service ---
+Exact-output consistency (runs 2-10 byte-identical to run 1): 2/2
+Functional consistency: STABLE across all 10 runs
+Any invented facts across any run: False
+Any missing facts across any run: False
+Fallback triggered on any run: False
+
+>>> FINAL PASS/FAIL for explicit_returned_to_service: PASS
+
+##############################################################################
+# CASE: void_rule_vague_participation
+# Asset: CR0007  WO#: 27932929
+# ORIGINAL INPUT: ['Assisted with the fix.']
+##############################################################################
+
+--- Run 1 ---
+validation_result=True  fallback_result=False
+asset_id='CR0007'
+actions_performed=['Performed the fix']
+unresolved_issues=[]
+returned_to_service=None
+narrative='The fix was performed.'
+missing_facts=[]
+invented_facts=[]
+
+--- Run 2 ---
+validation_result=True  fallback_result=False
+asset_id='CR0007'
+actions_performed=['Performed the fix']
+unresolved_issues=[]
+returned_to_service=None
+narrative='The fix was performed.'
+missing_facts=[]
+invented_facts=[]
+
+--- Run 3 ---
+validation_result=True  fallback_result=False
+asset_id='CR0007'
+actions_performed=['Performed the fix']
+unresolved_issues=[]
+returned_to_service=None
+narrative='The fix was performed.'
+missing_facts=[]
+invented_facts=[]
+
+--- Consistency summary for void_rule_vague_participation ---
+Exact-output consistency (runs 2-10 byte-identical to run 1): 2/2
+Functional consistency: STABLE across all 10 runs
+Any invented facts across any run: False
+Any missing facts across any run: False
+Fallback triggered on any run: False
+
+>>> FINAL PASS/FAIL for void_rule_vague_participation: PASS
+
+##############################################################################
+# CASE: unclear_incomplete_remark
+# Asset: TSP0004  WO#: 27833999
+# ORIGINAL INPUT: ['thing on left side making noise checked couldnt find issue']
+##############################################################################
+
+--- Run 1 ---
+validation_result=False  fallback_result=True
+asset_id='TSP0004'
+actions_performed=['Checked the thing on the left side for noise']
+unresolved_issues=[]
+returned_to_service=None
+narrative='thing on left side making noise checked couldnt find issue'
+missing_facts=[]
+invented_facts=["unrecognized new word(s): ['found', 'however', 'not']"]
+
+--- Run 2 ---
+validation_result=False  fallback_result=True
+asset_id='TSP0004'
+actions_performed=['Checked the thing on the left side for noise']
+unresolved_issues=[]
+returned_to_service=None
+narrative='thing on left side making noise checked couldnt find issue'
+missing_facts=[]
+invented_facts=["unrecognized new word(s): ['found', 'however', 'not']"]
+
+--- Run 3 ---
+validation_result=False  fallback_result=True
+asset_id='TSP0004'
+actions_performed=['Checked the thing on the left side for noise']
+unresolved_issues=[]
+returned_to_service=None
+narrative='thing on left side making noise checked couldnt find issue'
+missing_facts=[]
+invented_facts=["unrecognized new word(s): ['found', 'however', 'not']"]
+
+--- Consistency summary for unclear_incomplete_remark ---
+Exact-output consistency (runs 2-10 byte-identical to run 1): 2/2
+Functional consistency: STABLE across all 10 runs
+Any invented facts across any run: True
+Any missing facts across any run: False
+Fallback triggered on any run: True
+
+>>> FINAL PASS/FAIL for unclear_incomplete_remark: FAIL
+
+##############################################################################
+# CASE: misspelled_remark
+# Asset: BALER0002  WO#: 27965956
+# ORIGINAL INPUT: ['recalibrated teh bailer sesnor after it was throwing flase erors']
+##############################################################################
+
+--- Run 1 ---
+validation_result=False  fallback_result=True
+asset_id='BALER0002'
+actions_performed=['Recalibrated the bailer sensor', 'Resolved false error']
+unresolved_issues=[]
+returned_to_service=None
+narrative='recalibrated teh bailer sesnor after it was throwing flase erors'
+missing_facts=[]
+invented_facts=[]
+
+--- Run 2 ---
+validation_result=False  fallback_result=True
+asset_id='BALER0002'
+actions_performed=['Recalibrated the bailer sensor', 'Resolved false error']
+unresolved_issues=[]
+returned_to_service=None
+narrative='recalibrated teh bailer sesnor after it was throwing flase erors'
+missing_facts=[]
+invented_facts=[]
+
+--- Run 3 ---
+validation_result=False  fallback_result=True
+asset_id='BALER0002'
+actions_performed=['Recalibrated the bailer sensor', 'Resolved false error']
+unresolved_issues=[]
+returned_to_service=None
+narrative='recalibrated teh bailer sesnor after it was throwing flase erors'
+missing_facts=[]
+invented_facts=[]
+
+--- Consistency summary for misspelled_remark ---
+Exact-output consistency (runs 2-10 byte-identical to run 1): 2/2
+Functional consistency: STABLE across all 10 runs
+Any invented facts across any run: False
+Any missing facts across any run: False
+Fallback triggered on any run: True
+
+>>> FINAL PASS/FAIL for misspelled_remark: PASS
+
+==============================================================================
+OVERALL: ONE OR MORE CASES FAILED
+_USE_AI in ai_rewriter.py: UNCHANGED (still disabled, per instruction)
+==============================================================================
