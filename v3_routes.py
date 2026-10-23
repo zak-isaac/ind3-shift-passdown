@@ -761,7 +761,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             existing=db.get_cmms_entry(shift_id,r["wo_number"],r["tech_name"])
             incoming={
                 "unit":r["asset_id"],"reported_issue":r["reported_issue"],
-                "cause_text":r["cause"],"remarks_list":r["remarks_list"],"rfr_type":r["rfr"]
+                "cause_text":r["reported_issue"],"remarks_list":r["remarks_list"],"rfr_type":r["rfr"]
             }
             if existing:
                 with db._conn() as c:
@@ -796,7 +796,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                 eid=db.upsert_cmms_entry(shift_id,r["wo_number"],r["asset_id"],r["reported_issue"],json.dumps(r["remarks_list"]),r["tech_name"])
                 with db._conn() as c:
                     c.execute("INSERT INTO v3_entry_meta(entry_id,shift_id,reported_issue,cause_text,original_remarks,imported_v3,source_snapshot,rfr_type) VALUES (?,?,?,?,?,1,?,?)",
-                              (eid,shift_id,r["reported_issue"],r["cause"],json.dumps(r["remarks_list"]),json.dumps(incoming),r["rfr"]))
+                              (eid,shift_id,r["reported_issue"],r["reported_issue"],json.dumps(r["remarks_list"]),json.dumps(incoming),r["rfr"]))
                 added+=1
         with db._conn() as c:
             c.execute("INSERT INTO v3_shift_source(shift_id,filename,rows_json) VALUES (?,?,?) "
