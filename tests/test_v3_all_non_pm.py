@@ -13,5 +13,5 @@ def test_all_non_pm_categories_and_unknown_are_happenings():
     assert len(happenings)==9
     assert len(pms)==2
     assert summary["not_closed"]==1
-    assert {r["rfr"] for r in happenings}==set(categories[:9]) - {"Preventive Maintenance"}
+    assert {r["rfr"] for r in happenings}==set(categories[:10]) - {"Preventive Maintenance"}
     assert "unsupported_rfr" not in summary
