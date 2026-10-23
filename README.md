@@ -8,7 +8,7 @@
 - **Master credentials:** configure the approved environment variables described in [V3 deployment instructions](docs/V3_OPERATIONAL_PATCH_DEPLOYMENT.md). Do not store credentials in GitHub.
 - **Safety:** stage and test on a backup DB; verify Walmart network/IT approval before allowing other laptops to connect.
 
-**Important:** This change is on the development branch until reviewed and merged. The workshop PC will not change automatically from a GitHub commit.
+**Important:** The V3-only changes are merged into `main`. The workshop PC still needs its local code updated and tested; GitHub changes do not automatically restart or replace its running installation.
 
 ---
 
