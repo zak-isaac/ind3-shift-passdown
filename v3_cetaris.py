@@ -72,7 +72,8 @@ def parse_excel(data: bytes) -> list[dict]:
     try:
         workbook = load_workbook(BytesIO(data), read_only=True, data_only=True)
     except Exception as exc:
-        raise ValueError("Unable to read this XLSX export.") from exc
+        raise ValueError("Unable to read this file as an Excel (.xlsx) workbook. "
+                          "Make sure you selected the actual exported report file.") from exc
     try:
         sheet = workbook.active
         source = sheet.iter_rows(values_only=True)
@@ -82,7 +83,7 @@ def parse_excel(data: bytes) -> list[dict]:
         mapping = {str(name).strip().casefold(): pos for pos, name in enumerate(headers) if name is not None}
         missing = [name for name in REQUIRED if name.casefold() not in mapping]
         if missing:
-            raise ValueError("This isn't the supported Cetaris Desktop report. Missing columns: " + ", ".join(missing))
+            raise ValueError("This Excel file doesn't match the expected Cetaris work order export. Missing columns: " + ", ".join(missing))
 
         def get(row, label):
             pos = mapping.get(label.casefold())

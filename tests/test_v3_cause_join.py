@@ -184,3 +184,46 @@ def test_empty_cause_column_falls_back_to_service_description(client_and_shift):
     assert confirmed.status_code == 303
 
     assert db.get_v3_entry_causes(sid) == {"28088888": "Conveyor belt jammed with debris"}
+
+
+def test_upload_accepted_regardless_of_filename_extension(client_and_shift):
+    """Validation must be based on actual file CONTENT, not the filename --
+    a tech on any device (laptop, workstation, whatever) can end up with an
+    oddly-named or extensionless download. A real Cetaris export must be
+    accepted no matter what the browser happened to name it.
+    """
+    client, sid = client_and_shift
+    timecard_xlsx = _xlsx_bytes(
+        ["WO Number", "Asset ID", "Asset #", "WO Status", "SJ / PM Code", "Repair Class",
+         "Last Shift", "Service/Repair Description", "Technician", "Technician Remarks",
+         "Cause", "Start Date", "WO Closed Date/Time", "Primary RFR"],
+        [[28077777, None, "TRKGATE0005", "Closed", None, "Unplanned", "S2", "Gate won't open",
+          "Smith, John", "Replaced sensor", None, "2026-10-20 08:00:00", "2026-10-20 09:00:00", "Breakdown"]],
+    )
+    # No .xlsx extension at all -- used to be hard-rejected before even
+    # looking at the content.
+    staged = client.post("/v3/import", data={"shift_id": sid},
+                          files={"file": ("export_downloaded", timecard_xlsx,
+                                  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert staged.status_code == 200
+    assert "Please upload" not in staged.text
+    assert "Smith, John" in staged.text  # staged technician summary rendered -> upload succeeded
+
+
+def test_garbage_content_rejected_with_content_based_message(client_and_shift):
+    """A wrong/corrupt file (not a real workbook) must be rejected based on
+    its content, with a message that doesn't blame the filename/device."""
+    client, sid = client_and_shift
+    staged = client.post("/v3/import", data={"shift_id": sid},
+                          files={"file": ("report.xlsx", b"not a real workbook", "application/octet-stream")})
+    assert staged.status_code == 200
+    assert "Unable to read this file as an Excel" in staged.text
+    assert "Please upload a Cetaris Desktop" not in staged.text
+
+
+def test_no_file_selected_gives_clear_message(client_and_shift):
+    client, sid = client_and_shift
+    staged = client.post("/v3/import", data={"shift_id": sid},
+                          files={"file": ("", b"", "application/octet-stream")})
+    assert staged.status_code == 200
+    assert "No file was selected" in staged.text

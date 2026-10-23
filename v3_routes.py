@@ -826,8 +826,10 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         return checked
 
     @router.post("/import",response_class=HTMLResponse)
-    async def stage_import(request:Request,shift_id:int=Form(...),file:UploadFile=File(...)):
+    async def stage_import(request:Request,shift_id:int=Form(...),file:UploadFile|None=File(default=None)):
         shift=secure(request,shift_id)
+        if file is None or not file.filename or not file.filename.strip():
+            return render(request,shift,warning="No file was selected. Choose your Cetaris work order export and try again.")
         data=await file.read(MAX_SIZE + 1)
         # Cause/repair-description export (WO Number + Repair Description) --
         # a separate file from the timecard export, same as V2. Detected by
@@ -838,8 +840,14 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             for wo_number,cause_text in causes.items():
                 db.upsert_wo_cause(shift_id=shift_id,wo_number=wo_number,cause_text=cause_text)
             return render(request,shift,notice=f"Linked cause text for {len(causes)} work order(s).")
-        if not file.filename or not file.filename.lower().endswith(".xlsx"):
-            return render(request,shift,warning="Please upload a Cetaris Desktop .xlsx report.")
+        # No filename/extension gate here on purpose: the exact device or
+        # browser a tech exports from (laptop, workstation, etc.) can produce
+        # odd filenames (missing/duplicated extensions, re-saved copies).
+        # parse_excel() below validates by actual CONTENT -- it opens the
+        # file as a real workbook and checks for the expected columns -- so
+        # rejection is based on whether the data is a real Cetaris export,
+        # never on what the filename happens to look like. Universal by
+        # construction, not by guessing which extensions to allow-list.
         try:
             records=parse_excel(data)
         except ValueError as exc:
