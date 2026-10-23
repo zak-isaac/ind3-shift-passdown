@@ -2509,9 +2509,12 @@ async def _build_eml_response(report_id: int, subject: str, html_body: str) -> R
     else:
         body_html = f"<pre>{rec.get('content', '')}</pre>"
 
-    # ── Inject lead's signature before </body> ──
-    sig_html  = _sigs.get_signature_html(lead_name)
-    body_html = body_html.replace("</body>", sig_html + "</body>")
+    # Append the Next Gen signature; keep the existing passdown HTML untouched.
+    signature_shift = (
+        ReportData.model_validate_json(rec["report_json"]).shift_type
+        if rec.get("report_json") else ""
+    )
+    body_html = _sigs.append_signature(body_html, lead_name, signature_shift)
 
     # ── Build .eml ──
     import base64 as _b64
@@ -3426,6 +3429,7 @@ async def download_eml(report_id: int):
     subject  = (
         f"{data.shift_type} Passdown"
     )
+    html_body = _sigs.append_signature(html_body, data.lead_name, data.shift_type)
     eml  = _build_eml(subject, to_addrs, html_body)
     fname = f"passdown_{rec['generated_at'].replace(' ', '_').replace(':', '-')}.eml"
     return Response(
@@ -3446,6 +3450,11 @@ async def download_eml_edited(
     if not rec:
         raise HTTPException(status_code=404, detail="Report not found")
     to_addrs = db.get_setting("email_to", "").strip()
+    if rec.get("report_json"):
+        data = ReportData.model_validate_json(rec["report_json"])
+        html_body = _sigs.append_signature(html_body, data.lead_name, data.shift_type)
+    else:
+        html_body = _sigs.append_signature(html_body, "")
     eml  = _build_eml(subject, to_addrs, html_body)
     fname = f"passdown_{rec['generated_at'].replace(' ', '_').replace(':', '-')}.eml"
     return Response(
