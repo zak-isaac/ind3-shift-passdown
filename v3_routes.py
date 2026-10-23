@@ -690,33 +690,41 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                     WHERE shift_id=? AND entry_id IN (SELECT id FROM entries
                         WHERE shift_id=? AND tech_name IN ({placeholders}))""",
                     (shift_id,shift_id,*sorted(selected)))
-        # A fresh Cetaris export can reopen a WO, change it into a PM, or drop
-        # it from this shift. Keep its source/edits for audit, but do not report
-        # stale imported happenings as completed. Only V3-imported entries are
-        # affected; manual entries and original V2 records remain untouched.
-        current_keys={(r["wo_number"],r["tech_name"]) for r in records if r["kind"]=="happening"}
+        # Cumulative imports: missing WOs are retained. Only explicitly
+        # present non-qualifying WOs may revoke earlier imported completion.
+        incoming_by_wo = {}
+        for raw in rows:
+            if raw["tech_name"] in selected:
+                incoming_by_wo.setdefault(raw["wo_number"], []).append(raw)
+        eligible_happenings = {r["wo_number"] for r in records if r["kind"] == "happening"}
+        eligible_pms = {r["wo_number"] for r in records if r["kind"] == "pm"}
         with db._conn() as c:
-            previous_imports=c.execute("""SELECT e.id,e.wo_number,e.tech_name,e.excluded
+            previous_imports = c.execute("""SELECT e.id,e.wo_number,m.mst_edited
                 FROM entries e JOIN v3_entry_meta m ON m.entry_id=e.id
-                WHERE e.shift_id=? AND m.imported_v3=1""",(shift_id,)).fetchall()
+                WHERE e.shift_id=? AND m.imported_v3=1""", (shift_id,)).fetchall()
             for old in previous_imports:
-                if (old["wo_number"],old["tech_name"]) not in current_keys:
-                    c.execute("UPDATE entries SET excluded=1 WHERE id=?",(old["id"],))
-                    c.execute("UPDATE v3_entry_meta SET selection_hidden=1 WHERE entry_id=?",(old["id"],))
-        # Provenance permits revoking stale V3-imported PMs without deleting V2 PMs.
-        new_pm_numbers={r["wo_number"] for r in records if r["kind"]=="pm"}
+                wo = old["wo_number"]
+                if wo in incoming_by_wo and wo not in eligible_happenings:
+                    if old["mst_edited"]:
+                        c.execute("UPDATE v3_entry_meta SET needs_review=1 WHERE entry_id=?", (old["id"],))
+                    else:
+                        c.execute("UPDATE entries SET excluded=1 WHERE id=?", (old["id"],))
+                        c.execute("UPDATE v3_entry_meta SET selection_hidden=1 WHERE entry_id=?", (old["id"],))
         with db._conn() as c:
-            tracked={r["wo_number"]:r["was_preexisting"] for r in c.execute(
-                "SELECT wo_number,was_preexisting FROM v3_pm_tracking WHERE shift_id=?",(shift_id,))}
-            for wo in tracked.keys()-new_pm_numbers:
-                if not tracked[wo]:
-                    c.execute("DELETE FROM pm_wos WHERE shift_id=? AND wo_number=?",(shift_id,wo))
-                c.execute("DELETE FROM v3_pm_tracking WHERE shift_id=? AND wo_number=?",(shift_id,wo))
-            for wo in new_pm_numbers-tracked.keys():
-                exists=c.execute("SELECT 1 FROM pm_wos WHERE shift_id=? AND wo_number=?",(shift_id,wo)).fetchone()
-                c.execute("INSERT INTO v3_pm_tracking (shift_id,wo_number,was_preexisting) VALUES (?,?,?)",
+            tracked = {r["wo_number"]:r["was_preexisting"] for r in c.execute(
+                "SELECT wo_number,was_preexisting FROM v3_pm_tracking WHERE shift_id=?", (shift_id,))}
+            for wo in tracked:
+                if wo in incoming_by_wo and wo not in eligible_pms:
+                    if not tracked[wo]:
+                        c.execute("DELETE FROM pm_wos WHERE shift_id=? AND wo_number=?", (shift_id,wo))
+                    c.execute("DELETE FROM v3_pm_tracking WHERE shift_id=? AND wo_number=?", (shift_id,wo))
+            for wo in eligible_pms-tracked.keys():
+                exists = c.execute("SELECT 1 FROM pm_wos WHERE shift_id=? AND wo_number=?", (shift_id,wo)).fetchone()
+                c.execute("INSERT OR IGNORE INTO v3_pm_tracking (shift_id,wo_number,was_preexisting) VALUES (?,?,?)",
                           (shift_id,wo,int(bool(exists))))
         for r in records:
+            if r["kind"]=="oos":
+                continue  # Breakdown OOS requires separate state tracking
             if r["kind"]=="pm":
                 db.upsert_pm_wo(shift_id,r["wo_number"],r["asset_id"],r["tech_name"])
                 continue
