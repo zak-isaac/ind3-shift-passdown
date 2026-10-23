@@ -62,6 +62,24 @@
    </form>{% else %}<div class="d2-dialog-body"><p>Upload a Cetaris file first to retrieve the technician list.</p></div>{% endif %}
  </dialog>
 
+ {% if pending_breakdowns %}
+ <section class="card" aria-label="Breakdown return-to-service confirmation">
+   <h2>Breakdown — Confirm Equipment Status</h2>
+   <p>These Breakdown work orders are Completed, but the asset's return to service needs MST confirmation. Choose a decision for each WO and save once.</p>
+   <form method="post" action="/v3/breakdown/confirm">
+     <input type="hidden" name="shift_id" value="{{ shift.id }}">
+     {% for b in pending_breakdowns %}
+     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid #dde5ee">
+       <strong>{{ b.asset_id }} · WO #{{ b.wo_number }}</strong>
+       <label><input type="radio" name="decision_{{ b.wo_number }}" value="rts"> Confirm RTS</label>
+       <label><input type="radio" name="decision_{{ b.wo_number }}" value="keep_oos"> Keep OOS</label>
+     </div>
+     {% endfor %}
+     <button class="button button-blue" type="submit">Save Breakdown Decisions</button>
+   </form>
+ </section>
+ {% endif %}
+
  <div class="workspace-grid d2-workspace-grid">
  <section class="card happenings d2-happenings" id="happenings">
    <div class="section-head d2-happenings-head"><div><h2>Shift happenings <span class="count-label">{{ happenings|length }}</span></h2><p>All Closed non-PM Cetaris work orders, reviewed by the shift owner.</p></div><button class="button button-outline" onclick="v3OpenManual()" type="button">Manual entry</button></div>
