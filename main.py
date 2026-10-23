@@ -607,7 +607,7 @@ async def dev_login_post(request: Request, code: str = Form(...)):
         from urllib.parse import quote
         err = quote("Not recognized. Use the test code or your associate number.")
         return RedirectResponse(f"/dev/login?error={err}", status_code=303)
-    resp = RedirectResponse("/", status_code=303)
+    resp = RedirectResponse("/v3", status_code=303)
     resp.set_cookie(dev_mode.DEV_COOKIE, dev_mode.DEV_TOKEN,
                      httponly=True, samesite="lax", path="/")
     return resp
@@ -626,26 +626,11 @@ async def dev_exit():
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request, error: str = ""):
-    shifts = db.get_active_shifts()          # 0-2 active shifts
-    shift  = shifts[0] if shifts else None   # backwards-compat for single-shift logic
-    now   = dev_mode.get_now()
-    today = now.date().isoformat()
-    elapsed_hours: float = 0.0
-    if shift:
-        try:
-            started = datetime.strptime(shift["created_at"], "%Y-%m-%d %H:%M:%S")
-            elapsed_hours = (now - started).total_seconds() / 3600
-        except Exception:
-            elapsed_hours = 0.0
-    day_name = now.strftime("%A")
-    weekday  = now.weekday()
-    valid_now = [s for s, days in _WEEKDAY_SHIFTS.items() if weekday in days]
-    return templates.TemplateResponse(
-        request, "home.html",
-        {"shift": shift, "shifts": shifts, "today": today,
-         "elapsed_hours": elapsed_hours, "is_dev_mode": dev_mode.is_active(),
-         "day_name": day_name, "valid_shifts_today": valid_now, "error": error}
-    )
+    """V3 is the only front door now -- see v3_routes.create_v3_router(). The
+    V2 template/data this route used to build (home.html) is dead code left
+    in place only as a fallback until Stage 2 of the V2->V3 cutover removes
+    home.html and the routes/partials that exist solely to serve it."""
+    return RedirectResponse("/v3", status_code=303)
 
 
 @app.get("/share", response_class=HTMLResponse)
@@ -987,51 +972,9 @@ async def api_active_shifts():
 
 @app.get("/tech/login", response_class=HTMLResponse)
 async def tech_login_get(request: Request, next: str = "/tech", shift_id: int = 0):
-    shifts = db.get_active_shifts()
-    if not shifts:
-        return RedirectResponse("/", status_code=303)
-    active_ids = {s["id"] for s in shifts}
-    chosen_id  = shift_id if shift_id in active_ids else shifts[0]["id"]
-    matched    = [s for s in shifts if s["id"] == chosen_id]
-    chosen     = matched[0] if matched else shifts[0]
-    if _get_tech_session(request, chosen["id"]):
-        return RedirectResponse("/tech", status_code=303)
-    return templates.TemplateResponse(
-        request, "tech_login.html",
-        {"shift": chosen, "shifts": shifts, "error": "", "next": next}
-    )
-
-
-@app.post("/tech/login", response_class=HTMLResponse)
-async def tech_login_post(
-    request: Request,
-    assoc_code: str = Form(...),
-    shift_id:   int = Form(0),
-    next: str = Form("/tech"),
-):
-    shifts = db.get_active_shifts()
-    if not shifts:
-        return RedirectResponse("/", status_code=303)
-    active_ids = {s["id"] for s in shifts}
-    chosen_id  = shift_id if shift_id in active_ids else shifts[0]["id"]
-    matched    = [s for s in shifts if s["id"] == chosen_id]
-    shift      = matched[0] if matched else shifts[0]
-
-    entry = _lookup_associate(assoc_code)
-    if entry is None:
-        return templates.TemplateResponse(
-            request, "tech_login.html",
-            {"shift": shift, "shifts": shifts,
-             "error": "Associate number not found. Try again or see your MST lead.",
-             "next": next}
-        )
-
-    safe_next = next if next.startswith("/") else "/tech"
-    resp = RedirectResponse(safe_next, status_code=303)
-    resp.set_cookie(_TECH_ASSOC_COOKIE, entry["assoc_num"],  httponly=False, samesite="lax", path="/")
-    resp.set_cookie(_TECH_SHIFT_COOKIE, str(shift["id"]),    httponly=False, samesite="lax", path="/")
-    resp.delete_cookie(_TECH_NAME_COOKIE, path="/")
-    return resp
+    """V2 tech entry -- superseded by /v3/login (single associate-number form
+    that auto-detects tech vs MST from the roster). See home()'s docstring."""
+    return RedirectResponse("/v3/login", status_code=303)
 
 
 @app.get("/tech/logout")
@@ -1351,113 +1294,8 @@ async def lead_logout():
 
 @app.get("/lead/login", response_class=HTMLResponse)
 async def lead_login_get(request: Request, next: str = "/lead"):
-    # Always show the PIN page — no bypass even if cookie exists.
-    # The cookie only keeps HTMX/API calls alive within an open session.
-    return templates.TemplateResponse(
-        request, "lead_login.html", {"next": next, "error": ""}
-    )
-
-
-@app.post("/lead/login", response_class=HTMLResponse)
-async def lead_login_post(
-    request: Request,
-    pin: str = Form(...),
-    next: str = Form("/lead"),
-):
-    import json
-    entered = pin.strip()
-    if _check_lead_credential(entered):
-        # Credential OK -- create any pending shift
-        pending_raw = request.cookies.get("__pending_shift")
-        bound_shift_id = 0
-        if pending_raw:
-            try:
-                p = json.loads(pending_raw)
-                assoc = _ROSTER.get(entered)
-                _, is_ot, _ = _check_shift_start_eligibility(assoc, p["shift_type"], dev_mode.get_now())
-                bound_shift_id = db.start_shift(
-                    p["date"], p["shift_type"], p["lead_name"],
-                    opened_by_role="mst", is_ot=is_ot, opened_by_assoc=entered,
-                )
-            except Exception as exc:
-                print(f"[login] pending shift cookie invalid: {exc}", flush=True)
-
-        # If no pending shift, prefer an explicit shift_id carried in `next`
-        # (set when the user clicked a specific shift's MST login button on
-        # Home, or an overlap-window link) -- far more reliable than guessing.
-        if not bound_shift_id:
-            from urllib.parse import urlparse, parse_qs
-            next_qs = parse_qs(urlparse(next).query)
-            requested_raw = (next_qs.get("shift_id") or [None])[0]
-            if requested_raw and requested_raw.isdigit():
-                candidate = db.get_shift(int(requested_raw))
-                if candidate and candidate.get("is_active"):
-                    bound_shift_id = candidate["id"]
-
-        # Still nothing explicit -- try matching this credential's own shift
-        # by lead name, but ONLY when that's unambiguous. With 2+ shifts
-        # active at once, a name match (or lack of one) is not reliable
-        # enough to bind to -- leave unbound rather than guess wrong.
-        if not bound_shift_id:
-            assoc = _ROSTER.get(entered)
-            active = db.get_active_shifts()
-            if assoc and len(active) == 1:
-                bound_shift_id = active[0]["id"]
-            elif assoc:
-                lead_display = assoc.get("display_name") or assoc.get("full_name", "")
-                matches = [s for s in active if s["lead_name"] == lead_display]
-                if len(matches) == 1:
-                    bound_shift_id = matches[0]["id"]
-
-        safe_next = next if next.startswith("/") else "/lead"
-        html = f"""
-        <!DOCTYPE html><html><head>
-          <meta http-equiv="refresh" content="0;url={safe_next}" />
-        </head><body>
-          <script>window.location.replace("{safe_next}");</script>
-        </body></html>
-        """
-        resp = HTMLResponse(content=html)
-        resp.set_cookie(_LEAD_COOKIE, _get_pin_hash(),
-                        httponly=True, samesite="lax", path="/",
-                        max_age=86400 * 30)  # 30 days
-        resp.delete_cookie("__pending_shift", path="/")
-        # Bind this session to the shift — prevents cross-shift mutations
-        if bound_shift_id:
-            resp.set_cookie(_LEAD_SHIFT_COOKIE, str(bound_shift_id),
-                            httponly=True, samesite="lax", path="/")
-        else:
-            resp.delete_cookie(_LEAD_SHIFT_COOKIE, path="/")
-        # Manager cookie — granted when a master credential is entered (see _MASTER_CODES)
-        if _is_master_credential(entered):
-            resp.set_cookie(_MGR_COOKIE, _MGR_TOKEN,
-                            httponly=True, samesite="lax", path="/")
-        else:
-            resp.delete_cookie(_MGR_COOKIE, path="/")
-        return resp
-
-    grace_shift = _find_end_shift_grace_shift(entered)
-    if grace_shift:
-        grace_next = "/lead?shift_id=" + str(grace_shift["id"])
-        grace_html = (
-            "<!DOCTYPE html><html><head>"
-            "<meta http-equiv='refresh' content='0;url=" + grace_next + "' />"
-            "</head><body><script>window.location.replace('" + grace_next + "');</script>"
-            "</body></html>"
-        )
-        grace_resp = HTMLResponse(content=grace_html)
-        grace_resp.set_cookie(_LEAD_COOKIE, _get_pin_hash(),
-                               httponly=True, samesite="lax", path="/",
-                               max_age=86400)
-        grace_resp.set_cookie(_LEAD_SHIFT_COOKIE, str(grace_shift["id"]),
-                               httponly=True, samesite="lax", path="/")
-        grace_resp.delete_cookie(_MGR_COOKIE, path="/")
-        return grace_resp
-
-    return templates.TemplateResponse(
-        request, "lead_login.html",
-        {"next": next, "error": "Incorrect associate ID or PIN. Please try again."},
-    )
+    """V2 MST entry -- superseded by /v3/login. See home()'s docstring."""
+    return RedirectResponse("/v3/login", status_code=303)
 
 
 @app.get("/lead", response_class=HTMLResponse)
@@ -3448,3 +3286,32 @@ async def download_report(report_id: int):
         media_type="text/plain; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
+
+
+# ── V3 shift workspace (opt-in, /v3) ───────────────────────────────────────
+# Parallel UI for the same shift data. Reuses every V2 auth/eligibility
+# building block above so there is exactly one source of truth for "who can
+# touch which shift" -- see v3_routes.create_v3_router()'s docstring for why
+# get_v2_cookie_value exists (it lets V3 logins also satisfy V2 helpers like
+# lead_generate, which V3's own /generate route calls directly).
+from v3_routes import create_v3_router
+
+app.include_router(create_v3_router(
+    templates=templates,
+    is_lead_authed=_is_lead_authed,
+    can_manage_shift=_can_manage_shift,
+    resolve_my_shift=_resolve_my_shift,
+    shift_window=_shift_window,
+    lead_redirect=lambda destination: RedirectResponse(destination, status_code=303),
+    get_mst_roster=lambda: _ROSTER,
+    start_eligibility=_check_shift_start_eligibility,
+    # NOTE: V2 bypasses this entirely while dev_mode is active (see lead_login
+    # above); V3 doesn't yet thread that per-request toggle through a static
+    # dict param, so dev-mode shift-day bypass isn't mirrored here. Low-risk
+    # gap (dev mode is sandboxed test data only) but worth closing later.
+    allowed_shift_days=_WEEKDAY_SHIFTS,
+    now_func=dev_mode.get_now,
+    get_v2_cookie_value=_get_pin_hash,
+    generate_report=lead_generate,
+    verify_master_code=_is_master_credential,
+))
