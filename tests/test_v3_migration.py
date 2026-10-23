@@ -74,6 +74,21 @@ def test_sidebar_active_state_matches_current_page(client_and_shift):
         assert labels[page] in html[active_idx:active_idx+400]
 
 
+def test_no_version_badge_or_topbar_banner_shown(client_and_shift):
+    """No internal version label (V3, etc.) or the old breadcrumb/"Shift owner"
+    mode-pill topbar banner should ever reach the rendered page -- operators
+    shouldn't see internal versioning, and the banner was explicitly removed.
+    (The sidebar's own "Shift owner" fallback profile label is unrelated and
+    expected to remain.)"""
+    client,sid=client_and_shift
+    for page,path in {"workspace":"/v3","history":"/v3/history","analytics":"/v3/analytics","admin":"/v3/admin"}.items():
+        html=client.get(path,params={"shift_id":sid}).text
+        assert ">V3<" not in html,f"{page} still shows a V3 badge"
+        assert 'class="crumb"' not in html,f"{page} still renders the breadcrumb banner"
+        assert 'class="d2-mode"' not in html,f"{page} still renders the old mode pill"
+        assert '<header class="topbar' not in html,f"{page} still renders the topbar header"
+
+
 def test_v3_native_roster_crud(client_and_shift):
     """The V3-native roster endpoints (used by the redesigned admin page)
     add/toggle/edit/delete associates directly against db.py, independent of
