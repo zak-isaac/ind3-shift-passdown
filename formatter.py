@@ -73,6 +73,8 @@ def format_html_preview(data: ReportData) -> str:
 
     for h in data.happenings:
         wo_tag = f" <span style='color:#555;font-size:13px;'>(WO#{h.wo_number})</span>" if h.wo_number else ""
+        cause = (getattr(h, "cause", "") or "").strip()
+        cause_part = f" : {cause}" if cause else ""
         if h.sub_points:
             # Sub-points: either (wo_number, remark) for multi-WO asset
             # or (tech_name, remark) for multi-tech single WO
@@ -87,14 +89,14 @@ def format_html_preview(data: ReportData) -> str:
             )
             happening_lines.append(
                 f'<li style="padding:8px 0;border-bottom:1px solid #eee;font-size:14px;color:#111;line-height:1.7;">'
-                f'<strong style="color:#000;">{h.title}</strong>'
+                f'<strong style="color:#000;">{h.title}</strong>{cause_part}'
                 f'<ul style="list-style:none;margin:4px 0 0 8px;padding:0;">{sub_html}</ul></li>'
             )
         else:
             para = h.paragraph.rstrip(".")
             happening_lines.append(
                 f'<li style="padding:8px 0;border-bottom:1px solid #eee;font-size:14px;color:#111;line-height:1.7;">'
-                f'<strong style="color:#000;">{h.title}:</strong> {para}{wo_tag}.</li>'
+                f'<strong style="color:#000;">{h.title}</strong>{cause_part} : {para}{wo_tag}.</li>'
             )
 
     if happening_lines:
@@ -251,6 +253,8 @@ def format_email_passdown_html(
         h_items.append(f"{data.pm_count} PM{'s' if data.pm_count != 1 else ''} completed this shift")
     for h in data.happenings:
         prefix = h.title.split("\u2013")[0].split("-")[0].strip()
+        cause = (getattr(h, "cause", "") or "").strip()
+        cause_part = f" : {cause}" if cause else ""
         wo_tag = (
             f" <span style='color:#6b7280;font-size:12px;'>(WO# {h.wo_number})</span>"
             if getattr(h, "wo_number", "") else ""
@@ -263,12 +267,12 @@ def format_email_passdown_html(
                 for _, remark in h.sub_points
             )
             entry = (
-                f"<strong>{prefix}</strong>{wo_tag}"
+                f"<strong>{prefix}</strong>{cause_part}{wo_tag}"
                 f"<ul style='margin:4px 0 0 0;padding-left:20px;'>{sub_items}</ul>"
             )
             h_items.append(entry)
         elif prefix and " " not in prefix and "," not in prefix:
-            h_items.append(f"<strong>{prefix}:</strong> {h.paragraph}{wo_tag}")
+            h_items.append(f"<strong>{prefix}</strong>{cause_part} : {h.paragraph}{wo_tag}")
         else:
             h_items.append(f"{h.paragraph}{wo_tag}")
 

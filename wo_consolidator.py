@@ -286,17 +286,17 @@ def consolidated_to_happenings(
     building RewrittenHappening objects in both the lead_generate and
     shift_end report paths.
 
-    Each dict has keys: title, paragraph, wo_number, tech_name, conflicting
+    Each dict has keys: title, cause, paragraph, wo_number, tech_name, conflicting
 
-    cause_lookup: optional {wo_number: cause_text} from a separate Cetaris
-    "cause" export (see cause_lookup.py), joined in by WO Number. When a
-    match exists, title becomes "AssetID : Cause text " (note the trailing
-    space) instead of just "AssetID". Both live formatters (format_email and
-    format_html_preview in formatter.py) build their line as
-    f"{title}: {paragraph}" -- that trailing space plus their hardcoded
-    ": " is what turns this into a clean "AssetID : Cause : Remark" with
-    consistent " : " separators everywhere, with zero changes needed on
-    their end. No cause match -> title is unchanged, same output as always.
+    cause_lookup: optional {wo_number: cause-or-issue text} -- see
+    db.get_v3_entry_causes() / db.get_wo_causes(). Returned as its own
+    `cause` key, kept SEPARATE from `title`. `title` must stay a bare asset
+    ID: ai_rewriter.build_input() formats it as "ASSET_ID / remark1 |
+    remark2" and main.py's asset_groups merge keys directly off `title` --
+    embedding cause text into title corrupts the AI input and breaks
+    same-asset grouping (lesson learned 2026-10-23: first attempt at this
+    did exactly that). Callers building RewrittenHappening/the final email
+    are responsible for rendering "title : cause : paragraph".
     """
     out: list[dict] = []
     cause_lookup = cause_lookup or {}
@@ -307,9 +307,9 @@ def consolidated_to_happenings(
         dup_note = " [ Possible duplicate remarks — verify these describe separate work]" if wo.possible_duplicate else ""
         asset_title = wo.asset_id or f"WO #{wo.wo_number}"
         cause = cause_lookup.get(wo.wo_number, "").rstrip(".")
-        title = f"{asset_title} : {cause} " if cause else asset_title
         out.append({
-            "title":      title,
+            "title":      asset_title,
+            "cause":      cause,
             "paragraph":  wo.summary + conflict_note + dup_note,
             "all_remarks": wo.all_remarks,          # raw remarks for direct AI input
             "wo_number":  wo.wo_number,
@@ -324,6 +324,7 @@ def consolidated_to_happenings(
             issue = wo_prefix_re.sub("", issue).strip().rstrip(".")
         out.append({
             "title":      (e.get("unit") or "").strip(),
+            "cause":      "",
             "paragraph":  issue,
             "wo_number":  "",
             "tech_name":  e.get("tech_name", ""),

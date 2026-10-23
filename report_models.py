@@ -15,7 +15,13 @@ class OosUnit(BaseModel):
 
 
 class RewrittenHappening(BaseModel):
-    title: str        # asset ID
+    title: str        # asset ID -- MUST stay a clean/bare asset ID string.
+    # ai_rewriter.build_input() and main.py's asset_groups merge logic both
+    # key/format directly off `title` as a plain asset ID ("ASSET_ID /
+    # remark1 | remark2"); embedding anything else into it (e.g. a cause
+    # string) corrupts the AI input AND breaks same-asset grouping. Use the
+    # dedicated `cause` field below instead.
+    cause: str = ""   # short cause/issue text, shown as "title : cause :"
     paragraph: str    # single-tech summary (used when sub_points is empty)
     wo_number: str = ""  # WO number for the report line, empty for manual entries
     tech_name: str = ""  # who logged it (single-tech)

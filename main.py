@@ -3104,12 +3104,12 @@ async def lead_generate(
             continue
         if len(clean) == 1:
             raw_happenings.append(RewrittenHappening(
-                title=h["title"], paragraph=clean[0][1],
+                title=h["title"], cause=h.get("cause", ""), paragraph=clean[0][1],
                 wo_number=h["wo_number"], tech_name=clean[0][0], sub_points=[],
             ))
         else:
             raw_happenings.append(RewrittenHappening(
-                title=h["title"], paragraph="",
+                title=h["title"], cause=h.get("cause", ""), paragraph="",
                 wo_number=h["wo_number"], tech_name="", sub_points=clean,
             ))
 
@@ -3123,6 +3123,12 @@ async def lead_generate(
         if len(group) == 1:
             happenings.append(group[0])
         else:
+            # Multiple WOs for the same asset this shift -- there's no
+            # single cause that covers the whole merged sub-point list, so
+            # use the first non-empty one as a best-effort headline cause
+            # rather than showing none at all (same asset having >1 WO in
+            # one shift is the rare case; most assets have exactly one).
+            merged_cause = next((rh.cause for rh in group if rh.cause), "")
             sub_pts: list[tuple[str, str]] = []
             for rh in group:
                 if rh.sub_points:
@@ -3131,7 +3137,7 @@ async def lead_generate(
                 else:
                     sub_pts.append((rh.wo_number, rh.paragraph))
             happenings.append(RewrittenHappening(
-                title=asset_id, paragraph="", wo_number="", tech_name="", sub_points=sub_pts,
+                title=asset_id, cause=merged_cause, paragraph="", wo_number="", tech_name="", sub_points=sub_pts,
             ))
 
 
