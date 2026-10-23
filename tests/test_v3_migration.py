@@ -73,6 +73,40 @@ def test_sidebar_active_state_matches_current_page(client_and_shift):
         assert active_idx!=-1,f"{page} page has no active nav-link at all"
         assert labels[page] in html[active_idx:active_idx+400]
 
+
+def test_v3_native_roster_crud(client_and_shift):
+    """The V3-native roster endpoints (used by the redesigned admin page)
+    add/toggle/edit/delete associates directly against db.py, independent of
+    the V2 assoc_list.html fragment, and re-render the V3 roster partial."""
+    client,_=client_and_shift
+
+    added=client.post("/v3/admin/roster/add",data={
+        "assoc_num":"9999","full_name":"Test Associate","shift":"S1","is_mst":"0"})
+    assert added.status_code==200
+    assert "Test Associate".upper() in added.text.upper()
+    assert db.get_associate("9999") is not None
+
+    listed=client.get("/v3/admin/roster")
+    assert listed.status_code==200
+    assert "9999" in listed.text
+
+    toggled=client.post("/v3/admin/roster/9999/toggle-mst")
+    assert toggled.status_code==200
+    assert db.get_associate("9999")["is_mst"]==1
+
+    edit_form=client.get("/v3/admin/roster/9999/edit-form")
+    assert edit_form.status_code==200
+    assert 'name="new_assoc_num"' in edit_form.text
+
+    edited=client.post("/v3/admin/roster/9999/edit",data={
+        "new_assoc_num":"9999","full_name":"Renamed Associate","shift":"S2","is_mst":"1"})
+    assert edited.status_code==200
+    assert db.get_associate("9999")["full_name"]=="RENAMED ASSOCIATE"
+
+    deleted=client.delete("/v3/admin/roster/9999")
+    assert deleted.status_code==200
+    assert db.get_associate("9999") is None
+
 def test_report_generation_then_shift_close(client_and_shift):
     client,sid=client_and_shift
     blocked=client.post("/v3/end",data={"shift_id":sid},follow_redirects=False)

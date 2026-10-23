@@ -24,7 +24,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                      shift_window, lead_redirect, get_mst_roster=None, verify_mst_pin=None,
                      start_eligibility=None, allowed_shift_days=None, now_func=None,
                      get_v2_cookie_value=None, generate_report=None,
-                     verify_master_code=None, build_eml_response=None):
+                     verify_master_code=None, build_eml_response=None, refresh_roster=None):
     router = APIRouter(prefix="/v3", tags=["Shift V3"])
 
     # Fallback mirrors main.py's _MASTER_CODES so standalone/test usage of this
@@ -513,20 +513,22 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             "data_json":json.dumps(data),
         })
 
+    def _admin_authed(request:Request) -> bool:
+        """Matches V2's gate: any authenticated session can view/configure
+        admin. Manager-only sub-sections would check is_manager on top of
+        this, the same way V2's admin.html does for OT codes."""
+        if get_mst_roster is not None:
+            return bool(decode_session(request))
+        return bool(is_lead_authed(request))
+
     @router.get("/admin", response_class=HTMLResponse)
     async def v3_admin(request:Request):
-        # Matches V2's gate: any authenticated session can view/configure.
-        # Manager-only sub-sections (none currently active) would check is_manager
-        # on top of this, the same way V2's admin.html does for OT codes.
-        if get_mst_roster is not None:
-            who=decode_session(request)
-            if not who:
+        if not _admin_authed(request):
+            if get_mst_roster is not None:
                 return RedirectResponse("/v3/login",status_code=303)
-            is_manager=bool(who["profile"].get("is_manager"))
-        else:
-            if not is_lead_authed(request):
-                return lead_redirect("/v3/admin")
-            is_manager=True
+            return lead_redirect("/v3/admin")
+        who=decode_session(request)
+        is_manager=bool(who["profile"].get("is_manager")) if who else True
         return templates.TemplateResponse(request,"v3/admin.html",{
             "dc_number":db.get_setting("dc_number","IND3"),
             "email_to":db.get_setting("email_to",""),
@@ -555,6 +557,85 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         db.set_setting("email_from_name",email_from_name.strip()[:160] or "IND3 Shift Passdown")
         db.set_setting("ms_client_id",ms_client_id.strip()[:300])
         return RedirectResponse("/v3/admin?notice=Configuration+saved",status_code=303)
+
+    def _refresh_roster():
+        if refresh_roster:
+            refresh_roster()
+
+    def _roster_list_response(request:Request):
+        return templates.TemplateResponse(request,"partials/v3_assoc_list.html",{"associates":db.get_associates()})
+
+    @router.get("/admin/roster", response_class=HTMLResponse)
+    async def v3_roster_list(request:Request):
+        if not _admin_authed(request):
+            return HTMLResponse("",status_code=403)
+        return _roster_list_response(request)
+
+    @router.post("/admin/roster/reload", response_class=HTMLResponse)
+    async def v3_roster_reload(request:Request):
+        if not _admin_authed(request):
+            return HTMLResponse("",status_code=403)
+        _refresh_roster()
+        return HTMLResponse('<span class="v3-roster-reload-ok">Roster re-synced.</span>')
+
+    @router.post("/admin/roster/add", response_class=HTMLResponse)
+    async def v3_roster_add(request:Request,assoc_num:str=Form(...),full_name:str=Form(...),
+                            shift:str=Form(""),default_id:str=Form(""),is_mst:str=Form("0")):
+        if not _admin_authed(request):
+            return HTMLResponse("",status_code=403)
+        if not assoc_num.strip() or not full_name.strip():
+            return HTMLResponse('<p class="v3-roster-error">Associate # and Name are required.</p>')
+        db.add_associate(assoc_num.strip(),full_name.strip(),shift.strip(),default_id.strip(),is_mst=(is_mst=="1"))
+        _refresh_roster()
+        return _roster_list_response(request)
+
+    @router.post("/admin/roster/{assoc_num}/toggle-mst", response_class=HTMLResponse)
+    async def v3_roster_toggle_mst(request:Request,assoc_num:str):
+        if not _admin_authed(request):
+            return HTMLResponse("",status_code=403)
+        assoc=db.get_associate(assoc_num)
+        if not assoc:
+            raise HTTPException(404)
+        db.set_associate_mst(assoc_num,not bool(assoc.get("is_mst",0)))
+        _refresh_roster()
+        return _roster_list_response(request)
+
+    @router.get("/admin/roster/{assoc_num}/edit-form", response_class=HTMLResponse)
+    async def v3_roster_edit_form(request:Request,assoc_num:str):
+        if not _admin_authed(request):
+            return HTMLResponse("",status_code=403)
+        assoc=db.get_associate(assoc_num)
+        if not assoc:
+            raise HTTPException(404)
+        return templates.TemplateResponse(request,"partials/v3_assoc_row_edit.html",{"a":assoc})
+
+    @router.get("/admin/roster/{assoc_num}/edit-form/cancel", response_class=HTMLResponse)
+    async def v3_roster_edit_cancel(request:Request,assoc_num:str):
+        if not _admin_authed(request):
+            return HTMLResponse("",status_code=403)
+        assoc=db.get_associate(assoc_num)
+        if not assoc:
+            raise HTTPException(404)
+        return templates.TemplateResponse(request,"partials/v3_assoc_row.html",{"a":assoc})
+
+    @router.post("/admin/roster/{assoc_num}/edit", response_class=HTMLResponse)
+    async def v3_roster_edit_save(request:Request,assoc_num:str,new_assoc_num:str=Form(...),
+                                  full_name:str=Form(...),shift:str=Form(""),is_mst:str=Form("0")):
+        if not _admin_authed(request):
+            return HTMLResponse("",status_code=403)
+        if not new_assoc_num.strip() or not full_name.strip():
+            return HTMLResponse('<p class="v3-roster-error">Associate # and Name are required.</p>')
+        db.update_associate(assoc_num,new_assoc_num.strip(),full_name.strip(),shift.strip(),is_mst=(is_mst=="1"))
+        _refresh_roster()
+        return _roster_list_response(request)
+
+    @router.delete("/admin/roster/{assoc_num}", response_class=HTMLResponse)
+    async def v3_roster_delete(request:Request,assoc_num:str):
+        if not _admin_authed(request):
+            return HTMLResponse("",status_code=403)
+        db.delete_associate(assoc_num)
+        _refresh_roster()
+        return _roster_list_response(request)
 
     @router.get("/operations", response_class=HTMLResponse)
     async def v3_operations(request:Request, shift_id:int):

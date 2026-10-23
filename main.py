@@ -3296,6 +3296,13 @@ async def download_report(report_id: int):
 # lead_generate, which V3's own /generate route calls directly).
 from v3_routes import create_v3_router
 
+def _refresh_roster_from_db():
+    """Reload the in-memory roster after a V3-native roster edit so new V3
+    logins see the change immediately, matching V2's admin_assoc_* routes."""
+    global _ROSTER
+    _ROSTER = db.associates_to_roster()
+
+
 app.include_router(create_v3_router(
     templates=templates,
     is_lead_authed=_is_lead_authed,
@@ -3315,4 +3322,5 @@ app.include_router(create_v3_router(
     generate_report=lead_generate,
     verify_master_code=_is_master_credential,
     build_eml_response=_build_eml_response,
+    refresh_roster=_refresh_roster_from_db,
 ))

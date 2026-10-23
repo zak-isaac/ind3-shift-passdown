@@ -118,6 +118,95 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
 .d2-dialog-note { border-left: 3px solid #0053e2; background: #f3f7ff; color: #4b607e; margin-top: 17px; padding: 12px 14px; font-size: 12px; }
 .d2-dialog-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding-top: 18px; }
 .d2-tech-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; margin-bottom: 14px; }
+
+/* ── V3-native Administration page ───────────────────────────────────── */
+.v3-admin-notice { background: #e4f7eb; color: #0c6b38; border: 1px solid #bfe9d2; padding: 12px 16px; border-radius: 10px; margin-bottom: 16px; font-size: 13px; font-weight: 700; }
+.v3-admin-kpis { grid-template-columns: repeat(3, 1fr); }
+.v3-admin-card { padding: 22px 24px 24px; margin-bottom: 18px; border-top: 3px solid var(--border); }
+.v3-admin-card.v3-accent-blue { border-top-color: #0053e2; }
+.v3-admin-card.v3-accent-amber { border-top-color: #f59e0b; }
+.v3-admin-card.v3-accent-green { border-top-color: #0c7739; }
+.v3-admin-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+.v3-admin-card-head h2 { font-size: 16px; margin: 0; color: #122a52; }
+.v3-admin-card-tag { font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 20px; background: #eef2f8; color: #5c6e88; }
+.v3-admin-card-tag.v3-tag-on { background: #def5e6; color: #0c7739; }
+.v3-admin-card-sub { font-size: 12px; color: #6b7c96; margin: 0 0 18px; }
+
+.v3-roster-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid #edf1f6; }
+.v3-roster-toolbar-hint { font-size: 11px; color: #8294ab; }
+.v3-roster-reload-ok { font-size: 12px; color: #0c7739; font-weight: 700; }
+.v3-roster-error { color: #c83939; font-size: 12px; font-weight: 700; padding: 6px 0; }
+.v3-roster-empty { color: #94a3b8; font-style: italic; font-size: 13px; padding: 10px 0; }
+.v3-roster-footnote { font-size: 11px; color: #94a3b8; margin: 10px 2px 0; }
+
+.v3-roster-table-wrap { overflow-x: auto; border: 1px solid #e9eef5; border-radius: 10px; }
+.v3-roster-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.v3-roster-table th { text-align: left; padding: 11px 14px; background: #f6f9fd; color: #5c6e88; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; font-weight: 800; border-bottom: 1px solid #e9eef5; }
+.v3-roster-table td { padding: 10px 14px; border-bottom: 1px solid #eef2f8; vertical-align: middle; }
+.v3-roster-row:last-child td { border-bottom: 0; }
+.v3-roster-row:hover { background: #f9fbfe; }
+.v3-roster-row-mgr { opacity: .55; font-style: italic; }
+.v3-roster-who { display: flex; align-items: center; gap: 10px; }
+.v3-roster-avatar { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; font-size: 12px; flex: none; color: #fff; }
+.v3-avatar-tech { background: #64748b; }
+.v3-avatar-mst { background: #0053e2; }
+.v3-avatar-mgr { background: #7c3aed; }
+.v3-roster-who-text b { display: block; font-size: 13px; color: #1b2c47; }
+.v3-roster-who-text small { display: block; font-size: 10px; color: #94a3b8; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.v3-roster-shift-pill { display: inline-block; padding: 3px 9px; border-radius: 6px; background: #eef2f8; color: #45587a; font-weight: 800; font-size: 11px; }
+.v3-roster-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #45587a; font-weight: 600; }
+.v3-dot-on, .v3-dot-off { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.v3-dot-on { background: #16c784; }
+.v3-dot-off { background: #c7cfdb; }
+.v3-roster-role { border: none; cursor: pointer; font-size: 11px; font-weight: 800; padding: 4px 11px; border-radius: 20px; transition: filter .15s; }
+.v3-roster-role:hover { filter: brightness(0.95); }
+.v3-role-mst { background: #e2ecff; color: #0053e2; }
+.v3-role-tech { background: #eef1f6; color: #5c6e88; }
+.v3-role-mgr { background: #efe5ff; color: #7c3aed; font-size: 11px; font-weight: 800; padding: 4px 11px; border-radius: 20px; }
+.v3-roster-actions { white-space: nowrap; }
+.v3-roster-ghost { background: none; border: 1px solid #dde5f0; color: #45587a; font-size: 11px; font-weight: 700; padding: 5px 11px; border-radius: 7px; cursor: pointer; margin-right: 6px; transition: all .15s; }
+.v3-roster-ghost:hover { border-color: #0053e2; color: #0053e2; }
+.v3-roster-ghost-danger:hover { border-color: #c83939; color: #c83939; }
+.v3-roster-ghost-save { background: #0053e2; color: #fff; border-color: #0053e2; }
+.v3-roster-ghost-save:hover { background: #0046bd; color: #fff; }
+.v3-roster-muted { color: #c3cbd8; font-size: 12px; }
+
+.v3-roster-row-edit td { background: #f6f9ff; }
+.v3-roster-edit-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; }
+.v3-roster-edit-form label { display: flex; flex-direction: column; gap: 4px; font-size: 10px; font-weight: 800; color: #5c6e88; text-transform: uppercase; letter-spacing: .03em; }
+.v3-roster-edit-form input, .v3-roster-edit-form select { font: inherit; text-transform: none; letter-spacing: 0; padding: 7px 10px; border: 1px solid #d8e3f0; border-radius: 7px; font-size: 13px; color: #1b2c47; }
+.v3-roster-edit-check { flex-direction: row !important; align-items: center; gap: 6px !important; }
+.v3-roster-edit-actions { display: flex; gap: 6px; margin-left: auto; }
+
+.v3-roster-add { border-top: 1px solid #edf1f6; margin-top: 18px; padding-top: 18px; }
+.v3-roster-add h3 { font-size: 13px; margin: 0 0 12px; color: #122a52; }
+.v3-form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.v3-form-grid-stack { grid-template-columns: 1fr; max-width: 480px; }
+.v3-form-grid label { display: flex; flex-direction: column; gap: 5px; font-size: 11px; font-weight: 800; color: #5c6e88; text-transform: uppercase; letter-spacing: .03em; }
+.v3-form-grid label span { text-transform: none; font-weight: 500; color: #94a3b8; font-size: 11px; }
+.v3-form-grid input, .v3-form-grid select { text-transform: none; letter-spacing: 0; font-size: 13px; color: #1b2c47; padding: 9px 11px; border: 1px solid #d8e3f0; border-radius: 8px; font-weight: 400; }
+.v3-form-grid input:focus, .v3-form-grid select:focus { outline: none; border-color: #0053e2; }
+.v3-form-grid-footer { grid-column: 1 / -1; display: flex; align-items: center; gap: 16px; margin-top: 4px; }
+
+.v3-webhook-form { display: flex; flex-direction: column; gap: 12px; max-width: 560px; }
+.v3-webhook-form input { padding: 10px 13px; border: 1px solid #d8e3f0; border-radius: 8px; font-size: 13px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.v3-webhook-form input:focus { outline: none; border-color: #0053e2; }
+.v3-webhook-actions { display: flex; gap: 10px; }
+@media(max-width: 830px) { .v3-admin-kpis { grid-template-columns: 1fr 1fr; } .v3-form-grid { grid-template-columns: 1fr; } }
+
+/* ── Shift happenings table — pro polish pass ── */
+.d2-happenings { border-top: 3px solid #0053e2; }
+.d2-wo-table thead th { position: sticky; top: 0; z-index: 1; }
+.d2-id { display: flex; align-items: center; gap: 9px; }
+.d2-id-text { min-width: 0; }
+.d2-id::before { content: attr(data-initial); width: 26px; height: 26px; border-radius: 7px; background: #e2ecff; color: #0053e2; display: grid; place-items: center; font-size: 11px; font-weight: 900; flex: none; }
+.d2-category { position: relative; padding-left: 16px !important; }
+.d2-category::before { content: ""; position: absolute; left: 6px; top: 50%; transform: translateY(-50%); width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .7; }
+.d2-icon-button { border: 1px solid #e3e9f2 !important; background: #f8fafd !important; border-radius: 7px !important; padding: 6px 11px !important; font-weight: 700 !important; transition: all .15s; }
+.d2-icon-button:hover { border-color: #0053e2 !important; background: #eef4ff !important; }
+.d2-wo-table tbody tr { transition: background .1s; }
+.d2-table-scroll { border-radius: 10px; }
+
 .d2-tech-toolbar input { flex: 1; min-width: 185px; border: 1px solid #d7e2f0; border-radius: 7px; padding: 11px 12px; font-size: 13px; }
 .d2-tech-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; max-height: 43vh; overflow-y: auto; }
 .d2-tech-choice { background: #fff; padding: 12px; font-size: 13px; border-color: #dce6f3; }

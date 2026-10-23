@@ -4,11 +4,20 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
 .v3-insights h1{font-size:28px;margin:0;color:#112548}
 .v3-insights>p{color:#667891;margin:4px 0 22px}
 .v3-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:15px;margin:0 0 20px}
-.v3-metrics .card{padding:22px;text-align:center}
-.v3-metrics strong{font-size:32px;display:block;color:#001e50}
+.v3-metric-card{padding:18px 20px;display:flex;align-items:center;gap:13px}
+.v3-metric-icon{width:42px;height:42px;border-radius:11px;background:#eef2f8;color:#45587a;display:grid;place-items:center;font-weight:900;font-size:17px;flex:none}
+.v3-metric-blue{background:#e2ecff;color:#0053e2}
+.v3-metric-green{background:#def5e6;color:#0c7739}
+.v3-metric-red{background:#fde7e9;color:#c83939}
+.v3-metrics strong{font-size:26px;display:block;color:#001e50;line-height:1.1}
 .v3-metrics strong.down{color:#c83939}
 .v3-metrics strong.green{color:#0c7739}
 .v3-metrics small{color:#667891;font-weight:700;text-transform:uppercase;letter-spacing:.03em;font-size:10px}
+.v3-charts .card{border-top:3px solid var(--border,#e0e6ef)}
+.v3-accent-red{border-top-color:#c83939!important}
+.v3-accent-amber{border-top-color:#f59e0b!important}
+.v3-accent-blue{border-top-color:#0053e2!important}
+.v3-accent-green{border-top-color:#0c7739!important}
 .v3-charts{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
 .v3-charts .card{padding:20px}
 .v3-charts h2{font-size:14px;margin:0 0 14px;color:#152947}
@@ -37,22 +46,22 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
 <main class="v3-insights" id="main-content"><h1>Maintenance Analytics</h1><p>Operational trends from closed, non-excluded work orders only &mdash; technician selections and manual exclusions are already respected.</p>
 
 <div class="v3-metrics">
-  <div class="card"><strong>{{ data.totals.total_shifts or 0 }}</strong><small>Total shifts</small></div>
-  <div class="card"><strong>{{ data.totals.total_entries or 0 }}</strong><small>Work orders logged</small></div>
-  <div class="card"><strong class="green">{{ data.totals.total_pms or 0 }}</strong><small>PMs completed</small></div>
-  <div class="card"><strong class="down">{{ data.priority_totals.down or 0 }}</strong><small>Down events</small></div>
+  <div class="card v3-metric-card"><div class="v3-metric-icon">S</div><div><strong>{{ data.totals.total_shifts or 0 }}</strong><small>Total shifts</small></div></div>
+  <div class="card v3-metric-card"><div class="v3-metric-icon v3-metric-blue">W</div><div><strong>{{ data.totals.total_entries or 0 }}</strong><small>Work orders logged</small></div></div>
+  <div class="card v3-metric-card"><div class="v3-metric-icon v3-metric-green">P</div><div><strong class="green">{{ data.totals.total_pms or 0 }}</strong><small>PMs completed</small></div></div>
+  <div class="card v3-metric-card"><div class="v3-metric-icon v3-metric-red">D</div><div><strong class="down">{{ data.priority_totals.down or 0 }}</strong><small>Down events</small></div></div>
 </div>
 
 <div class="v3-charts">
-  <div class="card"><h2>Most worked-on assets</h2><div class="v3-chart-wrap"><canvas id="chartTopAssets"></canvas></div></div>
-  <div class="card"><h2>Priority breakdown</h2><div class="v3-chart-wrap"><canvas id="chartPriority"></canvas></div></div>
-  <div class="card"><h2>Work orders per shift (last 30)</h2><div class="v3-chart-wrap"><canvas id="chartWOTrend"></canvas></div></div>
-  <div class="card"><h2>PMs completed per shift (last 30)</h2><div class="v3-chart-wrap"><canvas id="chartPMTrend"></canvas></div></div>
+  <div class="card v3-accent-red"><h2>Most worked-on assets</h2><div class="v3-chart-wrap"><canvas id="chartTopAssets"></canvas></div></div>
+  <div class="card v3-accent-amber"><h2>Priority breakdown</h2><div class="v3-chart-wrap"><canvas id="chartPriority"></canvas></div></div>
+  <div class="card v3-accent-blue"><h2>Work orders per shift (last 30)</h2><div class="v3-chart-wrap"><canvas id="chartWOTrend"></canvas></div></div>
+  <div class="card v3-accent-green"><h2>PMs completed per shift (last 30)</h2><div class="v3-chart-wrap"><canvas id="chartPMTrend"></canvas></div></div>
 </div>
 
 <div class="v3-tables">
-<section class="card"><h2>Repeat problem assets</h2><p class="hint">Assets appearing in more than one shift, ranked by shift count.</p><table><thead><tr><th>Asset</th><th>Shifts</th><th>Work orders</th></tr></thead><tbody>{% for item in data.repeat_assets %}<tr><td>{{ item.unit }}</td><td>{{ item.shift_cnt }}</td><td>{{ item.total_wo }}</td></tr>{% else %}<tr><td colspan="3">No repeat assets found.</td></tr>{% endfor %}</tbody></table></section>
-<section class="card"><h2>Top technicians by entries</h2><p class="hint">All-time entry counts, excluded entries not counted.</p><div class="v3-chart-wrap" style="height:220px"><canvas id="chartTopTechs"></canvas></div></section>
+<section class="card v3-accent-red"><h2>Repeat problem assets</h2><p class="hint">Assets appearing in more than one shift, ranked by shift count.</p><table><thead><tr><th>Asset</th><th>Shifts</th><th>Work orders</th></tr></thead><tbody>{% for item in data.repeat_assets %}<tr><td>{{ item.unit }}</td><td>{{ item.shift_cnt }}</td><td>{{ item.total_wo }}</td></tr>{% else %}<tr><td colspan="3">No repeat assets found.</td></tr>{% endfor %}</tbody></table></section>
+<section class="card v3-accent-blue"><h2>Top technicians by entries</h2><p class="hint">All-time entry counts, excluded entries not counted.</p><div class="v3-chart-wrap" style="height:220px"><canvas id="chartTopTechs"></canvas></div></section>
 </div>
 
 <div class="v3-insight-strip"><h2>Executive insights</h2><div class="v3-insight-grid">
