@@ -457,8 +457,26 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         db.set_carry_over(entry_id,False)
         return return_workspace(shift_id,"Carry-over dismissed")
 
+    def roster_technician_counts(counts, shift):
+        """Annotate detected technicians from the existing Drax roster."""
+        import re
+        def key(name):
+            parts=re.findall(r"[a-z]+",str(name).casefold())
+            return tuple(sorted((parts[0],parts[-1]))) if len(parts)>=2 else tuple(parts)
+        assigned=set()
+        if get_mst_roster:
+            for person in get_mst_roster().values():
+                if str(person.get("shift","")).strip().upper()!=shift["shift_type"]:
+                    continue
+                name=person.get("full_name") or person.get("display_name") or ""
+                if name: assigned.add(key(name))
+        return [{**c,"assigned":key(c["name"]) in assigned} for c in counts]
+
     def render(request, shift, **extra):
         info = model(shift["id"])
+        if extra.get("staged"):
+            extra["staged"]={**extra["staged"],
+                             "counts":roster_technician_counts(extra["staged"]["counts"],shift)}
         context = {
             "shift":shift,
             **info,
