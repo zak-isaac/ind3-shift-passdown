@@ -1,0 +1,92 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>IND3 &middot; Administration</title><link rel="stylesheet" href="/static/v3.css"><link rel="stylesheet" href="/static/v3_design2.css"><link rel="stylesheet" href="/static/tailwind.min.css"><script src="/static/htmx.min.js"></script><style>
+.htmx-indicator{display:none}.htmx-request .htmx-indicator{display:inline-block}.htmx-request.htmx-indicator{display:inline-block}
+.v3-admin{max-width:900px;margin:35px auto;padding:0 20px 40px}
+.v3-admin h1{font-size:28px;margin:0 0 7px;color:#112548}
+.v3-admin>p{color:#667891;margin:0 0 20px}
+.v3-admin .notice{background:#e7f7ec;color:#176c39;padding:12px 16px;border-radius:10px;margin-bottom:18px;font-size:13px;font-weight:700}
+</style></head><body>
+<div class="shell design2-shell">
+{% set active_page = 'admin' %}
+{% include 'v3/_sidebar.html' %}
+<div class="viewport">
+{% set crumb = 'Administration' %}
+{% include 'v3/_topbar.html' %}
+<main class="v3-admin" id="main-content"><h1>Administration</h1><p>System configuration &mdash; same roster and notification settings as the V2 dashboard.</p>{% if notice %}<p class="notice">{{ notice }}</p>{% endif %}
+
+<!-- Associate Roster (reuses the existing V2 /admin/associates endpoints -- same roster, one source of truth) -->
+<section class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-6">
+  <div class="flex items-center justify-between mb-1">
+    <h2 class="font-black text-base" style="color:#001e50;">Associate Roster</h2>
+    <span class="text-xs text-gray-400">{{ roster_count }} loaded</span>
+  </div>
+  <p class="text-gray-500 text-xs mb-4">Roster seeded from the Associates spreadsheet. Changes are saved to the facility database.</p>
+  <div class="flex items-center gap-3 mb-5 pb-4 border-b">
+    <button hx-post="/admin/reload-roster" hx-target="#roster-reload-msg" hx-swap="innerHTML"
+      class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-4 py-2 rounded-xl text-xs transition border border-gray-300">
+      Re-sync from Drax
+    </button>
+    <span id="roster-reload-msg" class="text-xs text-gray-500">Imports all associates from the Drax file into the DB.</span>
+  </div>
+  <div id="assoc-table" hx-get="/admin/associates" hx-trigger="load, rosterReloaded from:body" hx-swap="innerHTML">
+    <p class="text-gray-400 text-sm italic">Loading associates...</p>
+  </div>
+  <div class="border-t pt-4 mt-4">
+    <h3 class="font-bold text-sm mb-2" style="color:#001e50;">Add Associate Manually</h3>
+    <form hx-post="/admin/associates/add" hx-target="#assoc-table" hx-swap="innerHTML" hx-on::after-request="this.reset()" class="grid grid-cols-2 gap-3">
+      <div class="flex flex-col gap-1"><label class="text-xs font-bold text-gray-500 uppercase tracking-wide">Associate #</label>
+        <input name="assoc_num" type="text" required placeholder="e.g. 12345" class="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-wm-blue outline-none transition" /></div>
+      <div class="flex flex-col gap-1"><label class="text-xs font-bold text-gray-500 uppercase tracking-wide">Full Name</label>
+        <input name="full_name" type="text" required placeholder="e.g. John Smith" class="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-wm-blue outline-none transition" /></div>
+      <div class="flex flex-col gap-1"><label class="text-xs font-bold text-gray-500 uppercase tracking-wide">Shift</label>
+        <select name="shift" class="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-wm-blue outline-none transition">
+          <option value="">&mdash; Any &mdash;</option><option value="S1">S1</option><option value="S2">S2</option><option value="S3">S3</option><option value="S4">S4</option><option value="S5">S5</option>
+        </select></div>
+      <div class="flex flex-col gap-1"><label class="text-xs font-bold text-gray-500 uppercase tracking-wide">Default ID</label>
+        <input name="default_id" type="text" placeholder="optional" class="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-wm-blue outline-none transition" /></div>
+      <div class="col-span-2 flex items-center gap-3">
+        <label class="flex items-center gap-2 cursor-pointer select-none">
+          <input type="checkbox" name="is_mst" value="1" class="w-4 h-4 accent-wm-blue rounded" />
+          <span class="text-sm font-semibold text-gray-700">MST &mdash; can log into the lead dashboard</span>
+        </label>
+        <button type="submit" class="ml-auto bg-wm-blue hover:bg-blue-700 text-white font-black px-5 py-2 rounded-xl text-sm transition">Add</button>
+      </div>
+    </form>
+  </div>
+</section>
+
+<!-- Teams Notifications (reuses existing V2 /admin/teams-webhook endpoint) -->
+<section class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-6">
+  <div class="flex items-center justify-between mb-1">
+    <h2 class="font-black text-base" style="color:#001e50;">Teams Notifications</h2>
+    {% if teams_webhook_url %}<span class="text-xs font-bold bg-green-100 text-green-700 px-2.5 py-0.5 rounded-full">Active</span>{% else %}<span class="text-xs font-bold bg-gray-100 text-gray-500 px-2.5 py-0.5 rounded-full">Off</span>{% endif %}
+  </div>
+  <p class="text-gray-500 text-xs mb-4">Paste your Teams channel incoming webhook URL. A card will be posted whenever a tech logs a <strong>Down</strong> or <strong>Degraded</strong> unit.</p>
+  <form method="POST" action="/admin/teams-webhook" class="flex flex-col gap-3">
+    <input name="webhook_url" type="url" placeholder="https://walmart.webhook.office.com/..." value="{{ teams_webhook_url }}" class="rounded-xl border-2 border-gray-200 focus:border-wm-blue px-4 py-2.5 text-sm font-mono outline-none transition w-full" />
+    <div class="flex gap-3">
+      <button type="submit" class="bg-wm-blue hover:bg-blue-700 text-white font-black px-6 py-2.5 rounded-xl text-sm transition">Save Webhook</button>
+      {% if teams_webhook_url %}<button type="submit" name="webhook_url" value="" class="bg-white border border-gray-300 hover:border-red-400 text-gray-500 hover:text-red-600 font-bold px-5 py-2.5 rounded-xl text-sm transition">Clear</button>{% endif %}
+    </div>
+  </form>
+</section>
+
+<!-- Facility &amp; email settings (V3-native route) -->
+<section class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+  <h2 class="font-black text-base mb-1" style="color:#001e50;">Facility &amp; Email Settings</h2>
+  <p class="text-gray-500 text-xs mb-5">Controls the passdown report's sender name, recipients, and distribution center tag.</p>
+  <form method="post" action="/v3/admin/settings" class="flex flex-col gap-4">
+    <div class="flex flex-col gap-1"><label class="text-xs font-bold text-gray-500 uppercase tracking-wide">Distribution Center</label>
+      <input name="dc_number" value="{{ dc_number }}" maxlength="20" required class="rounded-xl border-2 border-gray-200 focus:border-wm-blue px-4 py-2.5 text-sm outline-none transition w-full" /></div>
+    <div class="flex flex-col gap-1"><label class="text-xs font-bold text-gray-500 uppercase tracking-wide">Passdown recipients (comma-separated)</label>
+      <input name="email_to" value="{{ email_to }}" placeholder="recipient@company.com" class="rounded-xl border-2 border-gray-200 focus:border-wm-blue px-4 py-2.5 text-sm outline-none transition w-full" /></div>
+    <div class="flex flex-col gap-1"><label class="text-xs font-bold text-gray-500 uppercase tracking-wide">Sender display name</label>
+      <input name="email_from_name" value="{{ email_from_name }}" maxlength="160" class="rounded-xl border-2 border-gray-200 focus:border-wm-blue px-4 py-2.5 text-sm outline-none transition w-full" /></div>
+    <div class="flex flex-col gap-1"><label class="text-xs font-bold text-gray-500 uppercase tracking-wide">Microsoft Graph client ID (optional)</label>
+      <input name="ms_client_id" value="{{ ms_client_id }}" class="rounded-xl border-2 border-gray-200 focus:border-wm-blue px-4 py-2.5 text-sm outline-none transition w-full font-mono" /></div>
+    <button type="submit" class="w-fit bg-wm-blue hover:bg-blue-700 text-white font-black px-6 py-2.5 rounded-xl text-sm transition">Save configuration</button>
+  </form>
+</section>
+
+</main>
+</div></div>
+</body></html>

@@ -506,22 +506,35 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                 return RedirectResponse("/v3/login",status_code=303)
         elif not is_lead_authed(request):
             return lead_redirect("/v3/analytics")
+        data=db.get_analytics()
         return templates.TemplateResponse(request,"v3/analytics.html",{
             "shift_id":shift_id,
-            "data":db.get_analytics(),
+            "data":data,
+            "data_json":json.dumps(data),
         })
 
     @router.get("/admin", response_class=HTMLResponse)
     async def v3_admin(request:Request):
-        who=decode_session(request)
-        if not who or not who["profile"].get("is_manager"):
-            raise HTTPException(403,"Management access required")
+        # Matches V2's gate: any authenticated session can view/configure.
+        # Manager-only sub-sections (none currently active) would check is_manager
+        # on top of this, the same way V2's admin.html does for OT codes.
+        if get_mst_roster is not None:
+            who=decode_session(request)
+            if not who:
+                return RedirectResponse("/v3/login",status_code=303)
+            is_manager=bool(who["profile"].get("is_manager"))
+        else:
+            if not is_lead_authed(request):
+                return lead_redirect("/v3/admin")
+            is_manager=True
         return templates.TemplateResponse(request,"v3/admin.html",{
             "dc_number":db.get_setting("dc_number","IND3"),
             "email_to":db.get_setting("email_to",""),
             "email_from_name":db.get_setting("email_from_name","IND3 Shift Passdown"),
             "ms_client_id":db.get_setting("ms_client_id",""),
+            "teams_webhook_url":db.get_setting("teams_webhook_url",""),
             "roster_count":len(get_mst_roster() if get_mst_roster else {}),
+            "is_manager":is_manager,
             "notice":request.query_params.get("notice",""),
         })
 
@@ -530,7 +543,9 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                                 email_to:str=Form(""),email_from_name:str=Form(""),
                                 ms_client_id:str=Form("")):
         who=decode_session(request)
-        if not who or not who["profile"].get("is_manager"):
+        if get_mst_roster is not None and not who:
+            return RedirectResponse("/v3/login",status_code=303)
+        if get_mst_roster is None and not is_lead_authed(request):
             raise HTTPException(403,"Management access required")
         dc_number=dc_number.strip().upper()
         if not dc_number or len(dc_number)>20:
@@ -957,7 +972,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         return HTMLResponse(render_pm_section(shift_id))
 
     @router.post("/manual")
-    async def add_manual(request:Request,shift_id:int=Form(...),unit:str=Form(""),issue:str=Form(""),remarks:str=Form(""),wo_number:str=Form("")):
+    async def add_manual(request:Request,shift_id:int=Form(...),unit:str=Form(""),issue:str=Form(""),cause:str=Form(""),remarks:str=Form(""),wo_number:str=Form("")):
         secure(request,shift_id)
         if not unit.strip() or not issue.strip():
             raise HTTPException(400,"Asset ID and reported issue are required")
@@ -965,8 +980,8 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         with db._conn() as c:
             if wo_number.strip():
                 c.execute("UPDATE entries SET wo_number=? WHERE id=?",(wo_number.strip()[:50],eid))
-            c.execute("INSERT INTO v3_entry_meta(entry_id,shift_id,reported_issue,original_remarks,mst_edited,imported_v3,rfr_type) VALUES (?,?,?,?,1,0,'Work Request')",
-                      (eid,shift_id,issue.strip()[:4000],json.dumps([remarks.strip()] if remarks.strip() else [])))
+            c.execute("INSERT INTO v3_entry_meta(entry_id,shift_id,reported_issue,cause_text,original_remarks,mst_edited,imported_v3,rfr_type) VALUES (?,?,?,?,?,1,0,'Work Request')",
+                      (eid,shift_id,issue.strip()[:4000],cause.strip()[:4000],json.dumps([remarks.strip()] if remarks.strip() else [])))
         return RedirectResponse(f"/v3?shift_id={shift_id}&notice=Manual+happening+added",status_code=303)
 
     @router.post("/loto")

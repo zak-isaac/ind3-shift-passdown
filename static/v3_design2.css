@@ -28,9 +28,13 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
 .d2-brand small, .d2-nav-bottom, .design2-shell .nav-cap { font-size: 11px; }
 .design2-shell .nav-link { font-size: 13px; padding: 12px 13px; }
 .design2-shell .nav-link em { font-size: 11px; }
-.d2-topbar .crumb, .d2-mode, .d2-profile b { font-size: 12px; }
-.d2-profile small { font-size: 11px; }
-.d2-signout { font-size: 12px; font-weight: 700; }
+.d2-topbar .crumb, .d2-mode { font-size: 12px; }
+.d2-sidebar-profile { display: flex; align-items: center; gap: 9px; padding: 12px 13px; margin: 2px 5px; border-top: 1px solid #1d3c70; border-bottom: 1px solid #1d3c70; }
+.d2-profile-info { min-width: 0; }
+.d2-profile-info b { display: block; color: #fff; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.d2-profile-info small { display: block; color: #8fa5c7; font-size: 10px; }
+.d2-signout { display: block; text-align: center; margin: 10px 13px 16px; padding: 9px 11px; border: 1px solid #3a567f; border-radius: 7px; color: #ffd0d0; font-size: 12px; font-weight: 700; text-decoration: none; transition: background .15s, border-color .15s; }
+.d2-signout:hover { background: #2a4d80; border-color: #4a6da0; }
 .d2-page-intro h1 { font-size: 27px; }
 .d2-page-intro p { font-size: 13px; }
 .d2-page-intro .eyebrow { font-size: 10px; }
@@ -68,9 +72,12 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
 .d2-wo-table th:nth-child(5) { width: 10%; }
 .d2-wo-table th:nth-child(6) { width: 8%; }
 .d2-table-footer { font-size: 11px; }
-.d2-tools-card h2 { font-size: 17px; }
-.d2-tool summary, .d2-tool-inner { font-size: 12px; }
-.d2-tool-count { font-size: 11px; }
+.d2-tools-card { padding: 18px 17px 19px; }
+.d2-tools-card h2 { font-size: 19px; }
+.d2-tool summary, .d2-tool-inner { font-size: 13px; }
+.d2-tool summary { padding: 13px 2px; }
+.d2-tool-count { font-size: 12px; }
+.d2-workspace-grid { grid-template-columns: minmax(0,2.85fr) minmax(275px,1.1fr); }
 /* Shift tools -- restored V2 scannability: icon + color-coded left border + chevron per tool. */
 .d2-tool { border-left: 3px solid transparent; padding-left: 7px; margin-left: -7px; }
 .d2-tool-icon { flex: none; font-size: 14px; line-height: 1; opacity: .85; }

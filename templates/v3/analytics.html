@@ -1,0 +1,129 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>IND3 &middot; Analytics</title><link rel="stylesheet" href="/static/v3.css"><link rel="stylesheet" href="/static/v3_design2.css"><script src="/static/htmx.min.js"></script><script src="/static/chart.min.js"></script><style>
+body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+.v3-insights{max-width:1260px;margin:auto;padding:35px 25px}
+.v3-insights h1{font-size:28px;margin:0;color:#112548}
+.v3-insights>p{color:#667891;margin:4px 0 22px}
+.v3-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:15px;margin:0 0 20px}
+.v3-metrics .card{padding:22px;text-align:center}
+.v3-metrics strong{font-size:32px;display:block;color:#001e50}
+.v3-metrics strong.down{color:#c83939}
+.v3-metrics strong.green{color:#0c7739}
+.v3-metrics small{color:#667891;font-weight:700;text-transform:uppercase;letter-spacing:.03em;font-size:10px}
+.v3-charts{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
+.v3-charts .card{padding:20px}
+.v3-charts h2{font-size:14px;margin:0 0 14px;color:#152947}
+.v3-chart-wrap{position:relative;height:250px}
+.v3-tables{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.v3-tables .card{padding:20px}
+.v3-tables h2{font-size:14px;margin:0 0 6px;color:#152947}
+.v3-tables p.hint{font-size:11px;color:#8294ab;margin:0 0 14px}
+.v3-tables table{width:100%;border-collapse:collapse;font-size:12px}
+.v3-tables td,.v3-tables th{padding:10px;border-bottom:1px solid #e5ebf3;text-align:left}
+.v3-insight-strip{background:#071b37;border-radius:12px;padding:22px 24px;margin-top:18px;color:#fff}
+.v3-insight-strip h2{font-size:14px;margin:0 0 14px;color:#ffc220}
+.v3-insight-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.v3-insight-card{background:rgba(255,255,255,.08);border-radius:10px;padding:14px}
+.v3-insight-card p.label{color:#ffc220;font-weight:800;font-size:11px;margin:0 0 4px}
+.v3-insight-card p.value{color:#fff;font-weight:800;font-size:17px;margin:0 0 3px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.v3-insight-card p.sub{color:#9db3d6;font-size:11px;margin:0}
+@media(max-width:900px){.v3-charts,.v3-tables,.v3-insight-grid{grid-template-columns:1fr}}
+</style></head><body>
+<div class="shell design2-shell">
+{% set active_page = 'analytics' %}
+{% include 'v3/_sidebar.html' %}
+<div class="viewport">
+{% set crumb = 'Analytics' %}
+{% include 'v3/_topbar.html' %}
+<main class="v3-insights" id="main-content"><h1>Maintenance Analytics</h1><p>Operational trends from closed, non-excluded work orders only &mdash; technician selections and manual exclusions are already respected.</p>
+
+<div class="v3-metrics">
+  <div class="card"><strong>{{ data.totals.total_shifts or 0 }}</strong><small>Total shifts</small></div>
+  <div class="card"><strong>{{ data.totals.total_entries or 0 }}</strong><small>Work orders logged</small></div>
+  <div class="card"><strong class="green">{{ data.totals.total_pms or 0 }}</strong><small>PMs completed</small></div>
+  <div class="card"><strong class="down">{{ data.priority_totals.down or 0 }}</strong><small>Down events</small></div>
+</div>
+
+<div class="v3-charts">
+  <div class="card"><h2>Most worked-on assets</h2><div class="v3-chart-wrap"><canvas id="chartTopAssets"></canvas></div></div>
+  <div class="card"><h2>Priority breakdown</h2><div class="v3-chart-wrap"><canvas id="chartPriority"></canvas></div></div>
+  <div class="card"><h2>Work orders per shift (last 30)</h2><div class="v3-chart-wrap"><canvas id="chartWOTrend"></canvas></div></div>
+  <div class="card"><h2>PMs completed per shift (last 30)</h2><div class="v3-chart-wrap"><canvas id="chartPMTrend"></canvas></div></div>
+</div>
+
+<div class="v3-tables">
+<section class="card"><h2>Repeat problem assets</h2><p class="hint">Assets appearing in more than one shift, ranked by shift count.</p><table><thead><tr><th>Asset</th><th>Shifts</th><th>Work orders</th></tr></thead><tbody>{% for item in data.repeat_assets %}<tr><td>{{ item.unit }}</td><td>{{ item.shift_cnt }}</td><td>{{ item.total_wo }}</td></tr>{% else %}<tr><td colspan="3">No repeat assets found.</td></tr>{% endfor %}</tbody></table></section>
+<section class="card"><h2>Top technicians by entries</h2><p class="hint">All-time entry counts, excluded entries not counted.</p><div class="v3-chart-wrap" style="height:220px"><canvas id="chartTopTechs"></canvas></div></section>
+</div>
+
+<div class="v3-insight-strip"><h2>Executive insights</h2><div class="v3-insight-grid">
+{% if data.repeat_assets %}{% set top = data.repeat_assets[0] %}<div class="v3-insight-card"><p class="label">Most problematic asset</p><p class="value">{{ top.unit }}</p><p class="sub">{{ top.shift_cnt }} shifts &middot; {{ top.total_wo }} work orders</p></div>{% endif %}
+{% if data.top_techs %}{% set top_tech = data.top_techs[0] %}<div class="v3-insight-card"><p class="label">Most active technician</p><p class="value">{{ top_tech.tech_name }}</p><p class="sub">{{ top_tech.cnt }} entries logged</p></div>{% endif %}
+{% set downs = data.priority_totals.down or 0 %}{% set total = data.totals.total_entries or 1 %}<div class="v3-insight-card"><p class="label">Down-event ratio</p><p class="value">{{ ((downs / total) * 100) | round(1) }}%</p><p class="sub">{{ downs }} downs out of {{ total }} total work orders</p></div>
+</div></div>
+
+</main>
+</div></div>
+<script>
+const D = {{ data_json | safe }};
+const WM_BLUE='#0053e2', WM_SPARK='#ffc220', WM_RED='#c83939', WM_GREEN='#0c7739', GRAY='#94a3b8';
+Chart.defaults.font.family = "'Segoe UI', ui-sans-serif, system-ui, sans-serif";
+Chart.defaults.plugins.legend.display = false;
+
+new Chart(document.getElementById('chartTopAssets'), {
+  type: 'bar',
+  data: { labels: D.top_assets.map(a => a.unit),
+    datasets: [{ data: D.top_assets.map(a => a.cnt),
+      backgroundColor: D.top_assets.map((_, i) => i < 3 ? WM_RED : WM_BLUE), borderRadius: 6 }] },
+  options: { responsive: true, maintainAspectRatio: false,
+    scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+    plugins: { legend: { display: false },
+      tooltip: { callbacks: { label: ctx => ` ${ctx.raw} work order${ctx.raw !== 1 ? 's' : ''}` } } } }
+});
+
+const pt = D.priority_totals;
+new Chart(document.getElementById('chartPriority'), {
+  type: 'doughnut',
+  data: { labels: ['Down', 'Degraded', 'Monitor'],
+    datasets: [{ data: [pt.down || 0, pt.degraded || 0, pt.monitor || 0],
+      backgroundColor: [WM_RED, WM_SPARK, WM_GREEN], borderWidth: 2, borderColor: '#fff' }] },
+  options: { responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: true, position: 'bottom' } } }
+});
+
+const wos = D.wo_by_shift;
+new Chart(document.getElementById('chartWOTrend'), {
+  type: 'line',
+  data: { labels: wos.map(s => s.date + ' ' + s.shift_type),
+    datasets: [
+      { label: 'Total WOs', data: wos.map(s => s.wo_count),
+        borderColor: WM_BLUE, backgroundColor: WM_BLUE + '22', fill: true, tension: 0.3, pointRadius: 3 },
+      { label: 'Down events', data: wos.map(s => s.down_count),
+        borderColor: WM_RED, backgroundColor: WM_RED + '22', fill: false, tension: 0.3, pointRadius: 3 }
+    ] },
+  options: { responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: true, position: 'top' } },
+    scales: { x: { ticks: { maxRotation: 45, font: { size: 9 } } },
+              y: { beginAtZero: true, ticks: { precision: 0 } } } }
+});
+
+const pms = D.pm_by_shift;
+new Chart(document.getElementById('chartPMTrend'), {
+  type: 'bar',
+  data: { labels: pms.map(s => s.date + ' ' + s.shift_type),
+    datasets: [{ label: 'PMs', data: pms.map(s => s.pm_count), backgroundColor: WM_GREEN + 'cc', borderRadius: 4 }] },
+  options: { responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: { x: { ticks: { maxRotation: 45, font: { size: 9 } } },
+              y: { beginAtZero: true, ticks: { precision: 0 } } } }
+});
+
+new Chart(document.getElementById('chartTopTechs'), {
+  type: 'bar',
+  data: { labels: D.top_techs.map(t => t.tech_name),
+    datasets: [{ data: D.top_techs.map(t => t.cnt), backgroundColor: WM_BLUE, borderRadius: 6 }] },
+  options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
+});
+</script>
+</body></html>
