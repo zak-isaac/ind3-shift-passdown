@@ -154,3 +154,33 @@ def test_main_import_cause_column_available_for_report_without_separate_file(cli
     # Same merge pattern used in main.py's report generation call sites.
     merged = {**db.get_wo_causes(sid), **db.get_v3_entry_causes(sid)}
     assert merged["28099999"] == "Sensor failure (from main file)"
+
+
+def test_empty_cause_column_falls_back_to_service_description(client_and_shift):
+    """Real-world case at this facility: the literal 'Cause' column is
+    empty almost throughout; 'Service/Repair Description' is where the
+    actual cause narrative lives in practice. get_v3_entry_causes() must
+    fall back to it -- matching the EXACT fallback the workspace page
+    already uses (v3_routes.py's model(): cause_text or reported_issue) --
+    or the email report shows no cause for the vast majority of real WOs
+    even after the Cause-column fix.
+    """
+    client, sid = client_and_shift
+    timecard_xlsx = _xlsx_bytes(
+        ["WO Number", "Asset ID", "Asset #", "WO Status", "SJ / PM Code", "Repair Class",
+         "Last Shift", "Service/Repair Description", "Technician", "Technician Remarks",
+         "Cause", "Start Date", "WO Closed Date/Time", "Primary RFR"],
+        [[28088888, None, "TRKGATE0004", "Closed", None, "Unplanned", "S2",
+          "Conveyor belt jammed with debris", "Smith, John", "Cleared jam, inspected belt",
+          None,  # Cause column left blank, as in real exports
+          "2026-10-20 08:00:00", "2026-10-20 09:00:00", "Breakdown"]],
+    )
+    staged = client.post("/v3/import", data={"shift_id": sid},
+                          files={"file": ("timecard.xlsx", timecard_xlsx,
+                                  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    token = re.search(r"/v3/import/([a-f0-9]{32})/confirm", staged.text).group(1)
+    confirmed = client.post(f"/v3/import/{token}/confirm", data={"shift_id": sid, "techs": ["Smith, John"]},
+                             follow_redirects=False)
+    assert confirmed.status_code == 303
+
+    assert db.get_v3_entry_causes(sid) == {"28088888": "Conveyor belt jammed with debris"}

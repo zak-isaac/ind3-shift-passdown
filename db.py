@@ -861,26 +861,29 @@ def get_wo_causes(shift_id: int) -> dict:
 
 
 def get_v3_entry_causes(shift_id: int) -> dict:
-    """Return {wo_number: cause_text} sourced from the main V3 Cetaris
-    import's own "Cause" column (persisted per-entry in v3_entry_meta on
-    import -- see v3_cetaris.py's "cause" field and v3_routes.py's confirm
-    import). This is a DIFFERENT source than get_wo_causes() above, which
-    only covers a separately-uploaded cause/repair-description export.
+    """Return {wo_number: cause-or-issue text}, resolved with the EXACT same
+    fallback chain the workspace page already uses (v3_routes.py's model():
+    cause_text, or if blank, reported_issue -- which comes from the main
+    Cetaris import's "Service/Repair Description" column, falling back to
+    the raw entry's issue field). The literal "Cause" column (v3_cetaris.py's
+    "cause" field) is almost always empty in real exports at this facility;
+    "Service/Repair Description" is where the actual cause narrative lives
+    in practice, so it has to be in this chain, not just a nicety.
 
-    The workspace page (v3_routes.py's model()) already prefers this source
-    over get_wo_causes() when displaying happenings; report generation in
-    main.py must merge both the same way or an MST who only uploads the one
-    main Cetaris file (no separate cause file) sees causes on the workspace
-    page but NOT in the emailed/downloaded report -- same cause data,
-    silently dropped on one of the two output paths.
+    This is a DIFFERENT source than get_wo_causes() above, which only covers
+    a separately-uploaded cause/repair-description export. Report generation
+    in main.py must merge both (see lead_generate/shift_end) or an MST who
+    only uploads the one main Cetaris file sees cause/issue text on the
+    workspace page but NOT in the emailed/downloaded report.
     """
     with _conn() as c:
         rows = c.execute("""
-            SELECT e.wo_number, m.cause_text
+            SELECT e.wo_number,
+                   COALESCE(NULLIF(m.cause_text,''), NULLIF(m.reported_issue,''), NULLIF(e.issue,'')) AS resolved
             FROM v3_entry_meta m JOIN entries e ON e.id = m.entry_id
-            WHERE m.shift_id = ? AND m.cause_text != '' AND e.wo_number != ''
+            WHERE m.shift_id = ? AND e.wo_number != ''
         """, (shift_id,)).fetchall()
-    return {row[0]: row[1] for row in rows}
+    return {row[0]: row[1] for row in rows if row[1]}
 
 
 def set_carry_over(entry_id: int, state: bool) -> None:
