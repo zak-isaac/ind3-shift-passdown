@@ -19,6 +19,19 @@ REQUIRED = (
     "Service/Repair Description", "Technician", "Technician Remarks", "Start Date",
 )
 PM_CATEGORIES = {"preventive maintenance", "preventative maintenance", "pm"}
+# What V2's cetaris_parser.py actually keys PM detection on: the "Work
+# Accomplished" column, not "Primary RFR". Cetaris exports PM work as
+# "Prev Maintenance" here -- RFR is the REASON the WO was opened, which for a
+# scheduled PM is often something else entirely, so checking RFR alone (the
+# original V3 behaviour) could silently classify zero rows as PM even on a
+# shift with real completed PMs. Keep PM_CATEGORIES too and check both so
+# either column being the PM signal still works.
+PM_WORK_ACCOMPLISHED = {
+    "prev maintenance",
+    "preventive maintenance",
+    "pm",
+    "pm - preventive maintenance",
+}
 DATE_FORMATS = ("%m/%d/%Y %I:%M %p", "%m/%d/%Y %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d")
 MAX_SIZE = 12 * 1024 * 1024
 MAX_ROWS = 30000
@@ -108,7 +121,8 @@ def select_records(rows: list[dict], selected: set[str], start: datetime, end: d
             summary["not_closed"] += 1
             continue
         category = r["rfr"].strip().casefold()
-        if category in PM_CATEGORIES:
+        work_accomplished = (r.get("work_accomplished") or "").strip().casefold()
+        if category in PM_CATEGORIES or work_accomplished in PM_WORK_ACCOMPLISHED:
             summary["pm_rows"] += 1
             eligible.append({**r, "kind": "pm"})
         else:

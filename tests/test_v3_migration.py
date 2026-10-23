@@ -57,6 +57,23 @@ def test_v3_navigation_and_pages(client_and_shift):
     assert "/v3/operations" in client.get("/v3/preview",params={"shift_id":sid}).text
 
 
+def test_history_eml_redownload(client_and_shift):
+    client,sid=client_and_shift
+    db.save_report(sid,"Test generated report","")
+    after=client.get("/v3/history")
+    assert after.status_code==200
+    assert f"/v3/history/{sid}/eml" in after.text
+
+    eml=client.get(f"/v3/history/{sid}/eml")
+    assert eml.status_code==200
+    assert eml.content==f"eml-for-report-{db.get_last_report_for_shift(sid)['id']}".encode()
+
+    # Works for a CLOSED shift too -- history must stay downloadable after the shift ends.
+    db.close_shift(sid)
+    closed_eml=client.get(f"/v3/history/{sid}/eml")
+    assert closed_eml.status_code==200
+
+
 def test_sidebar_active_state_matches_current_page(client_and_shift):
     """Each page must mark its OWN nav-link active, and every nav-link must carry
     hx-select-oob so the sidebar actually refreshes on htmx SPA-style navigation

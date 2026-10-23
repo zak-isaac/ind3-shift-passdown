@@ -64,7 +64,10 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                 window = shift_window(shift["shift_type"], date.fromisoformat(shift["date"]))
                 if not window:
                     continue
-                if now > window[1]:
+                # A shift is considered live from 1h before its scheduled start
+                # through 1h after its scheduled end -- matches the real-world
+                # handover grace period on both sides, not just at the start.
+                if now > window[1] + timedelta(hours=1):
                     db.close_shift(shift["id"])
                 elif now < window[0] - timedelta(hours=1):
                     db.close_shift(shift["id"])
@@ -80,7 +83,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             if allowed_shift_days and day.weekday() not in allowed_shift_days.get(code, ()):
                 continue
             window = shift_window(code, day)
-            if window and window[0] - timedelta(hours=1) <= now <= window[1]:
+            if window and window[0] - timedelta(hours=1) <= now <= window[1] + timedelta(hours=1):
                 return day
         return None
 
@@ -505,6 +508,23 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             "shifts":db.list_past_shifts_with_counts(limit=100),
         })
 
+    @router.get("/history/{shift_id}/eml")
+    async def v3_history_eml(request:Request, shift_id:int):
+        """Re-download the last generated report for any past shift as an
+        Outlook .eml, same compose format as the live Generate & Send flow --
+        does not regenerate the report, just re-packages what was already sent."""
+        if get_mst_roster is not None:
+            if not decode_session(request):
+                return RedirectResponse("/v3/login",status_code=303)
+        elif not is_lead_authed(request):
+            return lead_redirect("/v3/history")
+        if build_eml_response is None:
+            raise HTTPException(503,"Email composer unavailable")
+        report=db.get_last_report_for_shift(shift_id)
+        if not report:
+            raise HTTPException(404,"No report has been generated for this shift yet")
+        return await build_eml_response(report["id"],subject="",html_body="")
+
     @router.get("/analytics", response_class=HTMLResponse)
     async def v3_analytics(request:Request, shift_id:int=0):
         if get_mst_roster is not None:
@@ -742,6 +762,33 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         return render(request,shift,staged={"token":token,"filename":source["filename"],
                                            "counts":technician_counts(records),"total_rows":len(records)})
 
+    def _name_key(name):
+        import re as _re
+        return " ".join(sorted(_re.sub(r"[,]", " ", name or "").lower().split()))
+
+    def _roster_name_keys_for_shift(shift_type):
+        """Normalized full-name keys for every roster associate assigned to this
+        shift code, so a Cetaris 'Last, First' name can match a roster record
+        stored 'FIRST LAST' without requiring an exact-format match."""
+        if not get_mst_roster or not shift_type:
+            return set()
+        roster=get_mst_roster()
+        return {
+            _name_key(p.get("full_name") or p.get("display_name") or "")
+            for p in roster.values()
+            if str(p.get("shift") or "").upper()==shift_type and not p.get("is_manager")
+        }
+
+    def _auto_checked_techs(shift, tech_names, previously_selected):
+        """Pre-check technicians already on this shift's roster, plus anyone
+        previously confirmed on this shift -- the MST only has to additionally
+        check overtime/other-shift associates who showed up, not re-pick
+        their own crew every single upload."""
+        roster_keys=_roster_name_keys_for_shift(shift.get("shift_type"))
+        checked={name for name in tech_names if _name_key(name) in roster_keys}
+        checked |= (set(previously_selected) & set(tech_names))
+        return checked
+
     @router.post("/import",response_class=HTMLResponse)
     async def stage_import(request:Request,shift_id:int=Form(...),file:UploadFile=File(...)):
         shift=secure(request,shift_id)
@@ -770,9 +817,12 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         with db._conn() as c:
             c.execute("INSERT INTO v3_import_batches (token,shift_id,filename,created_at,rows_json) VALUES (?,?,?,?,?)",
                     (token,shift_id,file.filename[:240],datetime.now().isoformat(timespec="seconds"),json.dumps(records)))
+        info=model(shift_id)
+        tech_names=[c["name"] for c in technician_counts(records)]
+        auto_checked=_auto_checked_techs(shift,tech_names,info["selected_techs"])
         return render(request,shift,staged={
             "token":token,"filename":file.filename,"counts":technician_counts(records),
-            "total_rows":len(records),
+            "total_rows":len(records),"auto_checked":sorted(auto_checked),
         })
 
     @router.post("/import/{token}/confirm")
@@ -804,7 +854,12 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         with db._conn() as c:
             previous=c.execute("SELECT technicians_json FROM v3_shift_selection WHERE shift_id=?",(shift_id,)).fetchone()
         old_selected=set(json.loads(previous[0])) if previous else set()
-        removed=old_selected-selected
+        # Only reconsider technicians who actually appear in THIS upload's rows.
+        # A tech absent from a narrower/later re-export (timing, partial export,
+        # etc.) must never have their already-confirmed entries silently mass-
+        # excluded just because this particular file doesn't mention them --
+        # only an explicit uncheck of someone who IS listed here means "remove".
+        removed=(old_selected & allowed)-selected
         # Only auto-exclude a technician's V3 imports, preserving prior manual exclusions.
         if removed:
             placeholders=",".join("?" for _ in removed)
@@ -904,9 +959,15 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             c.execute("INSERT INTO v3_shift_source(shift_id,filename,rows_json) VALUES (?,?,?) "
                       "ON CONFLICT(shift_id) DO UPDATE SET filename=excluded.filename,rows_json=excluded.rows_json",
                       (shift_id,batch["filename"],batch["rows_json"]))
+            # Persist the UNION of this confirm's selection with anyone previously
+            # selected who simply isn't mentioned in this particular file -- never
+            # shrink the remembered crew just because one upload's export happened
+            # to be narrower. Only an explicit uncheck of someone visible in this
+            # file actually drops them (handled above via `removed`).
+            persisted_selection=selected|(old_selected-allowed)
             c.execute("INSERT INTO v3_shift_selection(shift_id,technicians_json,filename,imported_at) VALUES (?,?,?,?) "
                       "ON CONFLICT(shift_id) DO UPDATE SET technicians_json=excluded.technicians_json, filename=excluded.filename, imported_at=excluded.imported_at",
-                      (shift_id,json.dumps(sorted(selected)),batch["filename"],datetime.now().strftime("%Y-%m-%d %H:%M")))
+                      (shift_id,json.dumps(sorted(persisted_selection)),batch["filename"],datetime.now().strftime("%Y-%m-%d %H:%M")))
             c.execute("DELETE FROM v3_import_batches WHERE token=?",(token,))
         notice=f"Imported {added} new technician/WO entries; {unchanged} unchanged; {pending} flagged for review. {stats.get('unique_pm_wos',0)} distinct closed PM WOs in this import."
         skipped_parts=[]

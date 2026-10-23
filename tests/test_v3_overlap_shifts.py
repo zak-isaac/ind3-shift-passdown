@@ -88,4 +88,43 @@ def test_duplicate_shift_code_blocked_even_with_room_to_spare(tmp_path):
     assert len(db.get_active_shifts()) == 1
 
 
+def test_shift_stays_active_one_hour_past_scheduled_end_then_closes(tmp_path):
+    """A shift must remain active from 1h before its scheduled start through
+    1h after its scheduled end -- a symmetric handover grace period, not just
+    a head start. Window here: 06:00-14:00."""
+    db.set_db_path(tmp_path / "grace_period.db")
+    db.init_db()
+    roster = {"1001": {"display_name": "Grace Period Tester", "shift": "S1", "is_mst": True, "is_manager": False}}
+    now_box = {"t": datetime(2026, 10, 20, 7, 0)}
+
+    def shift_window(shift_type, d):
+        return (datetime.combine(d, time(6, 0)), datetime.combine(d, time(14, 0)))
+
+    app = FastAPI()
+    app.include_router(create_v3_router(
+        Jinja2Templates(directory=str(ROOT / "templates")),
+        lambda request: False, lambda request, shift: False, lambda request: None,
+        shift_window,
+        lambda url: RedirectResponse(url, status_code=303),
+        get_mst_roster=lambda: roster,
+        now_func=lambda: now_box["t"],
+    ))
+    client = TestClient(app)
+
+    started = client.post("/v3/login", data={"associate_id": "1001"}, follow_redirects=False)
+    assert started.status_code == 303, started.text[:300]
+    sid = int(started.headers["location"].split("shift_id=")[1])
+
+    # 30 minutes after the 14:00 scheduled end -- still inside the 1h grace window.
+    now_box["t"] = datetime(2026, 10, 20, 14, 30)
+    still_active = client.get("/v3", params={"shift_id": sid})
+    assert still_active.status_code == 200
+    assert db.get_shift(sid)["is_active"] == 1
+
+    # 90 minutes after the scheduled end -- past the 1h grace window, must close.
+    now_box["t"] = datetime(2026, 10, 20, 15, 30)
+    client.get("/v3", params={"shift_id": sid}, follow_redirects=False)
+    assert db.get_shift(sid)["is_active"] == 0
+
+
 

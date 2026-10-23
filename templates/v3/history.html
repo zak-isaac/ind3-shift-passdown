@@ -13,6 +13,9 @@
 .v3-pill{display:inline-block;padding:5px 10px;border-radius:20px;background:#e6f4ea;color:#176c39;font-size:11px;font-weight:800}
 .v3-pill.closed{background:#edf1f7;color:#596a82}
 .v3-records-empty{padding:48px 16px;text-align:center;color:#667891}
+.v3-eml-btn{display:inline-block;padding:6px 12px;border-radius:8px;background:#0053e2;color:#fff;font-size:11px;font-weight:800;text-decoration:none;white-space:nowrap}
+.v3-eml-btn:hover{background:#003da6}
+.v3-eml-btn.disabled{background:#edf1f7;color:#9aa8bc;pointer-events:none}
 body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
 </style></head><body>
 <div class="shell design2-shell">
@@ -21,6 +24,6 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
 <div class="viewport">
 {% set crumb = 'Shift history' %}
 {% include 'v3/_topbar.html' %}
-<main class="v3-records" id="main-content"><h1>Shift History</h1><p>Recorded shifts and passdown activity &mdash; most recent first. Existing shift records remain unchanged.</p><section class="card"><table class="v3-table"><thead><tr><th>Shift ID</th><th>Date</th><th>Shift</th><th>Shift owner</th><th>Happenings</th><th>Reports</th><th>Status</th></tr></thead><tbody>{% for s in shifts %}<tr><td><span class="v3-shift-id">#{{ s.id }}</span></td><td>{{ s.date }}</td><td><strong>{{ s.shift_type }}</strong></td><td>{{ s.lead_name }}</td><td><span class="v3-count-pill">{{ s.entry_count }}</span></td><td><span class="v3-count-pill">{{ s.report_count }}</span></td><td><span class="v3-pill {{ '' if s.is_active else 'closed' }}">{{ 'Active' if s.is_active else 'Closed' }}</span></td></tr>{% else %}<tr><td colspan="7"><div class="v3-records-empty">No shift history available yet.</div></td></tr>{% endfor %}</tbody></table></section></main>
+<main class="v3-records" id="main-content"><h1>Shift History</h1><p>Recorded shifts and passdown activity &mdash; most recent first. Existing shift records remain unchanged.</p><section class="card"><table class="v3-table"><thead><tr><th>Shift ID</th><th>Date</th><th>Shift</th><th>Shift owner</th><th>Happenings</th><th>Reports</th><th>Status</th><th>Actions</th></tr></thead><tbody>{% for s in shifts %}<tr><td><span class="v3-shift-id">#{{ s.id }}</span></td><td>{{ s.date }}</td><td><strong>{{ s.shift_type }}</strong></td><td>{{ s.lead_name }}</td><td><span class="v3-count-pill">{{ s.entry_count }}</span></td><td><span class="v3-count-pill">{{ s.report_count }}</span></td><td><span class="v3-pill {{ '' if s.is_active else 'closed' }}">{{ 'Active' if s.is_active else 'Closed' }}</span></td><td>{% if s.report_count > 0 %}<a class="v3-eml-btn" href="/v3/history/{{ s.id }}/eml">Download .eml</a>{% else %}<span class="v3-eml-btn disabled">No report yet</span>{% endif %}</td></tr>{% else %}<tr><td colspan="8"><div class="v3-records-empty">No shift history available yet.</div></td></tr>{% endfor %}</tbody></table></section></main>
 </div></div>
 </body></html>
