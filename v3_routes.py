@@ -20,6 +20,7 @@ import db
 import cause_lookup
 import v3_breakdown
 import v3_split
+import v3_import_review
 from v3_cetaris import parse_excel, select_records, technician_counts, MAX_SIZE
 
 
@@ -418,6 +419,20 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         notice="Asset returned to service" if decision=="rts" else "Asset kept out of service per MST decision"
         return return_workspace(shift_id,notice)
 
+    @router.post("/import-review/{review_id}/include")
+    async def v3_import_review_include(request:Request,review_id:int,shift_id:int=Form(...)):
+        secure(request,shift_id)
+        if not v3_import_review.include(db,shift_id,review_id):
+            raise HTTPException(404,"Review item not found or already resolved")
+        return return_workspace(shift_id,"Work order included in this shift")
+
+    @router.post("/import-review/{review_id}/dismiss")
+    async def v3_import_review_dismiss(request:Request,review_id:int,shift_id:int=Form(...)):
+        secure(request,shift_id)
+        if not v3_import_review.dismiss(db,shift_id,review_id):
+            raise HTTPException(404,"Review item not found or already resolved")
+        return return_workspace(shift_id,"Work order dismissed from review")
+
     @router.post("/rts/undo")
     async def v3_undo_rts(request:Request,shift_id:int=Form(...),unit:str=Form(...)):
         secure(request,shift_id)
@@ -477,6 +492,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             "oos_units":db.get_oos_units(),
             "rts_units":db.get_rts_events(shift["id"]),
             "breakdown_pending":v3_breakdown.pending(db),
+            "import_review":v3_import_review.pending(db,shift["id"]),
             "shift_notes":db.get_shift_notes(shift["id"]),
             "carry_overs":db.get_carry_over_entries(shift["id"]),
             "vendors":v3_vendors(shift["id"]),
@@ -884,6 +900,12 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         # process" shows up in the OOS panel you already have.
         breakdown_updates=v3_breakdown.sync(db,rows,selected,shift_id)
         records,stats=select_records(rows,selected,*window)
+        # Persist WHICH WOs were excluded/ambiguous, with their close time and
+        # reason, not just an aggregate count -- an MST couldn't previously
+        # see or act on anything beyond "N skipped". Hits overnight shifts
+        # (S3, S5) hardest since midnight-crossing timestamps are the most
+        # likely to disagree with a shift's computed window.
+        v3_import_review.record(db,shift_id,{"ambiguous":stats.get("ambiguous",[]),"excluded":stats.get("excluded",[])})
         added,unchanged,pending=0,0,0
         # Use short transactions. Existing db helpers open their own connections;
         # nesting them inside an active SQLite write transaction risks 'database locked'.
@@ -1016,7 +1038,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         if split_pending:
             skipped_parts.append(f"{len(split_pending)} need an explicit S4/S5 ownership call (ambiguous close time)")
         if skipped_parts:
-            notice += " Skipped " + " and ".join(skipped_parts) + " (not counted as happenings)."
+            notice += " Skipped " + " and ".join(skipped_parts) + " (not counted as happenings -- see Needs Review for details)."
         if breakdown_updates:
             notice += f" {breakdown_updates} breakdown WO(s) updated in the OOS/RTS tracker."
         from urllib.parse import quote

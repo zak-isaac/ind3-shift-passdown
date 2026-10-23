@@ -253,6 +253,64 @@ def test_breakdown_wo_tracked_as_oos_then_rts_decision(app_client):
     assert 'VOIDFILL0500' not in db.get_oos_units()
 
 
+def test_import_review_surfaces_skipped_wo_and_can_be_included(app_client):
+    """A WO closed outside this shift's window used to vanish into an
+    aggregate count ("Skipped 1 outside this shift's time window") with no
+    way to see which WO or act on it. It must now show up in the Needs
+    Review panel with its real detail, and an MST must be able to pull it
+    into the shift explicitly."""
+    import json, uuid
+    client,sid=app_client
+    client.get('/v3')
+    # app_client's window is 2026-10-20 00:00 -> 2026-10-21 00:00; this
+    # start_at is the day before, outside the window.
+    row=dict(wo_number="77001",tech_name="Ssaku, Isaac",asset_id="TSP0009",status="Closed",
+             rfr="Process Interruption",reported_issue="Belt jam",cause="",remarks="Cleared jam",
+             start_at="2026-10-19T23:00:00",closed_at="2026-10-19T23:30:00",
+             repair_class="Unplanned",pm_code="",last_shift="S2")
+    token=uuid.uuid4().hex
+    with db._conn() as c:
+        c.execute('INSERT INTO v3_import_batches(token,shift_id,filename,created_at,rows_json) VALUES (?,?,?,?,?)',
+                  (token,sid,'sample.xlsx',datetime.now().isoformat(timespec='seconds'),json.dumps([row])))
+    resp=client.post(f'/v3/import/{token}/confirm',data={'shift_id':str(sid),'techs':['Ssaku, Isaac']},follow_redirects=True)
+    assert resp.status_code==200,resp.text[:500]
+    assert 'see Needs Review for details' in resp.text
+
+    workspace=client.get(f'/v3?shift_id={sid}')
+    assert 'WO #77001' in workspace.text
+    assert 'TSP0009' in workspace.text
+    assert "Outside this shift" in workspace.text and "reporting window" in workspace.text
+    assert db.get_entries(sid)==[], 'must not silently appear as a happening before a decision is made'
+
+    import v3_import_review
+    [item]=v3_import_review.pending(db,sid)
+    included=client.post(f'/v3/import-review/{item["id"]}/include',data={'shift_id':str(sid)},follow_redirects=True)
+    assert included.status_code==200
+    entries=db.get_entries(sid)
+    assert len(entries)==1 and entries[0]['unit']=='TSP0009'
+    assert v3_import_review.pending(db,sid)==[], 'resolved item must drop off the pending list'
+
+
+def test_import_review_dismiss_does_not_create_entry(app_client):
+    client,sid=app_client
+    client.get('/v3')
+    import json, uuid, v3_import_review
+    row=dict(wo_number="77002",tech_name="Ssaku, Isaac",asset_id="TSP0010",status="Closed",
+             rfr="Process Interruption",reported_issue="False alarm",cause="",remarks="N/A",
+             start_at="2026-10-19T23:00:00",closed_at="2026-10-19T23:30:00",
+             repair_class="Unplanned",pm_code="",last_shift="S2")
+    token=uuid.uuid4().hex
+    with db._conn() as c:
+        c.execute('INSERT INTO v3_import_batches(token,shift_id,filename,created_at,rows_json) VALUES (?,?,?,?,?)',
+                  (token,sid,'sample.xlsx',datetime.now().isoformat(timespec='seconds'),json.dumps([row])))
+    client.post(f'/v3/import/{token}/confirm',data={'shift_id':str(sid),'techs':['Ssaku, Isaac']},follow_redirects=True)
+    [item]=v3_import_review.pending(db,sid)
+    dismissed=client.post(f'/v3/import-review/{item["id"]}/dismiss',data={'shift_id':str(sid)},follow_redirects=True)
+    assert dismissed.status_code==200
+    assert db.get_entries(sid)==[]
+    assert v3_import_review.pending(db,sid)==[]
+
+
 def test_s4_s5_split_shift_ownership(tmp_path):
     """A WO closed inside S4's window must not be credited to an S5 import of
     the same 24-hour Cetaris export; an ambiguous close time is held out and

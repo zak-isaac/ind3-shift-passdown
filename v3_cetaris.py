@@ -157,25 +157,21 @@ def select_records(rows: list[dict], selected: set[str], start: datetime, end: d
         closed_in_window = closed_at is not None and start <= closed_at <= end
         if started is None:
             summary["ambiguous_shift"] += 1
-            ambiguous.append({"wo_number": r["wo_number"], "tech_name": r["tech_name"],
-                               "reason": "Start Date is missing or unreadable -- cannot confirm shift."})
+            ambiguous.append({**r, "reason": "Start Date is missing or unreadable -- cannot confirm shift."})
             continue
         if not in_window:
             if closed_in_window:
                 # Conflicting signals: started outside the window but closed
                 # inside it. Don't guess which shift gets credit.
                 summary["ambiguous_shift"] += 1
-                ambiguous.append({"wo_number": r["wo_number"], "tech_name": r["tech_name"],
-                                   "reason": "Start Date and WO Closed Date/Time disagree on shift -- needs MST review."})
+                ambiguous.append({**r, "reason": "Start Date and WO Closed Date/Time disagree on shift -- needs MST review."})
                 continue
             summary["outside_shift"] += 1
-            excluded.append({"wo_number": r["wo_number"], "tech_name": r["tech_name"],
-                              "reason": "Outside this shift's reporting window."})
+            excluded.append({**r, "reason": "Outside this shift's reporting window."})
             continue
         if r["status"].strip().casefold() != "closed":
             summary["not_closed"] += 1
-            excluded.append({"wo_number": r["wo_number"], "tech_name": r["tech_name"],
-                              "reason": f"WO Status is '{r['status']}', not Closed."})
+            excluded.append({**r, "reason": f"WO Status is '{r['status']}', not Closed."})
             continue
         if _is_pm(r):
             summary["pm_rows"] += 1
