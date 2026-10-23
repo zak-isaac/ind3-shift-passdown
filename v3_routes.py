@@ -601,8 +601,12 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         # Called directly like this (not as a route), those defaults stay unresolved
         # Form marker objects -- must pass real empty lists explicitly or it crashes
         # the moment lead_generate tries to iterate them (e.g. rts_unit).
-        await generate_report(request,shift_id=shift_id,extra_title=[],extra_note=[],
-                              vendor_name=[],ro_item=[],rts_unit=[])
+        import inspect
+        optional={"extra_title":[],"extra_note":[],"vendor_name":[],
+                  "ro_item":[],"rts_unit":[]}
+        supported=inspect.signature(generate_report).parameters
+        await generate_report(request,shift_id=shift_id,
+                              **{k:v for k,v in optional.items() if k in supported})
         report=db.get_last_report_for_shift(shift_id)
         if not report:
             raise HTTPException(500,"Report was not saved")
