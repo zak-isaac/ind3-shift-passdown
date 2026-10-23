@@ -199,7 +199,8 @@ def test_unfamiliar_rfr_imports_and_reopened_wo_is_excluded(app_client):
     client.get('/v3')
     base={"wo_number":"98765","tech_name":"Ssaku, Isaac","asset_id":"ASSET987",
           "status":"Closed","rfr":"Safety Inspection","reported_issue":"Check guarding",
-          "cause":"","remarks":"Guard inspected","start_at":"2026-10-20T13:00:00"}
+          "cause":"","remarks":"Guard inspected","start_at":"2026-10-20T13:00:00",
+          "closed_at":"","repair_class":"","pm_code":"","last_shift":""}
     def send(rows):
         token=uuid.uuid4().hex
         with db._conn() as c:

@@ -36,8 +36,20 @@ def _make_httpx_mock():
     return mod
 
 
-sys.modules.setdefault("httpx", _make_httpx_mock())
+# Temporarily swap in a fake httpx so ai_rewriter imports without a real
+# client, then restore whatever was really in sys.modules. ai_rewriter's own
+# `import httpx` binds to the fake module object regardless (Python captures
+# that reference at import time), so this doesn't break ai_rewriter.httpx --
+# it just stops poisoning every OTHER test file collected later in the same
+# pytest session (e.g. anything using fastapi.testclient.TestClient, which
+# needs the real httpx.Response).
+_real_httpx = sys.modules.get("httpx")
+sys.modules["httpx"] = _make_httpx_mock()
 import ai_rewriter  # noqa: E402
+if _real_httpx is not None:
+    sys.modules["httpx"] = _real_httpx
+else:
+    del sys.modules["httpx"]
 
 
 def _make_ok_response(text: str) -> MagicMock:
