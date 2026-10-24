@@ -116,3 +116,24 @@ def hold(db, asset, keep=True):
             c.execute("INSERT INTO v3_oos_overrides(asset_id,keep_oos) VALUES (?,1) ON CONFLICT(asset_id) DO UPDATE SET keep_oos=1",(asset,))
         else:
             c.execute("DELETE FROM v3_oos_overrides WHERE asset_id=?",(asset,))
+
+
+def confirm_other_work_rts(db, asset, shift_id):
+    """RTS from verified non-breakdown Completed work, only for an existing OOS asset.
+
+    Do not clear OOS while another breakdown WO is unresolved or the asset has
+    an explicit manual OOS hold. Idempotent across repeated imports.
+    """
+    if not asset:
+        return False
+    ensure_tables(db)
+    with db._conn() as c:
+        if _unresolved(c,asset) or _manual_hold(c,asset):
+            return False
+        present=c.execute("SELECT 1 FROM oos_units WHERE unit=?",(asset,)).fetchone()
+        if not present:
+            return False
+        c.execute("DELETE FROM oos_units WHERE unit=?",(asset,))
+        c.execute("INSERT INTO rts_log(shift_id,unit,removed_at) VALUES (?,?,?)",
+                  (shift_id,asset,datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")))
+        return True
