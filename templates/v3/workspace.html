@@ -83,10 +83,8 @@
          {% if item.status=='completed' and item.kind!='pm' %}
            <label class="v3-review-check"><input type="checkbox" name="verified_{{ item.wo_number }}" value="yes">
              I verbally confirmed the completed work with the last technician.</label>
-           {% if item.rfr=='breakdown' %}
            <label class="v3-review-check"><input type="checkbox" name="rts_{{ item.wo_number }}" value="yes">
              Asset Returned to Service (RTS) — independently verified</label>
-           {% endif %}
          {% endif %}
          <label for="review_{{ item.wo_number }}">MST decision</label>
          <select id="review_{{ item.wo_number }}" name="review_{{ item.wo_number }}" required>
