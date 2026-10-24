@@ -278,3 +278,27 @@ def test_s3_import_route_keeps_friday_morning_ray_work(tmp_path):
         assert response.status_code==303, response.text[:500]
         assert db.get_pm_count(sid)==2
         assert all(e['wo_number']!="S4-ONLY" for e in db.get_entries(sid))
+
+
+def test_duplicate_completed_wo_cannot_credit_another_shift(app_client):
+    """A previously credited WO cannot be counted as an S2 PM or happening."""
+    import json,uuid
+    client,sid=app_client
+    client.get('/v3')
+    other=db.start_shift('2026-10-20','S1','Other MST')
+    db.upsert_pm_wo(other,'DUPLICATE-PM','M1','Tech S1')
+    rows=[{"wo_number":"DUPLICATE-PM","asset_id":"M1","tech_name":"Tech S2",
+           "status":"Closed","rfr":"Preventive Maintenance","reported_issue":"PM",
+           "cause":"","remarks":"Done","start_at":"2026-10-20T18:00:00",
+           "in_service_at":"2026-10-20T18:15:00"}]
+    token=uuid.uuid4().hex
+    with db._conn() as c:
+        c.execute("INSERT INTO v3_import_batches(token,shift_id,filename,created_at,rows_json) VALUES (?,?,?,?,?)",
+                  (token,sid,'dup.xlsx',datetime.now().isoformat(timespec='seconds'),json.dumps(rows)))
+    response=client.post(f'/v3/import/{token}/confirm',
+                         data={'shift_id':str(sid),'techs':['Tech S2']},
+                         follow_redirects=False)
+    assert response.status_code==200
+    assert 'Import blocked to prevent double-credit' in response.text
+    assert db.get_pm_count(sid)==0
+    assert db.get_pm_count(other)==1
