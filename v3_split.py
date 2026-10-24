@@ -63,18 +63,19 @@ def _windows(when):
             b = datetime.combine(day + timedelta(days=1) if overnight else day, end)
             if a <= when < b:
                 found.append((shift, day.isoformat()))
+            elif shift == "S5" and b <= when <= b + timedelta(minutes=30):
+                found.append((shift, day.isoformat()))
     return found
 
 
 def _resolve(when, tech, work_history, roster_shifts, confirmed_s5=False):
     options = _windows(when)
-    # S5 may claim 06:00–06:30 only when that technician is confirmed.
+    # S5 grace is an overlap, not an automatic S4 assignment.
     if confirmed_s5:
         yesterday = when.date() - timedelta(days=1)
-        if yesterday.weekday() >= 4:
-            end = datetime.combine(when.date(), time(6))
-            if end <= when <= end + timedelta(minutes=30):
-                options = [("S5", yesterday.isoformat())] + options
+        grace = ("S5", yesterday.isoformat())
+        if grace in options and datetime.combine(when.date(), time(6)) <= when <= datetime.combine(when.date(), time(6, 30)):
+            return grace
     if len(options) == 1:
         return options[0]
     if not options:
