@@ -748,7 +748,32 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                         "checked_techs":sorted(selected),
                         "checked_split_techs":sorted(split_selected)})
         records,stats=select_records(attributed,selected,*window)
-        v3_breakdown.sync(db,attributed,selected,shift_id)
+        # Cross-shift completion credit must be unique across the database,
+        # including older PM records. Never silently overwrite another shift.
+        completed_wos={r["wo_number"] for r in records if r["kind"] in ("pm","happening")}
+        cross_shift=[]
+        if completed_wos:
+            placeholders=",".join("?" for _ in completed_wos)
+            with db._conn() as c:
+                cross_shift=c.execute(f"""
+                    SELECT DISTINCT wo_number,shift_id FROM pm_wos
+                    WHERE shift_id<>? AND wo_number IN ({placeholders})
+                    UNION
+                    SELECT DISTINCT wo_number,shift_id FROM entries
+                    WHERE shift_id<>? AND excluded=0 AND wo_number IN ({placeholders})
+                """,(shift_id,*sorted(completed_wos),shift_id,*sorted(completed_wos))).fetchall()
+        if cross_shift:
+            labels=", ".join(f"WO {r['wo_number']} (shift #{r['shift_id']})" for r in cross_shift[:8])
+            return render(request,shift,
+                warning="Import blocked to prevent double-credit across shifts: "+labels+
+                        (f" and {len(cross_shift)-8} more" if len(cross_shift)>8 else "")+
+                        ". Review the existing shift's WO before retrying.",
+                staged={"token":token,"filename":batch["filename"],
+                        "counts":technician_counts(rows),"total_rows":len(rows),
+                        "checked_techs":sorted(selected),
+                        "checked_split_techs":sorted(split_selected)})
+        v3_breakdown.sync(db,rows,selected,shift_id,
+                          allowed_new_wos={r["wo_number"] for r in attributed})
         added,unchanged,pending=0,0,0
         # Use short transactions. Existing db helpers open their own connections;
         # nesting them inside an active SQLite write transaction risks 'database locked'.
