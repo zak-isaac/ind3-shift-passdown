@@ -76,6 +76,8 @@ def parse_excel(data: bytes) -> list[dict]:
                 "remarks": _text(get(row,"Technician Remarks")),
                 "start_at": started.isoformat(timespec="seconds") if started else "",
                 "closed_at": _parse_dt(get(row, "WO Closed Date/Time")).isoformat(timespec="seconds") if _parse_dt(get(row, "WO Closed Date/Time")) else "",
+                # In Service is a fallback for shift attribution, not a WO close time.
+                "in_service_at": _parse_dt(get(row, "In Service Date / Time")).isoformat(timespec="seconds") if _parse_dt(get(row, "In Service Date / Time")) else "",
                 "cause": _text(get(row,"Cause")),
                 "work_accomplished": _text(get(row,"Work Accomplished")),
             })
