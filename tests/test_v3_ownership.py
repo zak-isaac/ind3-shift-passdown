@@ -40,3 +40,20 @@ def test_deduplicates_technician_rows():
 
 def test_defer_does_not_credit():
     assert plan([row("1","Isaac")],saved={"1":{"decision":"defer","owner_shift":""}})["action"]=="pending"
+
+def test_s3_overnight_completion_belongs_to_evening_start_shift():
+    rows=[row("900","Sam",status="Closed",cat="Preventive Maintenance",
+              complete="2026-10-23T03:30:00",closed="2026-10-23T10:00:00")]
+    planned=plan_work_orders(rows,{"Sam"},"S3",D(2026,10,22,20,30),
+                            D(2026,10,23,7),{"Sam":"S3"})
+    assert planned[0]["action"]=="auto"
+
+def test_s5_overnight_completion_belongs_to_evening_start_shift():
+    rows=[row("901","Sam",status="Completed",cat="Preventive Maintenance",
+              complete="2026-10-24T02:30:00",closed="2026-10-24T10:00:00")]
+    planned=plan_work_orders(rows,{"Sam"},"S5",D(2026,10,23,17,30),
+                            D(2026,10,24,6),{"Sam":"S5"})
+    assert planned[0]["action"]=="auto"
+
+def test_cetaris_last_first_name_matches_roster_first_last():
+    assert plan([row("1","Ssaku, Isaac")],roster={"Isaac Ssaku":"S2"})["action"]=="verification"
