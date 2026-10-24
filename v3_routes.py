@@ -721,11 +721,18 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         split_selected=set(split_techs) & selected if shift["shift_type"]=="S5" else set()
         roster_shifts={}
         if get_mst_roster is not None:
+            import re
+            def name_key(value):
+                return tuple(sorted(re.findall(r"[a-z]+",str(value or "").casefold())))
+            by_name={name_key(name):name for name in allowed}
             for profile in get_mst_roster().values():
-                name=str(profile.get("display_name") or profile.get("full_name") or "").strip()
                 home=str(profile.get("shift") or "").strip().upper()
-                if name in allowed and home in ("S1","S2","S3","S4","S5"):
-                    roster_shifts[name]=home
+                if home not in ("S1","S2","S3","S4","S5"):
+                    continue
+                for label in (profile.get("full_name"),profile.get("display_name")):
+                    match=by_name.get(name_key(label))
+                    if match:
+                        roster_shifts[match]=home
         submitted=await request.form()
         decisions={key[len("split_wo_"):]:value for key,value in submitted.multi_items()
                    if key.startswith("split_wo_") and value in ("S1","S2","S3","S4","S5")}
