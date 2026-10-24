@@ -75,6 +75,9 @@ def parse_excel(data: bytes) -> list[dict]:
                 "tech_name": tech,
                 "remarks": _text(get(row,"Technician Remarks")),
                 "start_at": started.isoformat(timespec="seconds") if started else "",
+                "opened_at": _parse_dt(get(row, "WO Date / Time")).isoformat(timespec="seconds") if _parse_dt(get(row, "WO Date / Time")) else "",
+                "last_complete_at": _parse_dt(get(row, "WO Last Complete Date / Time")).isoformat(timespec="seconds") if _parse_dt(get(row, "WO Last Complete Date / Time")) else "",
+                "last_shift": _text(get(row, "Last Shift")),
                 "closed_at": _parse_dt(get(row, "WO Closed Date/Time")).isoformat(timespec="seconds") if _parse_dt(get(row, "WO Closed Date/Time")) else "",
                 # In Service is a fallback for shift attribution, not a WO close time.
                 "in_service_at": _parse_dt(get(row, "In Service Date / Time")).isoformat(timespec="seconds") if _parse_dt(get(row, "In Service Date / Time")) else "",
@@ -108,7 +111,7 @@ def select_records(rows: list[dict], selected: set[str], start: datetime, end: d
             summary["breakdown_in_process"] += 1
             eligible.append({**r, "kind": "oos"})
             continue
-        if status != "closed" and not (category == "breakdown" and status == "completed"):
+        if status not in ("closed", "completed"):
             summary["not_closed"] += 1
             continue
         if category in {"preventive maintenance", "preventative maintenance"}:
