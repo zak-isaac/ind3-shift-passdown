@@ -17,10 +17,13 @@ def as_dt(value):
 def normalized(value):
     return " ".join(str(value or "").casefold().split())
 
+def name_key(value):
+    return " ".join(sorted(str(value or "").replace(",", " ").casefold().split()))
+
 def plan_work_orders(rows, selected, shift_code, start, end, roster_shifts=None, saved=None):
     """One decision per WO, retaining all labor remarks; unknown ownership is not guessed."""
-    selected_keys = {normalized(t) for t in selected}
-    roster_shifts = {normalized(k): str(v).upper() for k, v in (roster_shifts or {}).items()}
+    selected_keys = {name_key(t) for t in selected}
+    roster_shifts = {name_key(k): str(v).upper() for k, v in (roster_shifts or {}).items()}
     saved = saved or {}
     by_wo = defaultdict(list)
     for r in rows:
@@ -28,7 +31,7 @@ def plan_work_orders(rows, selected, shift_code, start, end, roster_shifts=None,
             by_wo[str(r["wo_number"]).strip()].append(r)
     results = []
     for wo, group in by_wo.items():
-        participating = [r for r in group if normalized(r.get("tech_name")) in selected_keys]
+        participating = [r for r in group if name_key(r.get("tech_name")) in selected_keys]
         if not participating:
             continue
         statuses = {normalized(r.get("status")) for r in group}
@@ -38,12 +41,13 @@ def plan_work_orders(rows, selected, shift_code, start, end, roster_shifts=None,
         completion = [as_dt(r.get("last_complete_at")) for r in group]
         completion = max((v for v in completion if v is not None), default=None)
         techs = list(dict.fromkeys(str(r.get("tech_name") or "").strip() for r in group if r.get("tech_name")))
-        known_home = {roster_shifts.get(normalized(t)) for t in techs} - {None}
+        known_home = {roster_shifts.get(name_key(t)) for t in techs} - {None}
         selected_home = {roster_shifts.get(normalized(r.get("tech_name"))) for r in participating} - {None}
         cross_shift = len(known_home) > 1
         outside = completion is not None and not (start <= completion <= end)
+        unknown_selected = any(roster_shifts.get(name_key(r.get("tech_name"))) is None for r in participating) if roster_shifts else False
         foreign = bool(selected_home and shift_code not in selected_home)
-        ambiguous = cross_shift or outside or foreign or completion is None
+        ambiguous = cross_shift or outside or foreign or unknown_selected or completion is None
         stored = saved.get(wo) or {}
         owner = stored.get("owner_shift")
         decision = stored.get("decision")
