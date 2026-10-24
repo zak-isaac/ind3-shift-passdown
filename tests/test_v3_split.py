@@ -56,11 +56,36 @@ def test_multi_tech_same_shift_single_wo():
     assert assign(rows,{"Tech A","Tech B"},"S5","2026-10-23")==(rows,[])
 
 
-def test_nonsplit_unchanged():
-    rows=[row()]
-    assert assign(rows,{"Tech A"},"S2","2026-10-23")==(rows,[])
+def test_weekday_s2_is_filtered_by_its_shift_date():
+    rows=[row(start="2026-10-22T18:00:00",service="2026-10-22T18:30:00")]
+    assert assign(rows,{"Tech A"},"S2","2026-10-22")==(rows,[])
+    assert assign(rows,{"Tech A"},"S1","2026-10-22")==([],[])
 
 
-def test_in_process_preserved_for_oos():
-    rows=[row(status="In process")]
+def test_in_process_oos_is_shift_specific():
+    rows=[row(status="In process",start="2026-10-23T21:00:00")]
     assert assign(rows,{"Tech A"},"S5","2026-10-23")==(rows,[])
+    assert assign(rows,{"Tech A"},"S4","2026-10-23")==([],[])
+
+
+def test_thursday_s3_continues_friday_morning_with_roster():
+    rows=[row(wo="28025279",tech="Stamps, Ray",start="2026-10-23T05:55:00",
+              service="2026-10-23T06:53:00")]
+    roster={"Stamps, Ray":"S3"}
+    assert assign(rows,{"Stamps, Ray"},"S3","2026-10-22",roster_shifts=roster)==(rows,[])
+    assert assign(rows,{"Stamps, Ray"},"S4","2026-10-23",roster_shifts=roster)==([],[])
+
+
+def test_weekday_s1_s2_overlap_respects_roster():
+    rows=[row(start="2026-10-22T13:00:00",service="2026-10-22T13:20:00")]
+    assert assign(rows,{"Tech A"},"S1","2026-10-22",roster_shifts={"Tech A":"S1"})==(rows,[])
+    assert assign(rows,{"Tech A"},"S2","2026-10-22",roster_shifts={"Tech A":"S1"})==([],[])
+
+
+def test_no_timestamps_prompts_review():
+    rows=[row()]
+    assert assign(rows,{"Tech A"},"S2","2026-10-22")==([],[
+        {"wo_number":"101","asset_id":"M1","closed_at":"",
+         "time_source":"Technician Start / In Service / Roster",
+         "technicians":"Tech A",
+         "reason":"Missing or conflicting work-start and in-service evidence"}])
