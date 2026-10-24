@@ -208,3 +208,35 @@ def test_cumulative_reimport_keeps_work_orders_absent_from_later_file(app_client
     assert db.get_pm_count(sid)==1
     active={e['wo_number'] for e in db.get_entries(sid) if not e['excluded']}
     assert active=={'100','300'}
+
+
+def test_completed_non_pm_modal_requires_verbal_confirmation_and_pm_is_auto(app_client):
+    """The actual route must gate Completed repairs, while Completed PMs count automatically."""
+    import json, uuid
+    client,sid=app_client
+    client.get("/v3")
+    base={"tech_name":"Tech A","asset_id":"M1","status":"Completed",
+          "reported_issue":"Repair","cause":"","remarks":"Fixed",
+          "last_complete_at":"2026-10-20T13:00:00"}
+    rows=[{**base,"wo_number":"700","rfr":"Proactive Repair"},
+          {**base,"wo_number":"701","rfr":"Preventive Maintenance"}]
+    token=uuid.uuid4().hex
+    with db._conn() as c:
+        c.execute("INSERT INTO v3_import_batches(token,shift_id,filename,created_at,rows_json) VALUES (?,?,?,?,?)",
+                  (token,sid,"test.xlsx",datetime.now().isoformat(timespec="seconds"),json.dumps(rows)))
+    first=client.post(f"/v3/import/{token}/confirm",
+                      data={"shift_id":sid,"techs":["Tech A"]},follow_redirects=False)
+    assert first.status_code==200
+    assert "Completed WO" not in first.text or "Confirm completed work" in first.text
+    assert db.get_pm_count(sid)==0  # staged only, not yet committed
+    assert not db.get_entries(sid)
+    accepted=client.post(f"/v3/import/{token}/confirm",data={
+        "shift_id":sid,"techs":["Tech A"],"review_700":"include",
+        "owner_700":"S2","verified_700":"yes"
+    },follow_redirects=False)
+    assert accepted.status_code==303,accepted.text[:500]
+    assert db.get_pm_count(sid)==1
+    assert any(e["wo_number"]=="700" and not e["excluded"] for e in db.get_entries(sid))
+    with db._conn() as c:
+        decision=c.execute("SELECT * FROM v3_wo_review WHERE wo_number='700'").fetchone()
+    assert decision["decision"]=="include" and decision["verified"]==1
