@@ -715,12 +715,16 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         window=shift_window(shift["shift_type"],date.fromisoformat(shift["date"]))
         if not window:
             return render(request,shift,warning="Shift timing is not configured. Import cannot continue.")
-        split_selected=set(split_techs) & selected if shift["shift_type"] in ("S4","S5") else set()
+        # Attribute all selected weekend technicians; S5 grace needs an
+        # explicit confirmation of who worked S5, not a guessed roster.
+        split_selected=set(split_techs) & selected if shift["shift_type"]=="S5" else set()
         submitted=await request.form()
         decisions={key[len("split_wo_"):]:value for key,value in submitted.multi_items()
                    if key.startswith("split_wo_") and value in ("S4","S5")}
-        attributed,unresolved=v3_split.assign(rows,split_selected,shift["shift_type"],
-                                              shift["date"],decisions)
+        attributed,unresolved=v3_split.assign(
+            rows, selected if shift["shift_type"] in ("S4","S5") else set(),
+            shift["shift_type"], shift["date"], decisions,
+            confirmed_s5_techs=split_selected)
         if unresolved:
             return render(request,shift,
                 warning="Choose the owning shift for each ambiguous S4/S5 work order.",
