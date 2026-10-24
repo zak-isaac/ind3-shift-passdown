@@ -429,3 +429,128 @@ def test_cross_shift_duplicate_wo_is_blocked_not_double_credited(tmp_path):
     # The original S3 entry must be untouched -- no overwrite, no new S2 entry.
     assert any(e['wo_number']=='71001' for e in db.get_entries(s3_sid))
     assert not any(e['wo_number']=='71001' for e in db.get_entries(s2_sid))
+
+
+def _two_shift_router(tmp_path,sid_a,sid_b):
+    """Shared scaffolding for cross-shift duplicate tests below: one router
+    that can manage both shifts, mirroring an MST session that legitimately
+    has access to adjacent shifts (or a stale/retried request)."""
+    app=FastAPI()
+    app.mount('/static', StaticFiles(directory=str(DIR/'static')), name='static')
+    templates=Jinja2Templates(directory=str(DIR/'templates'))
+    app.include_router(create_v3_router(
+        templates,
+        is_lead_authed=lambda req: req.cookies.get('lead_auth')=='test',
+        can_manage_shift=lambda req, candidate: candidate in (sid_a,sid_b),
+        resolve_my_shift=lambda req: db.get_shift(sid_a),
+        shift_window=lambda shift,d:(datetime.combine(d,time(0)),datetime.combine(d+timedelta(days=1),time(0))),
+        lead_redirect=lambda dest: RedirectResponse('/lead/login?next='+dest,status_code=303)
+    ))
+    client=TestClient(app)
+    client.cookies.set('lead_auth','test')
+    client.get('/v3')
+    return client
+
+
+def _stage_and_confirm(client,sid,row,techs):
+    import json, uuid
+    token=uuid.uuid4().hex
+    with db._conn() as c:
+        c.execute('INSERT INTO v3_import_batches(token,shift_id,filename,created_at,rows_json) VALUES (?,?,?,?,?)',
+                  (token,sid,'sample.xlsx',datetime.now().isoformat(timespec='seconds'),json.dumps([row])))
+    return client.post(f'/v3/import/{token}/confirm',data={'shift_id':str(sid),'techs':techs},follow_redirects=True)
+
+
+def _pm_rows(shift_id):
+    with db._conn() as c:
+        return c.execute("SELECT wo_number FROM pm_wos WHERE shift_id=?",(shift_id,)).fetchall()
+
+
+def test_pm_already_credited_to_s3_blocks_s4_reimport(tmp_path):
+    """A PM WO already recorded against S3 must never also be credited to a
+    later S4 import of the same WO number -- PM-vs-PM, not just PM-vs-entries."""
+    db.set_db_path(tmp_path / 'test_pm_s3_s4.db')
+    db.init_db()
+    s3_sid=db.start_shift('2026-10-22','S3','Test MST S3')
+    s4_sid=db.start_shift('2026-10-23','S4','Test MST S4')
+    db.upsert_pm_wo(s3_sid,'81001','BALER0003','Stamps, Ray')
+    client=_two_shift_router(tmp_path,s3_sid,s4_sid)
+    # Clean S4-only work-start, same WO number, PM-coded -- would otherwise
+    # import cleanly into S4 on its own merits.
+    row=dict(wo_number="81001",tech_name="Stamps, Ray",asset_id="BALER0003",status="Closed",
+             rfr="PM",reported_issue="Scheduled PM",cause="",remarks="PM completed",
+             start_at="2026-10-23T09:00:00",closed_at="",repair_class="Planned",
+             pm_code="PM1",last_shift="S4")
+    resp=_stage_and_confirm(client,s4_sid,row,['Stamps, Ray'])
+    assert resp.status_code==200
+    assert 'Import blocked to prevent double-credit' in resp.text
+    assert 'WO 81001' in resp.text
+    assert any(p['wo_number']=='81001' for p in _pm_rows(s3_sid))
+    assert not _pm_rows(s4_sid)
+
+
+def test_pm_already_credited_to_s4_blocks_s5_reimport(tmp_path):
+    """Same guard, the Friday-S4-into-Friday-S5 boundary this whole project
+    is centered on: a PM already in S4 must not also land in S5."""
+    db.set_db_path(tmp_path / 'test_pm_s4_s5.db')
+    db.init_db()
+    s4_sid=db.start_shift('2026-10-23','S4','Test MST S4')
+    s5_sid=db.start_shift('2026-10-23','S5','Test MST S5')
+    db.upsert_pm_wo(s4_sid,'81002','FLEX0009','Nusbaum, Harry')
+    client=_two_shift_router(tmp_path,s4_sid,s5_sid)
+    row=dict(wo_number="81002",tech_name="Nusbaum, Harry",asset_id="FLEX0009",status="Closed",
+             rfr="PM",reported_issue="Scheduled PM",cause="",remarks="PM completed",
+             start_at="2026-10-23T20:00:00",closed_at="",repair_class="Planned",
+             pm_code="PM1",last_shift="S5")
+    resp=_stage_and_confirm(client,s5_sid,row,['Nusbaum, Harry'])
+    assert resp.status_code==200
+    assert 'Import blocked to prevent double-credit' in resp.text
+    assert 'WO 81002' in resp.text
+    assert _pm_rows(s4_sid) and not _pm_rows(s5_sid)
+
+
+def test_multi_technician_wo_blocked_regardless_of_which_tech_reimports(tmp_path):
+    """A WO already recorded (under one technician) in another shift must
+    still be blocked even when a DIFFERENT technician on the same WO is the
+    one selected for the later import -- the guard keys on wo_number, not
+    the specific technician/shift combination that happened to claim it."""
+    db.set_db_path(tmp_path / 'test_multi_tech.db')
+    db.init_db()
+    s3_sid=db.start_shift('2026-10-22','S3','Test MST S3')
+    s4_sid=db.start_shift('2026-10-23','S4','Test MST S4')
+    db.upsert_cmms_entry(s3_sid,'81003','WAV0012','Panel fault','[]','Stamps, Ray')
+    client=_two_shift_router(tmp_path,s3_sid,s4_sid)
+    # A DIFFERENT technician (Johnson, Damond) also worked this same WO,
+    # selected for S4's import -- still must not double-credit.
+    row=dict(wo_number="81003",tech_name="Johnson, Damond",asset_id="WAV0012",status="Closed",
+             rfr="Process Interruption",reported_issue="Panel fault",cause="",remarks="Helped diagnose",
+             start_at="2026-10-23T09:00:00",closed_at="",repair_class="",pm_code="",last_shift="S4")
+    resp=_stage_and_confirm(client,s4_sid,row,['Johnson, Damond'])
+    assert resp.status_code==200
+    assert 'Import blocked to prevent double-credit' in resp.text
+    assert not any(e['wo_number']=='81003' for e in db.get_entries(s4_sid))
+
+
+def test_repeated_upload_of_same_shift_same_wo_does_not_double_count(tmp_path):
+    """Re-uploading the SAME file (or a later export containing the same
+    already-imported WO) to the SAME shift must be idempotent -- reported as
+    'unchanged', never a second entry or inflated happening count."""
+    db.set_db_path(tmp_path / 'test_repeat_upload.db')
+    db.init_db()
+    s2_sid=db.start_shift('2026-10-20','S2','Test MST S2')
+    client=_two_shift_router(tmp_path,s2_sid,s2_sid)
+    row=dict(wo_number="81004",tech_name="Ssaku, Isaac",asset_id="M2360",status="Closed",
+             rfr="Process Interruption",reported_issue="Cab smell",cause="",remarks="Inspected",
+             start_at="2026-10-20T18:00:00",closed_at="",repair_class="",pm_code="",last_shift="S2")
+    first=_stage_and_confirm(client,s2_sid,row,['Ssaku, Isaac'])
+    assert first.status_code==200
+    assert 'Imported 1 new technician/WO entries' in first.text
+    entries_after_first=db.get_entries(s2_sid)
+    assert len([e for e in entries_after_first if e['wo_number']=='81004'])==1
+
+    second=_stage_and_confirm(client,s2_sid,row,['Ssaku, Isaac'])
+    assert second.status_code==200
+    assert 'Imported 0 new technician/WO entries; 1 unchanged' in second.text
+    entries_after_second=db.get_entries(s2_sid)
+    assert len([e for e in entries_after_second if e['wo_number']=='81004'])==1, \
+        'repeated upload of the same WO must never create a second entry'

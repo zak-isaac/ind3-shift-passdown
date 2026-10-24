@@ -9,12 +9,15 @@ Date/Time") is also tried as a fallback evidence source alongside
 `in_service_at`, since it plays the same "when was this really touched"
 role for this facility's export.
 
-S4 owns 17:30-18:00 overlap; S5 owns 18:00-06:00, with a confirmed
-technician grace through 06:30. A technician's confirmed shift and nearby
-unambiguous labor start resolve S1/S2, S2/S3, and S3/S4 overlaps the same
-way. A later administrative WO close never transfers work ownership.
-Ambiguous cross-shift work surfaces to the MST for an explicit shift choice
-via v3_import_review.py, instead of being guessed either way.
+S4 owns 17:30-18:00 overlap; S5 owns 18:00-06:00. The 06:00-06:30 morning
+grace is just another scheduled overlap (S5-yesterday vs. S4/S1-today), not
+a status granted by technician SELECTION for S5 -- selection confirms shift
+participation, not that a given WO's work continued past 6:00 AM. A
+technician's roster home shift and nearby unambiguous labor start resolve
+this and every other overlap (S1/S2, S2/S3, S3/S4) the same way. A later
+administrative WO close never transfers work ownership. Ambiguous
+cross-shift work surfaces to the MST for an explicit shift choice via
+v3_import_review.py, instead of being guessed either way.
 """
 from __future__ import annotations
 from collections import defaultdict
@@ -33,7 +36,11 @@ def parse_close(value):
 
 
 def owner_for_close(value, day, confirmed_s5=False):
-    """Map a timestamp to S4, S5, or None; name retained for API compatibility."""
+    """Legacy S4/S5-only timestamp mapper; name retained for API compatibility
+    but UNUSED by assign() (grep confirms no live call sites as of 2026-10-24).
+    Does not reflect the current engine's roster/continuity grace resolution
+    -- do not use this for new S5 grace logic; see _resolve() instead.
+    """
     when = parse_close(value)
     if when is None:
         return None
@@ -73,14 +80,22 @@ def _windows(when):
     return found
 
 
-def _resolve(when, tech, work_history, roster_shifts, confirmed_s5=False):
+def _resolve(when, tech, work_history, roster_shifts):
+    """Resolve a single timestamp to one (shift, day) pair, or None if
+    genuinely ambiguous.
+
+    The S5 06:00-06:30 morning grace is NOT a special case here: _windows()
+    already lists it as a real overlap option (S5-yesterday vs S4/S1-today)
+    for any timestamp in that range, for every technician alike. Technician
+    SELECTION for S5 only confirms shift participation, not that a given
+    technician's specific WO continued past 6:00 AM -- so grace-window work
+    is resolved by the exact same roster-then-continuity evidence as any
+    other overlap below, never auto-assigned to S5 just because the
+    technician was selected. A technician with no earlier unambiguous S5
+    start this shift and no S5 roster entry correctly falls through to the
+    Needs Review path, same as any other unresolved overlap.
+    """
     options = _windows(when)
-    # S5 grace is an overlap, not an automatic S4 assignment.
-    if confirmed_s5:
-        yesterday = when.date() - timedelta(days=1)
-        grace = ("S5", yesterday.isoformat())
-        if grace in options and datetime.combine(when.date(), time(6)) <= when <= datetime.combine(when.date(), time(6, 30)):
-            return grace
     if len(options) == 1:
         return options[0]
     if not options:
@@ -114,11 +129,13 @@ def _completion_evidence(r):
 
 
 def assign(rows, selected_split, shift_code, shift_day, decisions=None,
-           confirmed_s5_techs=None, roster_shifts=None):
+           roster_shifts=None):
     """Select completed WOs for one S1-S5 shift, using technician work evidence.
 
-    A technician's confirmed shift and nearby unambiguous labor start resolve
-    overlaps. A later administrative WO close never transfers work ownership.
+    A technician's roster home shift and nearby unambiguous labor start
+    resolve overlaps -- including the S5 06:00-06:30 morning grace, which is
+    just another overlap, not a status granted by being selected for S5. A
+    later administrative WO close never transfers work ownership.
 
     Returns (accepted_rows, pending_review_items, owned_elsewhere_count).
     `owned_elsewhere_count` is the number of distinct WOs the evidence
@@ -133,7 +150,6 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
     selected = set(selected_split)
     decisions = decisions or {}
     roster_shifts = roster_shifts or {}
-    confirmed = set(confirmed_s5_techs or ())
     history = defaultdict(list)
     by_wo = defaultdict(list)
     for r in rows:
@@ -151,8 +167,7 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
         for r in items:
             dt = parse_close(r.get("start_at"))
             if dt:
-                label = _resolve(dt, r.get("tech_name", ""), history, roster_shifts,
-                                 confirmed_s5=r.get("tech_name", "") in confirmed)
+                label = _resolve(dt, r.get("tech_name", ""), history, roster_shifts)
                 if label:
                     starts.append((dt, r.get("tech_name", ""), label))
                 else:
@@ -171,8 +186,7 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
         elif ambiguous:
             reason = "Overlapping technician start without confirmed shift evidence"
         else:
-            labels = [_resolve(_completion_evidence(r), r.get("tech_name", ""),
-                               history, roster_shifts, confirmed_s5=r.get("tech_name", "") in confirmed)
+            labels = [_resolve(_completion_evidence(r), r.get("tech_name", ""), history, roster_shifts)
                       for r in items if _completion_evidence(r)]
             labels = [v for v in labels if v]
             if len(set(labels)) == 1:
@@ -180,15 +194,14 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
             else:
                 reason = "Missing or conflicting work-start and in-service evidence"
         # A recorded equipment return during the technician's scheduled
-        # shift (including S3/S4 overlap) does not transfer ownership.
+        # shift (including any overlap, e.g. S5's 06:00-06:30 grace) does not
+        # transfer ownership. _windows() already lists the grace pairing for
+        # any grace-window timestamp, so a legitimate S5 grace completion
+        # naturally passes this check without a separate carve-out.
         if owner:
             for r in items:
                 service = _completion_evidence(r)
-                if service and owner not in _windows(service) and not (
-                    owner[0] == "S5" and r.get("tech_name") in confirmed and
-                    datetime.combine(date.fromisoformat(owner[1]) + timedelta(days=1), time(6)) <= service <=
-                    datetime.combine(date.fromisoformat(owner[1]) + timedelta(days=1), time(6, 30))
-                ):
+                if service and owner not in _windows(service):
                     owner = None
                     reason = "Equipment returned outside technician's owning shift"
                     break
@@ -218,11 +231,6 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
                 # A selected completed WO with no timing evidence must never
                 # disappear silently; MST confirms its ownership.
                 relevant = True
-            if shift_code == "S5" and any(r.get("tech_name") in confirmed for r in items):
-                relevant = relevant or any(
-                    datetime.combine(date.fromisoformat(day) + timedelta(days=1), time(6)) <= dt <=
-                    datetime.combine(date.fromisoformat(day) + timedelta(days=1), time(6, 30))
-                    for dt in evidence if dt)
             if relevant:
                 pending.append({
                     "wo_number": wo, "asset_id": items[0].get("asset_id", ""),
@@ -243,8 +251,7 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
             # OOS is shift-specific too; a breakdown opened by another shift
             # must not leak into the active shift's status tracking.
             when = parse_close(r.get("start_at")) or parse_close(r.get("opened_at"))
-            if when and _resolve(when, r.get("tech_name", ""), history, roster_shifts,
-                                 confirmed_s5=r.get("tech_name", "") in confirmed) == (shift_code, day):
+            if when and _resolve(when, r.get("tech_name", ""), history, roster_shifts) == (shift_code, day):
                 accepted.append(r)
     # Distinct WOs the evidence confidently placed in a DIFFERENT, specific
     # shift (e.g. yesterday's S4, already recorded there) -- not ambiguous,

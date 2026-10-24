@@ -934,12 +934,14 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         # are present in the same submission.
         decisions={**v3_import_review.ownership_decisions(db),**decisions}
         roster_shifts=_roster_home_shift_map(allowed)
-        # S5's 06:00-06:30 morning grace only applies to technicians the MST
-        # has actually selected for THIS S5 import -- never blanket-applied.
-        confirmed_s5=selected if shift["shift_type"]=="S5" else set()
+        # S5's 06:00-06:30 morning grace is resolved by v3_split.py as just
+        # another scheduled overlap (roster home shift, then the technician's
+        # own earlier unambiguous S5 work-start that same night) -- technician
+        # SELECTION for S5 only confirms shift participation, never grants
+        # automatic ownership of grace-window work on its own.
         all_rows=rows
         rows,split_pending,owned_elsewhere=v3_split.assign(rows,selected,shift["shift_type"],date.fromisoformat(shift["date"]),
-                                           decisions,confirmed_s5_techs=confirmed_s5,roster_shifts=roster_shifts)
+                                           decisions,roster_shifts=roster_shifts)
         if split_pending:
             v3_import_review.record(db,shift_id,{"ownership":split_pending})
 
