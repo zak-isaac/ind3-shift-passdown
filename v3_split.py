@@ -66,8 +66,15 @@ def _windows(when):
     return found
 
 
-def _resolve(when, tech, work_history, roster_shifts):
+def _resolve(when, tech, work_history, roster_shifts, confirmed_s5=False):
     options = _windows(when)
+    # S5 may claim 06:00–06:30 only when that technician is confirmed.
+    if confirmed_s5:
+        yesterday = when.date() - timedelta(days=1)
+        if yesterday.weekday() >= 4:
+            end = datetime.combine(when.date(), time(6))
+            if end <= when <= end + timedelta(minutes=30):
+                options = [("S5", yesterday.isoformat())] + options
     if len(options) == 1:
         return options[0]
     if not options:
@@ -102,6 +109,7 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
     selected = set(selected_split)
     decisions = decisions or {}
     roster_shifts = roster_shifts or {}
+    confirmed = set(confirmed_s5_techs or ())
     history = defaultdict(list)
     by_wo = defaultdict(list)
     for r in rows:
@@ -119,7 +127,8 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
         for r in items:
             dt = parse_close(r.get("start_at"))
             if dt:
-                label = _resolve(dt, r.get("tech_name", ""), history, roster_shifts)
+                label = _resolve(dt, r.get("tech_name", ""), history, roster_shifts,
+                                 confirmed_s5=r.get("tech_name", "") in confirmed)
                 if label:
                     starts.append((dt, r.get("tech_name", ""), label))
                 else:
@@ -139,7 +148,7 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
             reason = "Overlapping technician start without confirmed shift evidence"
         else:
             labels = [_resolve(parse_close(r.get("in_service_at")), r.get("tech_name", ""),
-                               history, roster_shifts)
+                               history, roster_shifts, confirmed_s5=r.get("tech_name", "") in confirmed)
                       for r in items if parse_close(r.get("in_service_at"))]
             labels = [v for v in labels if v]
             if len(set(labels)) == 1:
@@ -151,7 +160,11 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
         if owner:
             for r in items:
                 service = parse_close(r.get("in_service_at"))
-                if service and owner not in _windows(service):
+                if service and owner not in _windows(service) and not (
+                    owner[0] == "S5" and r.get("tech_name") in confirmed and
+                    datetime.combine(date.fromisoformat(owner[1]) + timedelta(days=1), time(6)) <= service <=
+                    datetime.combine(date.fromisoformat(owner[1]) + timedelta(days=1), time(6, 30))
+                ):
                     owner = None
                     reason = "Equipment returned outside technician's owning shift"
                     break
@@ -173,6 +186,15 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
             evidence = [parse_close(r.get(k)) for r in items for k in
                         ("start_at", "in_service_at", "opened_at")]
             relevant = any((shift_code, day) in _windows(dt) for dt in evidence if dt)
+            if not any(evidence):
+                # A selected completed WO with no timing evidence must never
+                # disappear silently; MST confirms its ownership.
+                relevant = True
+            if shift_code == "S5" and any(r.get("tech_name") in confirmed for r in items):
+                relevant = relevant or any(
+                    datetime.combine(date.fromisoformat(day) + timedelta(days=1), time(6)) <= dt <=
+                    datetime.combine(date.fromisoformat(day) + timedelta(days=1), time(6, 30))
+                    for dt in evidence if dt)
             if relevant:
                 pending.append({
                     "wo_number": wo, "asset_id": items[0].get("asset_id", ""),
@@ -181,7 +203,19 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
                     "technicians": ", ".join(sorted({r.get("tech_name", "") for r in items})),
                     "reason": reason,
                 })
-    accepted = [r for r in rows if r.get("tech_name") in selected and
-                (str(r.get("status", "")).strip().casefold() not in ("closed", "completed")
-                 or ownership.get(str(r.get("wo_number", ""))) == (shift_code, day))]
+    accepted = []
+    for r in rows:
+        if r.get("tech_name") not in selected:
+            continue
+        status = str(r.get("status", "")).strip().casefold()
+        if status in ("closed", "completed"):
+            if ownership.get(str(r.get("wo_number", ""))) == (shift_code, day):
+                accepted.append(r)
+        else:
+            # OOS is shift-specific too; a breakdown opened by another shift
+            # must not leak into the active shift's status tracking.
+            when = parse_close(r.get("start_at")) or parse_close(r.get("opened_at"))
+            if when and _resolve(when, r.get("tech_name", ""), history, roster_shifts,
+                                 confirmed_s5=r.get("tech_name", "") in confirmed) == (shift_code, day):
+                accepted.append(r)
     return accepted, pending
