@@ -764,6 +764,8 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                 "counts":technician_counts(rows),"total_rows":len(rows),
                 "checked_techs":sorted(selected),"review_items":needs})
         if needs:
+            # Validate every form choice before any decision is committed.
+            review_updates=[]
             for item in needs:
                 wo=item["wo_number"]
                 action=str(submitted.get("review_"+wo,"")).strip()
@@ -782,9 +784,13 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                     rts=False
                 if rts and not (action=="include" and verified and item["kind"]!="pm"):
                     raise HTTPException(400,"RTS requires verified Completed non-PM work.")
-                who=decode_session(request)
-                reviewed_by=(who or {}).get("associate") or shift["lead_name"]
-                with db._conn() as c:
+                review_updates.append((wo,owner,action,int(verified),int(rts)))
+            who=decode_session(request)
+            reviewed_by=(who or {}).get("associate") or shift["lead_name"]
+            reviewed_at=datetime.now(timezone.utc).isoformat()
+            with db._conn() as c:
+                for wo,owner,action,verified,rts in review_updates:
+                    payload=(wo,shift_id,owner,action,verified,rts,str(reviewed_by),reviewed_at)
                     c.execute("""INSERT INTO v3_wo_review
                         (wo_number,review_shift_id,owner_shift,decision,verified,rts,reviewed_by,reviewed_at)
                         VALUES (?,?,?,?,?,?,?,?)
@@ -792,16 +798,11 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                         review_shift_id=excluded.review_shift_id,
                         owner_shift=excluded.owner_shift,decision=excluded.decision,
                         verified=excluded.verified,rts=excluded.rts,
-                        reviewed_by=excluded.reviewed_by,reviewed_at=excluded.reviewed_at""",
-                        (wo,shift_id,owner,action,int(verified),int(rts),str(reviewed_by),
-                         datetime.now(timezone.utc).isoformat()))
-                with db._conn() as c:
+                        reviewed_by=excluded.reviewed_by,reviewed_at=excluded.reviewed_at""",payload)
                     c.execute("""INSERT INTO v3_wo_review_audit
                         (wo_number,review_shift_id,owner_shift,decision,verified,rts,reviewed_by,reviewed_at)
-                        VALUES (?,?,?,?,?,?,?,?)""",
-                        (wo,shift_id,owner,action,int(verified),int(rts),str(reviewed_by),
-                         datetime.now(timezone.utc).isoformat()))
-                saved[wo]={"owner_shift":owner,"decision":action,"verified":int(verified),"rts":int(rts)}
+                        VALUES (?,?,?,?,?,?,?,?)""",payload)
+                    saved[wo]={"owner_shift":owner,"decision":action,"verified":verified,"rts":rts}
             planned=v3_ownership.plan_work_orders(rows,selected,shift["shift_type"],*window,
                                                   roster_shifts=roster,saved=saved)
         accepted_wos={p["wo_number"] for p in planned if p["action"]=="auto"}
