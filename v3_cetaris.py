@@ -104,12 +104,23 @@ def _open_csv_grid(data: bytes):
     return headers, rows, None
 
 
-def parse_excel(data: bytes) -> list[dict]:
+def parse_excel(data: bytes, stats: dict | None = None) -> list[dict]:
     """Parse a bounded, validated Cetaris work order export (.xlsx or .csv)
     into JSON-serializable normalized rows. Format is detected by actual
     content (tries xlsx first, falls back to CSV), never by filename --
     see v3_routes.py's stage_import().
+
+    `stats`, if given, is populated in-place with import-diagnostics counts
+    (2026-10-24 facility request): source_rows (every data row in the file,
+    including ones this function legitimately skips), skipped_no_wo,
+    skipped_no_tech (e.g. unassigned 'To be Done' PM WOs with no technician
+    or start date yet -- correctly not labor evidence for any shift, but an
+    MST should be able to SEE that count, not just infer it from a smaller-
+    than-expected total). Optional and additive: existing callers that don't
+    pass `stats` are unaffected.
     """
+    if stats is None:
+        stats = {}
     if len(data) > MAX_SIZE:
         raise ValueError("This file exceeds the 12 MB import limit.")
     try:
@@ -135,12 +146,20 @@ def parse_excel(data: bytes) -> list[dict]:
             return row[pos] if pos is not None and pos < len(row) else None
 
         results = []
+        source_rows = skipped_no_wo = skipped_no_tech = 0
         for i, row in enumerate(source):
             if i >= MAX_ROWS:
                 raise ValueError("Import limited to 30,000 labor rows. Narrow your Cetaris export dates.")
+            if all(cell is None for cell in row):
+                continue  # a genuinely blank trailing row, not real data
+            source_rows += 1
             wo = normalize_wo(get(row, "WO Number"))
             tech = _text(get(row, "Technician"))
-            if not wo or not tech:
+            if not wo:
+                skipped_no_wo += 1
+                continue
+            if not tech:
+                skipped_no_tech += 1
                 continue
             started = _parse_dt(get(row, "Start Date"))
             closed_at = _parse_dt(get(row, "WO Closed Date/Time"))
@@ -177,6 +196,10 @@ def parse_excel(data: bytes) -> list[dict]:
                 "last_shift": _text(get(row, "Last Shift")),
                 "rfr": _text(get(row, "Primary RFR")),
             })
+        stats["source_rows"] = source_rows
+        stats["skipped_no_wo"] = skipped_no_wo
+        stats["skipped_no_tech"] = skipped_no_tech
+        stats["parsed_rows"] = len(results)
         return results
     finally:
         if workbook is not None:

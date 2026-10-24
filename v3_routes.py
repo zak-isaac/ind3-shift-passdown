@@ -298,6 +298,15 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                 c.execute("ALTER TABLE v3_entry_meta ADD COLUMN selection_hidden INTEGER NOT NULL DEFAULT 0")
             if "source_snapshot" not in cols:
                 c.execute("ALTER TABLE v3_entry_meta ADD COLUMN source_snapshot TEXT NOT NULL DEFAULT ''")
+            batch_cols={row[1] for row in c.execute("PRAGMA table_info(v3_import_batches)")}
+            if "parse_stats_json" not in batch_cols:
+                # Import diagnostics (2026-10-24 facility request): source row
+                # count, skip reasons, parsed count -- captured at stage time
+                # since only stage_import() has the raw file bytes; confirm_import()
+                # reads it back to build the full diagnostics notice. Nullable/
+                # defaulted so every existing direct-INSERT test call site
+                # (which lists explicit columns, omitting this one) keeps working.
+                c.execute("ALTER TABLE v3_import_batches ADD COLUMN parse_stats_json TEXT NOT NULL DEFAULT '{}'")
 
     def secure(request, shift_id=None):
         if get_mst_roster is not None:
@@ -874,7 +883,8 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         # never on what the filename happens to look like. Universal by
         # construction, not by guessing which extensions to allow-list.
         try:
-            records=parse_excel(data)
+            parse_stats={}
+            records=parse_excel(data,stats=parse_stats)
         except ValueError as exc:
             return render(request,shift,warning=str(exc))
         if not records:
@@ -884,8 +894,8 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             # Old unconfirmed imports are staging data, not shift history.
             c.execute("DELETE FROM v3_import_batches WHERE created_at < ?", ((datetime.now()-timedelta(days=1)).isoformat(timespec="seconds"),))
         with db._conn() as c:
-            c.execute("INSERT INTO v3_import_batches (token,shift_id,filename,created_at,rows_json) VALUES (?,?,?,?,?)",
-                    (token,shift_id,file.filename[:240],datetime.now().isoformat(timespec="seconds"),json.dumps(records)))
+            c.execute("INSERT INTO v3_import_batches (token,shift_id,filename,created_at,rows_json,parse_stats_json) VALUES (?,?,?,?,?,?)",
+                    (token,shift_id,file.filename[:240],datetime.now().isoformat(timespec="seconds"),json.dumps(records),json.dumps(parse_stats)))
         info=model(shift_id)
         tech_names=[c["name"] for c in technician_counts(records)]
         auto_checked=_auto_checked_techs(shift,tech_names,info["selected_techs"])
@@ -908,6 +918,10 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         if datetime.now()-staged_at > timedelta(hours=24):
             raise HTTPException(410,"Import preview expired. Upload a fresh Cetaris report.")
         rows=json.loads(batch["rows_json"])
+        try:
+            parse_stats=json.loads(batch["parse_stats_json"] or "{}")
+        except (TypeError,ValueError):
+            parse_stats={}
         allowed={r["tech_name"] for r in rows}
         selected=set(techs) & allowed
         if not selected:
@@ -1136,6 +1150,27 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             notice += " Skipped " + " and ".join(all_parts) + " (not counted as happenings in this shift" + tail
         if breakdown_updates:
             notice += f" {breakdown_updates} breakdown WO(s) updated in the OOS/RTS tracker."
+        # Import diagnostics (2026-10-24 facility request, triggered by a real
+        # multi-shift overnight export): always shown, not just on failure, so
+        # a low or zero count is never ambiguous between "nothing happened
+        # this shift" and "the import is broken". source_rows/parsed_rows come
+        # from parse_excel() at stage time; everything else from this confirm.
+        review_count=len(split_pending)+stats.get("ambiguous_shift",0)
+        excluded_bits=[]
+        if owned_elsewhere: excluded_bits.append(f"{owned_elsewhere} belong to a different shift")
+        if stats.get("not_closed"): excluded_bits.append(f"{stats['not_closed']} not yet closed")
+        if stats.get("outside_shift"): excluded_bits.append(f"{stats['outside_shift']} outside shift window")
+        if parse_stats.get("skipped_no_tech"): excluded_bits.append(f"{parse_stats['skipped_no_tech']} unassigned (no technician on record)")
+        if parse_stats.get("skipped_no_wo"): excluded_bits.append(f"{parse_stats['skipped_no_wo']} missing WO number")
+        notice += (
+            f" | Diagnostics: {parse_stats.get('source_rows',len(all_rows))} source rows, "
+            f"{parse_stats.get('parsed_rows',len(all_rows))} parsed, "
+            f"{len({r['wo_number'] for r in all_rows})} unique WOs seen, "
+            f"{len(rows)} attributed to this shift, "
+            f"{stats.get('unique_pm_wos',0)} PMs, {stats.get('unique_happening_wos',0)} Shift Happenings, "
+            f"{review_count} need MST review"
+            + (", excluded: " + "; ".join(excluded_bits) if excluded_bits else "") + "."
+        )
         from urllib.parse import quote
         return RedirectResponse(f"/v3?shift_id={shift_id}&notice={quote(notice)}",status_code=303)
 
