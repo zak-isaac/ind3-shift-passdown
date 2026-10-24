@@ -107,19 +107,10 @@
      <div class="d2-tech-toolbar"><input type="search" id="v3-tech-search" placeholder="Search technicians by name" aria-label="Search technicians"><button type="button" class="button button-outline" onclick="v3ToggleAllTechs(true)">Select all</button><button type="button" class="button button-outline" onclick="v3ToggleAllTechs(false)">Clear all</button></div>
      <div class="d2-tech-grid">{% for t in staged.counts %}<label class="d2-tech-choice"><input type="checkbox" name="techs" value="{{ t.name }}" {% if (staged.checked_techs is defined and t.name in staged.checked_techs) or (staged.checked_techs is not defined and (t.name in selected_techs or (not imported_filename and t.assigned))) %}checked{% endif %}><span>{{ t.name }}{% if t.assigned %} · Assigned{% else %} · Other shift / OT{% endif %}</span><small>{{ t.count }} record{{ 's' if t.count != 1 else '' }}</small></label>{% endfor %}</div>
 
-     {% if staged.split_review is defined and staged.split_review %}
-     <div class="d2-dialog-note"><strong>Resolve ambiguous WO ownership</strong>
-       <p>The WO close timestamp is missing, outside both shifts, or within the 17:30–18:00 overlap. Assign each WO to the shift that should receive credit.</p>
-       {% for item in staged.split_review %}
-       <label style="display:block;margin:10px 0">WO #{{ item.wo_number }} · {{ item.asset_id }} · {{ item.closed_at or 'Missing close time' }}
-         <select name="split_wo_{{ item.wo_number }}" required><option value="">Choose owning shift</option><option value="S4">S4</option><option value="S5">S5</option></select>
-       </label>
-       {% endfor %}
-     </div>
-     {% endif %}
+
      {% endif %}
      {% if staged.review_items is not defined %}<div class="d2-tech-total" id="v3-tech-total" aria-live="polite">Select the technicians for this shift</div>{% endif %}
-     <div class="d2-dialog-actions"><button type="button" class="button button-outline" onclick="v3CloseTechs()">Cancel</button><button type="submit" class="button button-blue">{{ "Save Decisions &amp; Extract" if staged.review_items is defined else "Confirm Technicians &amp; Extract" }}</button></div>
+     <div class="d2-dialog-actions"><button type="button" class="button button-outline" onclick="v3CloseTechs()">Cancel</button><button type="submit" class="button button-blue">{{ "Save Decisions and Extract" if staged.review_items is defined else "Confirm Technicians and Extract" }}</button></div>
    </form>{% else %}<div class="d2-dialog-body"><p>Upload a Cetaris file first to retrieve the technician list.</p></div>{% endif %}
  </dialog>
 
