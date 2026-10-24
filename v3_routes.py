@@ -715,26 +715,33 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         window=shift_window(shift["shift_type"],date.fromisoformat(shift["date"]))
         if not window:
             return render(request,shift,warning="Shift timing is not configured. Import cannot continue.")
-        # Attribute all selected weekend technicians; S5 grace needs an
-        # explicit confirmation of who worked S5, not a guessed roster.
+        # Every shift (including Thursday S3 carried into Friday morning)
+        # uses the same WO ownership engine. Roster home shifts resolve
+        # overlapping handovers; explicit selected OT still remains selectable.
         split_selected=set(split_techs) & selected if shift["shift_type"]=="S5" else set()
+        roster_shifts={}
+        if get_mst_roster is not None:
+            for profile in get_mst_roster().values():
+                name=str(profile.get("display_name") or profile.get("full_name") or "").strip()
+                home=str(profile.get("shift") or "").strip().upper()
+                if name in allowed and home in ("S1","S2","S3","S4","S5"):
+                    roster_shifts[name]=home
         submitted=await request.form()
         decisions={key[len("split_wo_"):]:value for key,value in submitted.multi_items()
-                   if key.startswith("split_wo_") and value in ("S4","S5")}
+                   if key.startswith("split_wo_") and value in ("S1","S2","S3","S4","S5")}
         attributed,unresolved=v3_split.assign(
-            rows, selected if shift["shift_type"] in ("S4","S5") else set(),
-            shift["shift_type"], shift["date"], decisions,
-            confirmed_s5_techs=split_selected)
+            rows, selected, shift["shift_type"], shift["date"], decisions,
+            confirmed_s5_techs=split_selected, roster_shifts=roster_shifts)
         if unresolved:
             return render(request,shift,
-                warning="Choose the owning shift for each ambiguous S4/S5 work order.",
+                warning="Choose the owning shift for each ambiguous work order.",
                 staged={"token":token,"filename":batch["filename"],
                         "counts":technician_counts(rows),"total_rows":len(rows),
                         "split_review":unresolved,
                         "checked_techs":sorted(selected),
                         "checked_split_techs":sorted(split_selected)})
         records,stats=select_records(attributed,selected,*window)
-        v3_breakdown.sync(db,rows,selected,shift_id)
+        v3_breakdown.sync(db,attributed,selected,shift_id)
         added,unchanged,pending=0,0,0
         # Use short transactions. Existing db helpers open their own connections;
         # nesting them inside an active SQLite write transaction risks 'database locked'.
