@@ -653,6 +653,10 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
     @router.post("/end")
     async def v3_end(request:Request,shift_id:int=Form(...)):
         shift=secure(request,shift_id)
+        with db._conn() as c:
+            pending=c.execute("SELECT COUNT(*) FROM v3_wo_review WHERE review_shift_id=? AND decision='defer'",(shift_id,)).fetchone()[0]
+        if pending:
+            return RedirectResponse(f"/v3/operations?shift_id={shift_id}&warning=Resolve+pending+WO+ownership+before+ending+the+shift",status_code=303)
         report=db.get_last_report_for_shift(shift_id)
         if not report:
             return RedirectResponse(f"/v3/operations?shift_id={shift_id}&warning=Generate+a+report+before+ending+the+shift",status_code=303)
