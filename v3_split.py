@@ -119,9 +119,16 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
 
     A technician's confirmed shift and nearby unambiguous labor start resolve
     overlaps. A later administrative WO close never transfers work ownership.
+
+    Returns (accepted_rows, pending_review_items, owned_elsewhere_count).
+    `owned_elsewhere_count` is the number of distinct WOs the evidence
+    confidently placed in a DIFFERENT, specific shift -- common when a Cetaris
+    export spans multiple shifts/days and most of it was already claimed by
+    an earlier shift's import. Not ambiguous, so not `pending`, but worth
+    surfacing in the import notice so "0 new entries" doesn't read as broken.
     """
     if shift_code not in ("S1", "S2", "S3", "S4", "S5") or not selected_split:
-        return rows, []
+        return rows, [], 0
     day = shift_day.isoformat() if isinstance(shift_day, date) else str(shift_day)
     selected = set(selected_split)
     decisions = decisions or {}
@@ -197,6 +204,10 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
                 if candidates:
                     owner = candidates[0]
         ownership[wo] = owner
+        import os as _os
+        if _os.environ.get("V3_SPLIT_DEBUG"):
+            print(f"[v3-split-diag] wo={wo} techs={[r.get('tech_name') for r in items]} "
+                  f"starts={[r.get('start_at') for r in items]} owner={owner} reason={reason!r}",flush=True)
         if owner is None:
             # Do not ask S4 MST to review an S3 WO whose technician was not
             # selected for S4. For genuinely ambiguous selected labor, review.
@@ -235,4 +246,11 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
             if when and _resolve(when, r.get("tech_name", ""), history, roster_shifts,
                                  confirmed_s5=r.get("tech_name", "") in confirmed) == (shift_code, day):
                 accepted.append(r)
-    return accepted, pending
+    # Distinct WOs the evidence confidently placed in a DIFFERENT, specific
+    # shift (e.g. yesterday's S4, already recorded there) -- not ambiguous,
+    # so not `pending`, but silently returning 0 accepted with no count at
+    # all reads as "something's broken" to an MST re-uploading a file that
+    # genuinely overlaps an already-covered shift. Surfaced by v3_routes.py
+    # in the import confirmation notice.
+    owned_elsewhere = sum(1 for owner in ownership.values() if owner and owner != (shift_code, day))
+    return accepted, pending, owned_elsewhere

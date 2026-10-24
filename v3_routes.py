@@ -938,7 +938,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         # has actually selected for THIS S5 import -- never blanket-applied.
         confirmed_s5=selected if shift["shift_type"]=="S5" else set()
         all_rows=rows
-        rows,split_pending=v3_split.assign(rows,selected,shift["shift_type"],date.fromisoformat(shift["date"]),
+        rows,split_pending,owned_elsewhere=v3_split.assign(rows,selected,shift["shift_type"],date.fromisoformat(shift["date"]),
                                            decisions,confirmed_s5_techs=confirmed_s5,roster_shifts=roster_shifts)
         if split_pending:
             v3_import_review.record(db,shift_id,{"ownership":split_pending})
@@ -1112,16 +1112,26 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             c.execute("DELETE FROM v3_import_batches WHERE token=?",(token,))
         notice=f"Imported {added} new technician/WO entries; {unchanged} unchanged; {pending} flagged for review. {stats.get('unique_pm_wos',0)} distinct closed PM WOs in this import."
         skipped_parts=[]
+        needs_review_parts=[]
         if stats.get("not_closed"):
             skipped_parts.append(f"{stats['not_closed']} not yet closed")
         if stats.get("outside_shift"):
             skipped_parts.append(f"{stats['outside_shift']} outside this shift's time window")
         if stats.get("ambiguous_shift"):
-            skipped_parts.append(f"{stats['ambiguous_shift']} flagged for MST review (timestamps don't clearly establish the shift)")
+            needs_review_parts.append(f"{stats['ambiguous_shift']} flagged for MST review (timestamps don't clearly establish the shift)")
         if split_pending:
-            skipped_parts.append(f"{len(split_pending)} need an explicit shift ownership call (see Needs Review)")
-        if skipped_parts:
-            notice += " Skipped " + " and ".join(skipped_parts) + " (not counted as happenings -- see Needs Review for details)."
+            needs_review_parts.append(f"{len(split_pending)} need an explicit shift ownership call")
+        if owned_elsewhere:
+            # Common and EXPECTED when a Cetaris export spans multiple shifts
+            # or days -- these WOs' work-start evidence confidently belongs to
+            # a different, already-recorded shift (nothing to review -- it's
+            # not ambiguous, just not this shift's). Surfaced so "0 new
+            # entries" never reads as "something's broken".
+            skipped_parts.append(f"{owned_elsewhere} already belong to a different shift's record")
+        all_parts=skipped_parts+needs_review_parts
+        if all_parts:
+            tail=" -- see Needs Review for details)." if needs_review_parts else ")."
+            notice += " Skipped " + " and ".join(all_parts) + " (not counted as happenings in this shift" + tail
         if breakdown_updates:
             notice += f" {breakdown_updates} breakdown WO(s) updated in the OOS/RTS tracker."
         from urllib.parse import quote
