@@ -274,6 +274,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                 );
                 CREATE TABLE IF NOT EXISTS v3_wo_review (
                   wo_number TEXT PRIMARY KEY,
+                  review_shift_id INTEGER NOT NULL DEFAULT 0,
                   owner_shift TEXT NOT NULL DEFAULT '',
                   decision TEXT NOT NULL DEFAULT '',
                   verified INTEGER NOT NULL DEFAULT 0,
@@ -605,6 +606,10 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
     @router.post("/generate")
     async def v3_generate(request:Request,shift_id:int=Form(...)):
         secure(request,shift_id)
+        with db._conn() as c:
+            outstanding=c.execute("SELECT COUNT(*) FROM v3_wo_review WHERE review_shift_id=? AND decision='defer'",(shift_id,)).fetchone()[0]
+        if outstanding:
+            return RedirectResponse(f"/v3/operations?shift_id={shift_id}&warning=Resolve+pending+WO+ownership+before+generating+the+final+report",status_code=303)
         if generate_report is None:
             raise HTTPException(503,"Report generator unavailable")
         # Reuse the established report-generation engine without rendering V2 HTML.
@@ -766,13 +771,14 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                 reviewed_by=(who or {}).get("associate") or shift["lead_name"]
                 with db._conn() as c:
                     c.execute("""INSERT INTO v3_wo_review
-                        (wo_number,owner_shift,decision,verified,rts,reviewed_by,reviewed_at)
-                        VALUES (?,?,?,?,?,?,?)
+                        (wo_number,review_shift_id,owner_shift,decision,verified,rts,reviewed_by,reviewed_at)
+                        VALUES (?,?,?,?,?,?,?,?)
                         ON CONFLICT(wo_number) DO UPDATE SET
+                        review_shift_id=excluded.review_shift_id,
                         owner_shift=excluded.owner_shift,decision=excluded.decision,
                         verified=excluded.verified,rts=excluded.rts,
                         reviewed_by=excluded.reviewed_by,reviewed_at=excluded.reviewed_at""",
-                        (wo,owner,action,int(verified),int(rts),str(reviewed_by),
+                        (wo,shift_id,owner,action,int(verified),int(rts),str(reviewed_by),
                          datetime.now(timezone.utc).isoformat()))
                 saved[wo]={"owner_shift":owner,"decision":action,"verified":int(verified),"rts":int(rts)}
             planned=v3_ownership.plan_work_orders(rows,selected,shift["shift_type"],*window,
