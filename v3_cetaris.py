@@ -67,6 +67,8 @@ def parse_excel(data: bytes) -> list[dict]:
             if not wo or not tech:
                 continue
             started = _parse_dt(get(row, "Start Date"))
+            completed = _parse_dt(get(row, "WO Last Complete Date / Time"))
+            closed = _parse_dt(get(row, "WO Closed Date/Time"))
             results.append({
                 "wo_number": wo, "asset_id": _text(get(row,"Asset #")),
                 "status": _text(get(row,"WO Status")),
@@ -75,7 +77,9 @@ def parse_excel(data: bytes) -> list[dict]:
                 "tech_name": tech,
                 "remarks": _text(get(row,"Technician Remarks")),
                 "start_at": started.isoformat(timespec="seconds") if started else "",
-                "closed_at": _parse_dt(get(row, "WO Closed Date/Time")).isoformat(timespec="seconds") if _parse_dt(get(row, "WO Closed Date/Time")) else "",
+                "closed_at": closed.isoformat(timespec="seconds") if closed else "",
+                "last_complete_at": completed.isoformat(timespec="seconds") if completed else "",
+                "update_at": (_parse_dt(get(row, "Update Date / Time")) or None).isoformat(timespec="seconds") if _parse_dt(get(row, "Update Date / Time")) else "",
                 "cause": _text(get(row,"Cause")),
                 "work_accomplished": _text(get(row,"Work Accomplished")),
             })
@@ -92,7 +96,7 @@ def technician_counts(rows: list[dict]) -> list[dict]:
 
 
 def select_records(rows: list[dict], selected: set[str], start: datetime, end: datetime):
-    """Include every Closed non-PM work order; route only PMs to the PM summary."""
+    """Select Completed/Closed work; caller must first authorize ambiguous ownership and Completed non-PM work."""
     summary = Counter()
     eligible = []
     for r in rows:
@@ -106,7 +110,7 @@ def select_records(rows: list[dict], selected: set[str], start: datetime, end: d
             summary["breakdown_in_process"] += 1
             eligible.append({**r, "kind": "oos"})
             continue
-        if status != "closed" and not (category == "breakdown" and status == "completed"):
+        if status not in ("closed", "completed"):
             summary["not_closed"] += 1
             continue
         if category in {"preventive maintenance", "preventative maintenance"}:

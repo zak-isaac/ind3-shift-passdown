@@ -44,6 +44,7 @@ function v3CloseTechs(){ document.getElementById('v3-tech-dialog')?.close(); }
 function v3UpdateTechCount(){
   const dlg=document.getElementById('v3-tech-dialog');
   if(!dlg)return;
+  if(dlg.dataset.review==='true')return;
   const checks=[...dlg.querySelectorAll('input[name="techs"]')];
   const chosen=checks.filter(x=>x.checked).length;
   const label=document.getElementById('v3-tech-total');
@@ -69,3 +70,13 @@ document.addEventListener('DOMContentLoaded',()=>{
     v3UpdateTechCount();
   }
 });
+
+let v3ReviewIndex=0;
+function v3ReviewStep(delta){
+  const items=[...document.querySelectorAll('#v3-ownership-reviews .v3-ownership-item')];
+  if(!items.length)return;
+  v3ReviewIndex=Math.max(0,Math.min(items.length-1,v3ReviewIndex+delta));
+  items.forEach((item,i)=>{item.hidden=i!==v3ReviewIndex;});
+  const progress=document.getElementById('v3-review-progress');
+  if(progress)progress.textContent=`${v3ReviewIndex+1} of ${items.length}`;
+}

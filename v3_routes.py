@@ -16,6 +16,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 import db
 import v3_breakdown
 import v3_split
+import v3_ownership
 from v3_cetaris import parse_excel, select_records, technician_counts, MAX_SIZE
 
 
@@ -270,6 +271,27 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                   id INTEGER PRIMARY KEY AUTOINCREMENT, shift_id INTEGER NOT NULL,
                   name TEXT NOT NULL, notes TEXT NOT NULL DEFAULT '',
                   created_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS v3_wo_review (
+                  wo_number TEXT PRIMARY KEY,
+                  review_shift_id INTEGER NOT NULL DEFAULT 0,
+                  owner_shift TEXT NOT NULL DEFAULT '',
+                  decision TEXT NOT NULL DEFAULT '',
+                  verified INTEGER NOT NULL DEFAULT 0,
+                  rts INTEGER NOT NULL DEFAULT 0,
+                  reviewed_by TEXT NOT NULL DEFAULT '',
+                  reviewed_at TEXT NOT NULL DEFAULT ''
+                );
+                CREATE TABLE IF NOT EXISTS v3_wo_review_audit (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  wo_number TEXT NOT NULL,
+                  review_shift_id INTEGER NOT NULL,
+                  owner_shift TEXT NOT NULL,
+                  decision TEXT NOT NULL,
+                  verified INTEGER NOT NULL,
+                  rts INTEGER NOT NULL,
+                  reviewed_by TEXT NOT NULL,
+                  reviewed_at TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS v3_pm_tracking (
                   shift_id INTEGER NOT NULL, wo_number TEXT NOT NULL,
@@ -595,6 +617,10 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
     @router.post("/generate")
     async def v3_generate(request:Request,shift_id:int=Form(...)):
         secure(request,shift_id)
+        with db._conn() as c:
+            outstanding=c.execute("SELECT COUNT(*) FROM v3_wo_review WHERE review_shift_id=? AND decision='defer'",(shift_id,)).fetchone()[0]
+        if outstanding:
+            return RedirectResponse(f"/v3/operations?shift_id={shift_id}&warning=Resolve+pending+WO+ownership+before+generating+the+final+report",status_code=303)
         if generate_report is None:
             raise HTTPException(503,"Report generator unavailable")
         # Reuse the established report-generation engine without rendering V2 HTML.
@@ -638,6 +664,10 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
     @router.post("/end")
     async def v3_end(request:Request,shift_id:int=Form(...)):
         shift=secure(request,shift_id)
+        with db._conn() as c:
+            pending=c.execute("SELECT COUNT(*) FROM v3_wo_review WHERE review_shift_id=? AND decision='defer'",(shift_id,)).fetchone()[0]
+        if pending:
+            return RedirectResponse(f"/v3/operations?shift_id={shift_id}&warning=Resolve+pending+WO+ownership+before+ending+the+shift",status_code=303)
         report=db.get_last_report_for_shift(shift_id)
         if not report:
             return RedirectResponse(f"/v3/operations?shift_id={shift_id}&warning=Generate+a+report+before+ending+the+shift",status_code=303)
@@ -715,22 +745,100 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         window=shift_window(shift["shift_type"],date.fromisoformat(shift["date"]))
         if not window:
             return render(request,shift,warning="Shift timing is not configured. Import cannot continue.")
-        split_selected=set(split_techs) & selected if shift["shift_type"] in ("S4","S5") else set()
         submitted=await request.form()
-        decisions={key[len("split_wo_"):]:value for key,value in submitted.multi_items()
-                   if key.startswith("split_wo_") and value in ("S4","S5")}
-        attributed,unresolved=v3_split.assign(rows,split_selected,shift["shift_type"],
-                                              shift["date"],decisions)
-        if unresolved:
-            return render(request,shift,
-                warning="Choose the owning shift for each ambiguous S4/S5 work order.",
-                staged={"token":token,"filename":batch["filename"],
-                        "counts":technician_counts(rows),"total_rows":len(rows),
-                        "split_review":unresolved,
-                        "checked_techs":sorted(selected),
-                        "checked_split_techs":sorted(split_selected)})
+        roster={}
+        if get_mst_roster is not None:
+            for person in get_mst_roster().values():
+                name=person.get("full_name") or person.get("display_name") or ""
+                if name:
+                    roster[name]=str(person.get("shift") or "").upper()
+        with db._conn() as c:
+            saved={r["wo_number"]:dict(r) for r in c.execute("SELECT * FROM v3_wo_review")}
+        planned=v3_ownership.plan_work_orders(rows,selected,shift["shift_type"],*window,
+                                              roster_shifts=roster,saved=saved)
+        needs=[p for p in planned if p["action"] in ("ownership","verification","pending")]
+        submitted_review=any(str(key).startswith("review_") for key in submitted.keys())
+        if needs and not submitted_review:
+            return render(request,shift,staged={
+                "token":token,"filename":batch["filename"],
+                "counts":technician_counts(rows),"total_rows":len(rows),
+                "checked_techs":sorted(selected),"review_items":needs})
+        if needs:
+            # Validate every form choice before any decision is committed.
+            review_updates=[]
+            for item in needs:
+                wo=item["wo_number"]
+                action=str(submitted.get("review_"+wo,"")).strip()
+                owner=str(submitted.get("owner_"+wo,"")).strip().upper()
+                verified=str(submitted.get("verified_"+wo,""))=="yes"
+                rts=str(submitted.get("rts_"+wo,""))=="yes"
+                if action not in ("include","exclude","defer"):
+                    raise HTTPException(400,"Choose a decision for every review item.")
+                if action=="include":
+                    if owner not in ("S1","S2","S3","S4","S5"):
+                        raise HTTPException(400,"Select the completing shift for every included WO.")
+                    if item["status"]=="completed" and item["kind"]!="pm" and not verified:
+                        raise HTTPException(400,"Verbal verification is required for Completed non-PM work.")
+                else:
+                    owner=owner if owner in ("S1","S2","S3","S4","S5") else ""
+                    rts=False
+                if rts and not (action=="include" and verified and item["kind"]!="pm"):
+                    raise HTTPException(400,"RTS requires verified Completed non-PM work.")
+                review_updates.append((wo,owner,action,int(verified),int(rts)))
+            who=decode_session(request)
+            reviewed_by=(who or {}).get("associate") or shift["lead_name"]
+            reviewed_at=datetime.now(timezone.utc).isoformat()
+            with db._conn() as c:
+                for wo,owner,action,verified,rts in review_updates:
+                    payload=(wo,shift_id,owner,action,verified,rts,str(reviewed_by),reviewed_at)
+                    c.execute("""INSERT INTO v3_wo_review
+                        (wo_number,review_shift_id,owner_shift,decision,verified,rts,reviewed_by,reviewed_at)
+                        VALUES (?,?,?,?,?,?,?,?)
+                        ON CONFLICT(wo_number) DO UPDATE SET
+                        review_shift_id=excluded.review_shift_id,
+                        owner_shift=excluded.owner_shift,decision=excluded.decision,
+                        verified=excluded.verified,rts=excluded.rts,
+                        reviewed_by=excluded.reviewed_by,reviewed_at=excluded.reviewed_at""",payload)
+                    c.execute("""INSERT INTO v3_wo_review_audit
+                        (wo_number,review_shift_id,owner_shift,decision,verified,rts,reviewed_by,reviewed_at)
+                        VALUES (?,?,?,?,?,?,?,?)""",payload)
+                    saved[wo]={"owner_shift":owner,"decision":action,"verified":verified,"rts":rts}
+            planned=v3_ownership.plan_work_orders(rows,selected,shift["shift_type"],*window,
+                                                  roster_shifts=roster,saved=saved)
+        accepted_wos={p["wo_number"] for p in planned if p["action"]=="auto"}
+        # Only credit authorized WOs; never let another shift's closure or assistance
+        # silently transfer completed work. In-process breakdowns still carry OOS.
+        attributed=[r for r in rows if r["wo_number"] in accepted_wos
+                    or (str(r.get("status","")).strip().casefold()=="in process"
+                        and str(r.get("rfr","")).strip().casefold()=="breakdown")]
         records,stats=select_records(attributed,selected,*window)
+        # Retain the full WO's technician remarks even when a previous-shift
+        # contributor is not selected for completion credit.
+        all_remarks={}
+        for source_row in rows:
+            wo=source_row.get("wo_number")
+            remark=str(source_row.get("remarks") or "").strip()
+            if wo and remark:
+                bucket=all_remarks.setdefault(wo,[])
+                if remark not in bucket:
+                    bucket.append(remark)
+        first_for_wo=set()
+        for record in records:
+            wo=record["wo_number"]
+            if record["kind"]=="happening" and wo not in first_for_wo:
+                record["remarks_list"]=all_remarks.get(wo,record["remarks_list"])
+                first_for_wo.add(wo)
         v3_breakdown.sync(db,rows,selected,shift_id)
+        for item in planned:
+            review=saved.get(item["wo_number"]) or {}
+            if (item["status"]=="completed" and item["kind"]!="pm"
+                    and review.get("decision")=="include" and review.get("rts")
+                    and review.get("owner_shift")==shift["shift_type"]):
+                if item["rfr"]=="breakdown":
+                    v3_breakdown.decide(db,shift_id,{item["wo_number"]:"rts"})
+                else:
+                    v3_breakdown.confirm_other_work_rts(db,item["asset_id"],shift_id)
+        split_selected=set()
         added,unchanged,pending=0,0,0
         # Use short transactions. Existing db helpers open their own connections;
         # nesting them inside an active SQLite write transaction risks 'database locked'.
@@ -867,7 +975,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                       "ON CONFLICT(shift_id) DO UPDATE SET technicians_json=excluded.technicians_json,filename=excluded.filename,imported_at=excluded.imported_at,split_techs_json=excluded.split_techs_json",
                       (shift_id,json.dumps(sorted(selected)),batch["filename"],datetime.now().strftime("%Y-%m-%d %H:%M"),json.dumps(sorted(split_selected))))
             c.execute("DELETE FROM v3_import_batches WHERE token=?",(token,))
-        notice=f"Imported {added} new technician/WO entries; {unchanged} unchanged; {pending} flagged for review. {stats.get('unique_pm_wos',0)} distinct closed PM WOs in this import."
+        notice=f"Imported {added} new technician/WO entries; {unchanged} unchanged; {pending} flagged for review. {stats.get('unique_pm_wos',0)} distinct completed/closed PM WOs in this import."
         skipped_parts=[]
         if stats.get("not_closed"):
             skipped_parts.append(f"{stats['not_closed']} not yet closed")

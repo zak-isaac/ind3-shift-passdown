@@ -26,7 +26,7 @@
    <div class="card d2-kpi d2-shift-kpi"><div><small>Current shift</small><strong>{{ shift.shift_type }} · {{ shift.date }}</strong><span>IND3 · {{ shift.lead_name }}</span></div></div>
    <div class="card d2-kpi"><div><small>Selected technicians</small><strong>{{ selected_techs|length }}</strong><span>From the Cetaris report</span></div></div>
    <div class="card d2-kpi"><div><small>Shift happenings</small><strong>{{ happenings|length }}</strong><span>Reported work orders</span></div></div>
-   <div class="card d2-kpi"><div><small>Completed PMs</small><strong>{{ pm_count }}</strong><span>Unique closed PM WOs</span></div></div>
+   <div class="card d2-kpi"><div><small>Completed PMs</small><strong>{{ pm_count }}</strong><span>Unique completed PM WOs</span></div></div>
  </section>
 
  <div class="d2-import-summary card" role="status">
@@ -50,57 +50,73 @@
    </form>
  </dialog>
 
- <dialog class="d2-dialog d2-technician-dialog" id="v3-tech-dialog" data-staged="{{ 'true' if staged else 'false' }}" aria-labelledby="v3-tech-title">
+ <dialog class="d2-dialog d2-technician-dialog" id="v3-tech-dialog" data-staged="{{ 'true' if staged else 'false' }}" data-review="{{ 'true' if staged and staged.review_items is defined else 'false' }}" aria-labelledby="v3-tech-title">
    <div class="d2-dialog-head"><div><p class="eyebrow">SHIFT TECHNICIAN FILTER</p><h2 id="v3-tech-title">Who worked this shift?</h2></div><button type="button" class="d2-close" onclick="v3CloseTechs()" aria-label="Close technician selection">Close</button></div>
    {% if staged %}<form method="post" action="/v3/import/{{ staged.token }}/confirm" class="d2-dialog-body">
      <input type="hidden" name="shift_id" value="{{ shift.id }}">
      <p>Detected <strong>{{ staged.counts|length }} technicians</strong> and <strong>{{ staged.total_rows }} labor rows</strong> in <strong>{{ staged.filename }}</strong>. Select only the technicians who worked your shift.</p>
+     {% if staged.review_items is defined %}
+     <div class="d2-dialog-note"><strong>Confirm completed work and shift ownership</strong>
+       <p>Review each exception before work is credited. Verbal verification is required for Completed non-PM WOs. PMs are automatically counted when ownership is clear.</p>
+     </div>
+     {% for name in staged.checked_techs %}<input type="hidden" name="techs" value="{{ name }}">{% endfor %}
+     <div id="v3-ownership-reviews" data-count="{{ staged.review_items|length }}">
+     {% for item in staged.review_items %}
+       <section class="v3-ownership-item" data-index="{{ loop.index0 }}" {% if not loop.first %}hidden{% endif %} aria-label="WO ownership confirmation">
+         <div class="v3-review-head"><strong>WO #{{ item.wo_number }} · {{ item.asset_id }}</strong>
+           <span class="v3-review-tag">{{ item.status|capitalize }} · {{ item.kind|upper }}</span></div>
+         <dl class="v3-review-details">
+           <div><dt>Last Complete</dt><dd>{{ item.last_complete_at or 'Not recorded' }}</dd></div>
+           <div><dt>WO Closed</dt><dd>{{ item.closed_at or 'Not closed' }}</dd></div>
+           <div><dt>Technicians</dt><dd>{{ item.techs|join(', ') }}</dd></div>
+           <div><dt>Cause</dt><dd>{{ item.reported_issue or 'Not supplied' }}</dd></div>
+         </dl>
+         <div class="v3-review-remarks"><strong>Cetaris technician remarks</strong>
+           {% for remark in item.remarks %}<p>{{ remark }}</p>{% else %}<p>No technician remarks in export.</p>{% endfor %}
+         </div>
+         <label for="owner_{{ item.wo_number }}">Shift responsible for completing this WO</label>
+         <select id="owner_{{ item.wo_number }}" name="owner_{{ item.wo_number }}">
+           {% for code in ['S1','S2','S3','S4','S5'] %}
+           <option value="{{ code }}" {% if code==shift.shift_type %}selected{% endif %}>{{ code }}</option>
+           {% endfor %}
+         </select>
+         {% if item.status=='completed' and item.kind!='pm' %}
+           <label class="v3-review-check"><input type="checkbox" name="verified_{{ item.wo_number }}" value="yes">
+             I verbally confirmed the completed work with the last technician.</label>
+           <label class="v3-review-check"><input type="checkbox" name="rts_{{ item.wo_number }}" value="yes">
+             Asset Returned to Service (RTS) — independently verified</label>
+         {% endif %}
+         <label for="review_{{ item.wo_number }}">MST decision</label>
+         <select id="review_{{ item.wo_number }}" name="review_{{ item.wo_number }}" required>
+           <option value="">Choose decision</option>
+           <option value="include">Confirm &amp; Include</option>
+           <option value="exclude">Do Not Include</option>
+           <option value="defer">Decide Later (no completion credit)</option>
+         </select>
+       </section>
+     {% endfor %}
+     </div>
+     <div class="v3-review-pagination">
+       <button type="button" class="button button-outline" onclick="v3ReviewStep(-1)">Previous</button>
+       <span id="v3-review-progress">1 of {{ staged.review_items|length }}</span>
+       <button type="button" class="button button-outline" onclick="v3ReviewStep(1)">Next</button>
+     </div>
+     {% else %}
      <div class="d2-tech-toolbar"><input type="search" id="v3-tech-search" placeholder="Search technicians by name" aria-label="Search technicians"><button type="button" class="button button-outline" onclick="v3ToggleAllTechs(true)">Select all</button><button type="button" class="button button-outline" onclick="v3ToggleAllTechs(false)">Clear all</button></div>
      <div class="d2-tech-grid">{% for t in staged.counts %}<label class="d2-tech-choice"><input type="checkbox" name="techs" value="{{ t.name }}" {% if (staged.checked_techs is defined and t.name in staged.checked_techs) or (staged.checked_techs is not defined and (t.name in selected_techs or (not imported_filename and t.assigned))) %}checked{% endif %}><span>{{ t.name }}{% if t.assigned %} · Assigned{% else %} · Other shift / OT{% endif %}</span><small>{{ t.count }} record{{ 's' if t.count != 1 else '' }}</small></label>{% endfor %}</div>
-     {% if shift.shift_type in ['S4','S5'] %}
-     <div class="d2-dialog-note"><strong>S4/S5 split-shift technicians</strong>
-       <p>Check only technicians who actually worked both weekend shifts. Their completed WOs will use WO Closed Date/Time for shift attribution.</p>
-       {% for t in staged.counts %}
-       <label style="display:inline-block;margin:7px 12px 7px 0"><input type="checkbox" name="split_techs" value="{{ t.name }}" {% if (staged.checked_split_techs is defined and t.name in staged.checked_split_techs) or (staged.checked_split_techs is not defined and t.name in selected_split_techs) %}checked{% endif %}> {{ t.name }}</label>
-       {% endfor %}
-     </div>
+
+
      {% endif %}
-     {% if staged.split_review is defined and staged.split_review %}
-     <div class="d2-dialog-note"><strong>Resolve ambiguous WO ownership</strong>
-       <p>The WO close timestamp is missing, outside both shifts, or within the 17:30–18:00 overlap. Assign each WO to the shift that should receive credit.</p>
-       {% for item in staged.split_review %}
-       <label style="display:block;margin:10px 0">WO #{{ item.wo_number }} · {{ item.asset_id }} · {{ item.closed_at or 'Missing close time' }}
-         <select name="split_wo_{{ item.wo_number }}" required><option value="">Choose owning shift</option><option value="S4">S4</option><option value="S5">S5</option></select>
-       </label>
-       {% endfor %}
-     </div>
-     {% endif %}
-     <div class="d2-tech-total" id="v3-tech-total" aria-live="polite">Select the technicians for this shift</div>
-     <div class="d2-dialog-actions"><button type="button" class="button button-outline" onclick="v3CloseTechs()">Cancel</button><button type="submit" class="button button-blue">Confirm Technicians &amp; Extract</button></div>
+     {% if staged.review_items is not defined %}<div class="d2-tech-total" id="v3-tech-total" aria-live="polite">Select the technicians for this shift</div>{% endif %}
+     <div class="d2-dialog-actions"><button type="button" class="button button-outline" onclick="v3CloseTechs()">Cancel</button><button type="submit" class="button button-blue">{{ "Save Decisions and Extract" if staged.review_items is defined else "Confirm Technicians and Extract" }}</button></div>
    </form>{% else %}<div class="d2-dialog-body"><p>Upload a Cetaris file first to retrieve the technician list.</p></div>{% endif %}
  </dialog>
 
- {% if pending_breakdowns %}
- <section class="card" aria-label="Breakdown return-to-service confirmation">
-   <h2>Breakdown — Confirm Equipment Status</h2>
-   <p>These Breakdown work orders are Completed, but the asset's return to service needs MST confirmation. Choose a decision for each WO and save once.</p>
-   <form method="post" action="/v3/breakdown/confirm">
-     <input type="hidden" name="shift_id" value="{{ shift.id }}">
-     {% for b in pending_breakdowns %}
-     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid #dde5ee">
-       <strong>{{ b.asset_id }} · WO #{{ b.wo_number }}</strong>
-       <label><input type="radio" name="decision_{{ b.wo_number }}" value="rts"> Confirm RTS</label>
-       <label><input type="radio" name="decision_{{ b.wo_number }}" value="keep_oos"> Keep OOS</label>
-     </div>
-     {% endfor %}
-     <button class="button button-blue" type="submit">Save Breakdown Decisions</button>
-   </form>
- </section>
- {% endif %}
+
 
  <div class="workspace-grid d2-workspace-grid">
  <section class="card happenings d2-happenings" id="happenings">
-   <div class="section-head d2-happenings-head"><div><h2>Shift happenings <span class="count-label">{{ happenings|length }}</span></h2><p>All Closed non-PM Cetaris work orders, reviewed by the shift owner.</p></div><button class="button button-outline" onclick="v3OpenManual()" type="button">Manual entry</button></div>
+   <div class="section-head d2-happenings-head"><div><h2>Shift happenings <span class="count-label">{{ happenings|length }}</span></h2><p>Confirmed completed work orders and Closed non-PM Cetaris work.</p></div><button class="button button-outline" onclick="v3OpenManual()" type="button">Manual entry</button></div>
    <div class="d2-table-filters"><input id="d2-search" type="search" placeholder="Search assets, issues, or remarks" aria-label="Search shift happenings"><select id="d2-type" aria-label="Filter by work type"><option value="">All types</option>{% for type in happenings|map(attribute="rfr_type")|unique|sort %}<option value="{{ type|lower|e }}">{{ type or "Unspecified" }}</option>{% endfor %}</select><select id="d2-asset" aria-label="Filter by asset"><option value="">All assets</option>{% for g in happenings %}<option value="{{ g.unit }}">{{ g.unit }}</option>{% endfor %}</select></div>
    <div class="d2-table-scroll"><table class="d2-wo-table"><thead><tr><th>Asset ID</th><th>Type</th><th>Cause / Issue</th><th>Tech Remarks</th><th>WO #</th><th>Actions</th></tr></thead><tbody>
    {% for g in happenings %}
