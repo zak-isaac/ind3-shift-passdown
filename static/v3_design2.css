@@ -271,3 +271,18 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
 /* Compact, visible explanation when Ollama safely restores source remarks. */
 .v3-ai-fallback-reason { display:block;max-width:190px;margin-top:3px;color:#73541c;font-size:10px;line-height:1.3;overflow-wrap:anywhere; }
 .v3-ai-fallback-reason[hidden] { display:none; }
+
+/* Oct 25 integrated V3 workspace: one Cetaris upload flow and five columns. */
+.d2-import-actions{display:flex;flex-direction:column;gap:7px;flex:none;min-width:155px}
+.d2-import-actions .button{width:100%;text-align:center;white-space:nowrap}
+.d2-import-check{display:flex;flex-wrap:wrap;gap:14px;padding:4px 8px 14px;color:#506984;font-size:11px}
+.d2-import-check strong{color:#17385c}
+.d2-happenings .d2-wo-table{min-width:770px;table-layout:fixed}
+.d2-happenings .d2-wo-table th:nth-child(1){width:15%}
+.d2-happenings .d2-wo-table th:nth-child(2){width:18%}
+.d2-happenings .d2-wo-table th:nth-child(3){width:24%}
+.d2-happenings .d2-wo-table th:nth-child(4){width:32%}
+.d2-happenings .d2-wo-table th:nth-child(5){width:11%}
+.d2-asset-wo{display:block;margin:5px 0 0;color:#586e86;font-size:10px;font-weight:650;white-space:nowrap}
+.design2-shell .d2-dashboard{padding-top:22px}
+@media(max-width:940px){.d2-import-actions{width:100%;flex-direction:row}.d2-import-actions .button{width:auto;flex:1}.d2-import-flow{flex-wrap:wrap}}

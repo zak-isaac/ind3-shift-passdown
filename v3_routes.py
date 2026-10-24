@@ -15,6 +15,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 import db
 import v3_breakdown
+from v3_cetaris_analytics import get_cetaris_analytics
 import v3_split
 from v3_import_audit import build_audit, preview_status
 from v3_cetaris import parse_excel, select_records, technician_counts, MAX_SIZE
@@ -118,8 +119,19 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                     return entry_page(request, "Override profile is unavailable.")
             elif not profile:
                 return entry_page(request, "Personal override profile is unavailable.")
+            manager={"associate": associate, "profile": {**profile, "is_manager": True}, "elevated": True}
+            # A manager clicking Resume on a specific active-shift card has
+            # already selected that shift. Bind the signed session and enter
+            # its dashboard directly; do not show a second shift selector.
+            if mode=="resume" and shift_id:
+                chosen=next((sh for sh in _v3_live_shifts() if sh["id"]==shift_id),None)
+                if not chosen:
+                    return entry_page(request,"The selected shift is no longer active.")
+                response=RedirectResponse(f"/v3?shift_id={chosen['id']}",status_code=303)
+                set_session_cookies(response,manager,chosen["id"])
+                return response
             response = entry_page(request, master_verified=True)
-            set_session_cookies(response, {"associate": associate, "profile": {**profile, "is_manager": True}, "elevated": True}, 0)
+            set_session_cookies(response,manager,0)
             return response
         profile=get_mst_roster().get(associate)
         if not profile:
@@ -661,7 +673,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             return lead_redirect("/v3/analytics")
         return templates.TemplateResponse(request,"v3/analytics.html",{
             "shift_id":shift_id,
-            "data":db.get_analytics(),
+            "data":get_cetaris_analytics(),
         })
 
     def require_v3_manager(request:Request):

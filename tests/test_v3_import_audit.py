@@ -36,5 +36,6 @@ def test_file_preview_status_is_unique_by_wo():
 def test_workspace_jinja_keeps_production_shell():
     html=(ROOT/"templates/v3/workspace.html").read_text()
     assert 'class="shell design2-shell"' in html
-    assert "Imported WO audit" in html
+    assert "Cetaris import summary" in html
+    assert "Show {{ import_audit.ignored_count }}" not in html
     Environment().parse(html)

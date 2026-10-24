@@ -183,7 +183,8 @@ def test_completed_wo_requires_two_choices_and_has_auditable_reminder(workspace_
     assert outcome.status_code == 303
     assert db.get_pm_count(sid) == 1
     dashboard = client.get("/v3")
-    assert "Completed · Close WO" in dashboard.text
+    assert "Completed · Close WO" not in dashboard.text
+    assert "WO #202" in dashboard.text
     with db._conn() as c:
         audits = c.execute("SELECT wo_number,evidence_json FROM v3_wo_attribution_audit WHERE shift_id=?",
                            (sid,)).fetchall()

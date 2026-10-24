@@ -20,8 +20,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pytest
       - name: Check Python syntax
-        run: python -m compileall -q main.py v3_routes.py v3_identity.py v3_cetaris.py v3_breakdown.py v3_split.py v3_only.py scripts/v3_acceptance.py
+        run: python -m compileall -q main.py v3_routes.py v3_identity.py v3_cetaris.py v3_breakdown.py v3_split.py v3_only.py spelling_fix.py v3_proofread.py v3_report_layout.py v3_ollama_background.py v3_cetaris_analytics.py scripts/v3_acceptance.py
       - name: Run V3 migration regression tests
         run: PYTHONPATH=. python -m pytest -q tests/test_v3_migration.py tests/test_v3_operational_patch.py tests/test_v3_all_non_pm.py tests/test_v3_split.py tests/test_v3_only.py tests/test_v3_acceptance.py
       - name: Run existing V3 route tests
-        run: PYTHONPATH=. python -m pytest -q tests/test_v3_routes.py tests/test_v3_ollama_background.py tests/test_v3_s5_overnight_pipeline.py tests/test_v3_ui_consistency.py tests/test_v3_shift_clock.py
+        run: PYTHONPATH=. python -m pytest -q tests/test_nextgen_signature.py tests/test_v3_report_format.py tests/test_v3_workshop_release_acceptance.py tests/test_v3_english_proofread_report.py tests/test_v3_routes.py tests/test_v3_ollama_background.py tests/test_v3_s5_overnight_pipeline.py tests/test_v3_ui_consistency.py tests/test_v3_shift_clock.py

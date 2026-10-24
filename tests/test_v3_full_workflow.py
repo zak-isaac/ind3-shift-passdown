@@ -115,12 +115,13 @@ def test_full_login_import_ai_preview_and_eml(tmp_path,monkeypatch):
         assert state.get("28030001",{}).get("status")=="passed",state
         page=browser.get("/v3",params={"shift_id":sid})
         assert page.status_code==200
-        assert "28030003" in page.text and "Outside this shift" in page.text
+        assert "28030003" not in page.text  # Ignored WOs stay in the backend audit, not the dashboard
         rewritten="Checked column tension and recalibrated the side guide. RTS."
         assert rewritten in page.text
         assert 'data-ai-remark-wo="28030001"' in page.text
-        assert "AI Passed" in page.text
-        assert "Completed · Close WO" in page.text
+        assert "AI Passed" not in page.text  # No debugging badges in the production table
+        assert "Completed · Close WO" not in page.text  # Practice-only badge removed
+        assert "<th>Action</th>" in page.text
         entry=next(e for e in db.get_entries(sid) if e["wo_number"]=="28030001")
         detail=browser.get(f"/v3/happening/{entry['id']}",params={"shift_id":sid})
         assert detail.status_code==200 and "Checked column tension" in detail.text

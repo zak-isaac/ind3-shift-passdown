@@ -25,71 +25,45 @@ def get_signature_html(
     lead_name: str, shift: str = "", role: str = "", email: str = "",
     *, spark_src: str = f"cid:{SPARK_CID}",
 ) -> str:
-    """Return a standalone signature; spark_src may be a data URL for preview.
+    """Compact Outlook signature matching the Calibri passdown email.
 
-    Exact-name contact mapping only; never guess employee email addresses.
+    No oversized bordered card, faux business card, or duplicate report
+    heading. The actual report stays untouched; the signoff is appended once.
     """
-    name = (lead_name or "").strip() or "IND3 Maintenance Team"
+    name = (lead_name or "").strip() or "IND3 Maintenance Reliability"
     known_role, known_email = KNOWN.get(name.casefold(), ("", ""))
-    title = (role or known_role or "IND3 Team Member").strip()
-    shift = (shift or "").strip()
+    title = (role or known_role or "Maintenance Reliability").strip()
     if shift:
-        title += f" | {shift}"
+        title += f" | {shift.strip()}"
+    safe_name = html.escape(name)
+    safe_title = html.escape(title)
+    src = html.escape(spark_src, quote=True)
     mail = (email or known_email).strip()
-    safe_name, safe_title = html.escape(name), html.escape(title)
-    safe_src = html.escape(spark_src, quote=True)
-    mail_row = ""
+    mail_html = ""
     if mail:
         safe_mail = html.escape(mail, quote=True)
-        mail_row = (
-            '<tr><td style="padding:0 0 11px;color:#344154;font-size:17px;'
-            'line-height:22px;">'
-            f'<a href="mailto:{safe_mail}" style="color:#344154;'
-            f'text-decoration:none;">{safe_mail}</a></td></tr>'
+        mail_html = (
+            f'<tr><td colspan="2" style="padding:3px 0 0 0;font-size:12px;'
+            f'line-height:17px;"><a href="mailto:{safe_mail}" '
+            f'style="color:#0053e2;text-decoration:none;">{safe_mail}</a></td></tr>'
         )
-
     return SIGNATURE_MARKER + f"""<table role="presentation" cellspacing="0" cellpadding="0" border="0"
-      style="width:100%;max-width:612px;background:#ffffff;border:1px solid #e4e7eb;
-      border-radius:16px;border-collapse:separate;font-family:Arial,Calibri,sans-serif;">
-      <tr><td style="padding:25px 22px 23px 23px;">
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-          <tr>
-            <td width="4" bgcolor="#0053E2" style="width:4px;min-width:4px;background:#0053E2;">&nbsp;</td>
-            <td style="padding-left:19px;">
-              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                <tr><td style="font-size:28px;line-height:34px;font-weight:700;
-                  color:#172B4D;padding:0 0 16px;">{safe_name}</td></tr>
-                <tr><td style="font-size:20px;line-height:26px;font-weight:700;
-                  color:#0053E2;padding:0 0 13px;">{safe_title}</td></tr>
-                <tr><td style="font-size:18px;line-height:24px;color:#6B778C;
-                  padding:0 0 23px;">IND3 &middot; Next Generation Fulfillment Center #8972</td></tr>
-                {mail_row}
-                <tr><td style="font-size:17px;line-height:22px;color:#465367;
-                  padding:0 0 27px;">{html.escape(ADDRESS)}</td></tr>
-                <tr><td style="border-top:1px solid #dce2ea;padding:25px 0 0;">
-                  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                    <tr>
-                      <td width="44" valign="middle" style="width:44px;padding-right:7px;">
-                        <img src="{safe_src}" width="38" height="38" alt="Walmart Spark"
-                         style="display:block;width:38px;height:38px;border:0;" />
-                      </td>
-                      <td valign="middle" style="white-space:nowrap;">
-                        <div style="font-size:21px;line-height:25px;font-weight:700;color:#0053E2;">Walmart</div>
-                        <div style="font-size:15px;line-height:20px;letter-spacing:.25px;
-                          color:#68768C;">NEXT GEN FULFILLMENT</div>
-                      </td>
-                      <td align="right" valign="middle" style="font-size:15px;line-height:20px;
-                        color:#68768C;white-space:nowrap;padding-left:12px;">
-                        Maintenance Operations
-                      </td>
-                    </tr>
-                  </table>
-                </td></tr>
-              </table>
-            </td>
-          </tr>
-        </table>
-      </td></tr>
+    style="width:100%;max-width:700px;margin:20px 0 0;border-top:1px solid #cfd8e3;
+    border-collapse:collapse;font-family:Calibri,Arial,sans-serif;color:#263d55;">
+    <tr><td colspan="2" style="padding:12px 0 1px;font-size:14px;
+    line-height:20px;font-weight:bold;">{safe_name}</td></tr>
+    <tr><td colspan="2" style="padding:0 0 3px;font-size:13px;
+    line-height:18px;color:#42576e;">{safe_title}</td></tr>
+    {mail_html}
+    <tr>
+      <td style="width:20px;padding:9px 5px 0 0;vertical-align:middle;">
+        <img src="{src}" width="17" height="17" alt="Walmart Spark"
+        style="display:block;width:17px;height:17px;border:0;" />
+      </td>
+      <td style="padding:9px 0 0;vertical-align:middle;font-size:11px;
+      line-height:15px;color:#61738a;">Walmart &middot; IND3 &middot;
+      NEXT GEN FULFILLMENT &middot; Maintenance Operations</td>
+    </tr>
     </table>"""
 
 

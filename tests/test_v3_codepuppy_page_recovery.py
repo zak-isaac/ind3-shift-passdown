@@ -66,8 +66,11 @@ def test_actual_s5_work_completion_is_displayed_next_calendar_day(tmp_path):
             }])))
         page=client.get("/v3",params={"shift_id":sid})
         assert page.status_code==200
-        assert "Oct 26, 4:30 AM" in page.text
-        assert "Next day · after midnight" in page.text
+        # Attribution still uses that actual completion; the user no longer
+        # wants the practice-only timestamp column visible on the dashboard.
+        assert "Oct 26, 4:30 AM" not in page.text
+        assert "Completed at</th>" not in page.text
+        assert "<th>Action</th>" in page.text
         assert "Oct 26, 9:45 AM" not in page.text
 
 

@@ -76,9 +76,12 @@ def test_s4_three_closed_wos_and_older_ignored_wo_are_visible(tmp_path):
         assert "/v3?shift_id" in confirm.headers["location"]
         screen=client.get(f"/v3?shift_id={shift_id}")
         assert screen.status_code==200,screen.text[:800]
-        assert "Imported WO audit" in screen.text
-        assert "28025555" in screen.text
-        assert "Outside this shift" in screen.text
+        assert "Cetaris import summary" in screen.text
+        assert "28025555" not in screen.text
+        assert "Outside this shift" not in screen.text
+        with db._conn() as c:
+            audit=c.execute("SELECT audit_json FROM v3_import_audit WHERE shift_id=?",(shift_id,)).fetchone()
+        assert audit and "28025555" in audit["audit_json"]
         assert "28025869" in screen.text
         assert "28025965" in screen.text
         assert "28025970" in screen.text

@@ -303,6 +303,14 @@ def test_duplicate_completed_wo_cannot_credit_another_shift(app_client):
     assert response.status_code==303
     screen=client.get(f"/v3?shift_id={sid}")
     assert screen.status_code==200
-    assert "Already credited to another shift (not counted)" in screen.text
+    # Historical rejected-WO reasons remain in the DB import audit, but
+    # the old thousands-row review drawer is intentionally hidden.
+    assert "Already credited to another shift (not counted)" not in screen.text
+    with db._conn() as c:
+        saved=c.execute("SELECT audit_json FROM v3_import_audit WHERE shift_id=?",(sid,)).fetchone()
+    assert saved is not None
+    audit=json.loads(saved["audit_json"])
+    assert any(r["wo_number"]=="DUPLICATE-PM" and "Already credited" in r["reason"]
+               for r in audit["ignored"])
     assert db.get_pm_count(sid)==0
     assert db.get_pm_count(other)==1

@@ -13,13 +13,14 @@
  {% if notice %}<div class="banner success" role="status">{{ notice }}</div>{% endif %}
  {% if warning %}<div class="banner warn" role="alert">{{ warning }}</div>{% endif %}
 
- <section class="d2-import-flow card" id="cetaris" aria-label="Cetaris extraction steps">
+ <section class="d2-import-flow card" id="cetaris" aria-label="Cetaris upload and extraction">
    <div class="d2-flow-step {{ 'is-complete' if imported_filename or staged else '' }}"><span class="d2-step-number">1</span><div><strong>Upload Cetaris File</strong><small>{{ staged.filename if staged else (imported_filename if imported_filename else 'One Cetaris Desktop XLSX') }}</small><span class="d2-step-status">{{ 'File ready' if staged else ('Uploaded' if imported_filename else 'Awaiting upload') }}</span></div></div>
-   <span class="d2-flow-arrow">—</span>
    <div class="d2-flow-step {{ 'is-complete' if selected_techs else '' }}"><span class="d2-step-number">2</span><div><strong>Select Technicians</strong><small>{{ selected_techs|length }} technician{{ 's' if selected_techs|length != 1 else '' }} selected</small><span class="d2-step-status">{{ 'Review new selection below' if staged else ('Confirmed' if selected_techs else 'After upload') }}</span></div></div>
-   <span class="d2-flow-arrow">—</span>
    <div class="d2-flow-step {{ 'is-complete' if imported_filename else '' }}"><span class="d2-step-number">3</span><div><strong>Extraction</strong><small>{{ happenings|length }} happenings · {{ pm_count }} PMs</small><span class="d2-step-status">{{ 'Extracted successfully' if imported_filename else 'Ready to review' }}</span></div></div>
-   <button class="button button-blue d2-reupload" onclick="v3OpenImport()" type="button">{{ 'Replace file' if imported_filename else 'Upload Cetaris File' }}</button>
+   <div class="d2-import-actions">
+     <button class="button button-blue d2-reupload" onclick="v3OpenImport()" type="button">{{ 'Replace file' if imported_filename else 'Upload Cetaris File' }}</button>
+     {% if imported_filename %}<a class="button button-outline" href="/v3/technicians?shift_id={{ shift.id }}">Change technicians</a>{% endif %}
+   </div>
  </section>
 
  <section class="d2-kpis" aria-label="Shift overview">
@@ -28,15 +29,6 @@
    <div class="card d2-kpi"><div><small>Shift happenings</small><strong>{{ happenings|length }}</strong><span>Reported work orders</span></div></div>
    <div class="card d2-kpi"><div><small>Completed PMs</small><strong>{{ pm_count }}</strong><span>Unique Completed or Closed PM WOs</span></div></div>
  </section>
-
- <div class="d2-import-summary card" role="status">
-  <div><strong>{{ 'Cetaris report ready' if imported_filename else 'Awaiting Cetaris file' }}</strong>
-  <span>{{ imported_filename if imported_filename else 'Import a .xlsx report to populate Shift Happenings.' }}</span></div>
-  <div class="d2-import-summary-actions">
-   <button type="button" class="button button-outline" onclick="v3OpenImport()">{{ 'Replace file' if imported_filename else 'Choose Excel file' }}</button>
-   {% if imported_filename %}<a class="button button-outline" href="/v3/technicians?shift_id={{ shift.id }}">Change technicians</a>{% endif %}
-  </div>
- </div>
 
  <dialog class="d2-dialog" id="v3-import-dialog" aria-labelledby="v3-import-title">
    <div class="d2-dialog-head"><div><p class="eyebrow">CETARIS DESKTOP</p><h2 id="v3-import-title">Upload Cetaris File</h2></div><button type="button" class="d2-close" onclick="v3CloseImport()" aria-label="Close upload window">Close</button></div>
@@ -100,60 +92,27 @@
 
 
  {% if import_audit %}
- <section class="card d2-import-audit" aria-label="Imported WO audit">
-   <div class="section-head"><div><h2>Imported WO audit</h2>
-     <p>Review all source work orders excluded from this shift; these records never count toward Shift Happenings or PMs.</p></div></div>
-   <div class="d2-audit-kpis">
-     <span><strong>{{ import_audit.work_orders }}</strong> source WOs</span>
-     <span><strong>{{ import_audit.technicians }}</strong> file technicians</span>
-     <span><strong>{{ import_audit.selected_technicians }}</strong> selected</span>
-     <span><strong>{{ import_audit.included_work_orders }}</strong> included</span>
-     <span><strong>{{ import_audit.ignored_count }}</strong> not counted</span>
-     <span><strong>{{ import_audit.oos_work_orders }}</strong> OOS separately</span>
-     {% if shift.shift_type == "S5" and import_audit.after_midnight_source_wos is defined %}
-     <span><strong>{{ import_audit.after_midnight_source_wos }}</strong> after-midnight WOs in file</span>
-     <span><strong>{{ import_audit.after_midnight_included_wos }}</strong> after-midnight included</span>
-     {% endif %}
-   </div>
-   {% if import_audit.ignored_count %}
-   <details class="d2-audit-details">
-     <summary>Show {{ import_audit.ignored_count }} ignored / other-shift WOs and reasons</summary>
-     <div class="d2-audit-scroll"><table class="d2-wo-table"><thead>
-       <tr><th>WO #</th><th>Asset</th><th>Status</th><th>Technicians</th><th>Labor start</th><th>Why not counted</th></tr></thead><tbody>
-       {% for item in import_audit.ignored %}
-       <tr><td>{{ item.wo_number }}</td><td>{{ item.asset_id }}</td><td>{{ item.status }}</td>
-         <td>{{ item.technicians }}</td><td>{{ item.start_at or 'Not recorded' }}</td><td>{{ item.reason }}</td></tr>
-       {% endfor %}
-       </tbody></table></div>
-   </details>
-   {% else %}<p>All source WOs were counted or tracked as OOS.</p>{% endif %}
- </section>
- {% elif imported_filename %}
- <section class="card d2-import-audit"><h2>Imported WO audit</h2>
-   <p>This report was imported before the audit feature. Re-upload the Cetaris Excel file to see excluded WOs and reasons.</p>
+ <section class="d2-import-check" aria-label="Cetaris import summary">
+   <span><strong>{{ import_audit.included_work_orders }}</strong> accepted WOs from {{ import_audit.work_orders }} in the latest export</span>
+   {% if shift.shift_type in ('S3','S5') and import_audit.after_midnight_included_wos is defined %}
+   <span>{{ import_audit.after_midnight_included_wos }} accepted after midnight</span>
+   {% endif %}
  </section>
  {% endif %}
  <div class="workspace-grid d2-workspace-grid">
  <section class="card happenings d2-happenings" id="happenings">
-   <div class="section-head d2-happenings-head"><div><h2>Shift happenings <span class="count-label">{{ happenings|length }}</span></h2><p>Closed non-PM work orders and MST-approved Completed reminders. Completion time reflects verified technician activity. {% if not ai_enabled %}Local AI is off. Restart V3 with IND3_OLLAMA_REWRITE=1 in its startup terminal and ensure local Ollama is running.{% endif %}</p></div>{% if ai_enabled %}<form method="post" action="/v3/ai/retry" style="display:inline-flex;margin-right:6px"><input type="hidden" name="shift_id" value="{{ shift.id }}"><button class="button button-outline" type="submit" title="Retry AI safely with the original technician remarks retained">Retry AI</button></form>{% endif %}<button class="button button-outline" onclick="v3OpenManual()" type="button">Manual entry</button></div>
+   <div class="section-head d2-happenings-head"><div><h2>Shift happenings <span class="count-label">{{ happenings|length }}</span></h2><p>Accepted non-PM work orders and technician remarks from Cetaris. Automatic proofreading and source-verified rewriting remain active in the report.</p></div>{% if ai_enabled %}<form method="post" action="/v3/ai/retry" style="display:inline-flex;margin-right:6px"><input type="hidden" name="shift_id" value="{{ shift.id }}"><button class="button button-outline" type="submit" title="Retry AI safely with the original technician remarks retained">Retry AI</button></form>{% endif %}<button class="button button-outline" onclick="v3OpenManual()" type="button">Manual entry</button></div>
    <div class="d2-table-filters"><input id="d2-search" type="search" placeholder="Search assets, issues, or remarks" aria-label="Search shift happenings"><select id="d2-type" aria-label="Filter by work type"><option value="">All types</option>{% for type in happenings|map(attribute="rfr_type")|unique|sort %}<option value="{{ type|lower|e }}">{{ type or "Unspecified" }}</option>{% endfor %}</select><select id="d2-asset" aria-label="Filter by asset"><option value="">All assets</option>{% for g in happenings %}<option value="{{ g.unit }}">{{ g.unit }}</option>{% endfor %}</select></div>
-   <div class="d2-table-scroll"><table class="d2-wo-table"><thead><tr><th>Asset ID</th><th>Type</th><th>Cause / Issue</th><th>Tech Remarks</th><th>Completed at</th><th>WO #</th><th>Actions</th></tr></thead><tbody>
+   <div class="d2-table-scroll"><table class="d2-wo-table"><thead><tr><th>Asset ID</th><th>Type</th><th>Cause</th><th>Tech Remarks</th><th>Action</th></tr></thead><tbody>
    {% for g in happenings %}
    <tr class="d2-data-row {% if g.excluded %}d2-excluded{% endif %}" data-asset="{{ g.unit|lower }}" data-type="{{ g.rfr_type|lower }}" data-search="{{ (g.unit ~ ' ' ~ g.wo_number ~ ' ' ~ (g.cause_text or g.reported_issue) ~ ' ' ~ (g.rows|map(attribute='tech_name')|join(' ')))|lower }}">
-    <td class="d2-id"><button type="button" onclick="v3OpenHappening({{ g.main_id }}, {{ shift.id }})">{{ g.unit or 'Unassigned' }}</button>{% if g.excluded %}<span class="d2-flag d2-flag-off">Excluded</span>{% endif %}{% if g.needs_review %}<span class="d2-flag">Review update</span>{% endif %}{% if g.needs_closure %}<span class="d2-flag">Completed · Close WO</span>{% endif %}</td>
+    <td class="d2-id"><button type="button" onclick="v3OpenHappening({{ g.main_id }}, {{ shift.id }})">{{ g.unit or 'Unassigned' }}</button><small class="d2-asset-wo">{{ 'WO #' ~ g.wo_number if g.wo_number else 'Manual entry' }}</small>{% if g.excluded %}<span class="d2-flag d2-flag-off">Excluded</span>{% endif %}{% if g.needs_review %}<span class="d2-flag">Review update</span>{% endif %}</td>
     <td><span class="d2-category {{ 'd2-breakdown' if g.rfr_type|lower == 'breakdown' else 'd2-interruption' if g.rfr_type|lower == 'process interruption' else 'd2-proactive' if g.rfr_type|lower == 'proactive repair' else 'd2-request' if g.rfr_type|lower == 'work request' else 'd2-other' }}">{{ g.rfr_type or 'Other' }}</span></td>
     <td><div class="d2-truncate" title="{{ g.cause_text or g.reported_issue }}">{{ g.cause_text or g.reported_issue or 'No issue recorded' }}</div></td>
     <td><div class="d2-truncate d2-tech-summary" {% if g.wo_number %}data-ai-remark-wo="{{ g.wo_number|e }}" data-ai-eligible="{{ '1' if g.ai_eligible else '0' }}" data-ai-original="{{ g.original_remarks|e }}"{% endif %}>{{ g.display_remarks }}</div><small class="d2-tech-names">{{ g.rows|map(attribute='tech_name')|join(', ') }}</small></td>
-    <td class="d2-work-time">
-      {% if g.work_time %}
-        <time datetime="{{ g.work_time }}" title="{{ g.work_time_source }}">{{ g.work_time_label }}</time>
-        {% if g.next_day_work %}<span class="d2-next-day">Next day · after midnight</span>{% endif %}
-      {% else %}<small>Completion time unavailable</small>{% endif %}
-    </td>
-    <td class="d2-wo">{{ g.wo_number or 'Manual' }}{% if g.wo_number %}<small class="v3-ai-result" data-ai-wo="{{ g.wo_number|e }}" style="display:block;font-size:11px" aria-live="polite" title="{{ g.ai_reason|e }}">{{ 'AI Passed' if g.ai_eligible and g.ai_status == 'passed' and g.ai_approved else 'AI Processing' if g.ai_eligible and g.ai_status in ('queued', 'writing') else 'Original Restored' if g.ai_eligible and g.ai_status in ('original','passed') else 'AI Disabled' if g.ai_eligible and not ai_enabled else 'MST Edited' if not g.ai_eligible and g.ai_status == 'passed' else '' }}</small><small class="v3-ai-fallback-reason" data-ai-reason-wo="{{ g.wo_number|e }}" {% if not (g.ai_eligible and g.ai_status=='original') %}hidden{% endif %}>{{ g.ai_reason|e if g.ai_status=='original' else '' }}</small>{% endif %}</td>
     <td class="d2-row-actions"><button type="button" class="d2-icon-button" title="View work order" aria-label="View or edit {{ g.unit }}" onclick="v3OpenHappening({{ g.main_id }}, {{ shift.id }})">View</button><form method="post" action="/v3/happening/{{ g.main_id }}/exclude"><input type="hidden" name="shift_id" value="{{ shift.id }}"><input type="hidden" name="excluded" value="{{ 0 if g.excluded else 1 }}"><button type="submit" class="d2-icon-button" title="{{ 'Restore' if g.excluded else 'Exclude' }}" aria-label="{{ 'Restore' if g.excluded else 'Exclude' }} {{ g.unit }}">{{ 'Restore' if g.excluded else 'Exclude' }}</button></form></td>
    </tr>
-   {% else %}<tr class="d2-empty"><td colspan="7">No Shift Happenings yet. Import a Cetaris XLSX file or add a manual entry.</td></tr>{% endfor %}
+   {% else %}<tr class="d2-empty"><td colspan="5">No Shift Happenings yet. Import a Cetaris XLSX file or add a manual entry.</td></tr>{% endfor %}
    </tbody></table></div><div class="d2-table-footer"><span><b id="d2-visible-count">{{ happenings|length }}</b> work orders shown · {{ happenings|selectattr('needs_review')|list|length }} pending review</span><span>Click an asset or View to open its details</span></div>
  </section>
  <aside class="d2-tools">
@@ -177,38 +136,21 @@
 (function(){
  const sid={{ shift.id|tojson }};
  const aiEnabled={{ ai_enabled|tojson }};
- const labels=document.querySelectorAll('[data-ai-wo]');
- if(!labels.length)return;
+ const summaries=[...document.querySelectorAll('[data-ai-remark-wo]')];
+ if(!aiEnabled || !summaries.length)return;
  async function refresh(){
   try{
    const response=await fetch('/v3/ai/drafts?shift_id='+encodeURIComponent(sid),{credentials:'same-origin',cache:'no-store'});
    if(!response.ok)return;
    const byWo=new Map(((await response.json()).drafts||[]).map(r=>[String(r.wo_number),r]));
-   for(const label of labels){
-    const r=byWo.get(label.dataset.aiWo);
-    const summary=document.querySelector('[data-ai-remark-wo="'+CSS.escape(label.dataset.aiWo)+'"]');
-    const eligible=summary?.dataset.aiEligible==='1';
-    if(!r){
-      label.textContent=!eligible?'MST Edited':(aiEnabled?'AI Not Run':'AI Disabled');
-      label.title=!eligible?'Manual edit retained':(aiEnabled?'No eligible Ollama rewrite recorded; original technician remarks shown':'Local Ollama rewriting is disabled; original technician remarks shown');
-      continue;
-    }
-    const safe=eligible && r.status==='passed' && Number(r.approved)===1 && Boolean(r.draft);
-    label.textContent=!eligible?'MST Edited':!aiEnabled?'AI Disabled':safe?'AI Passed':
-      r.status==='queued'?'AI Queued'+(r.queue_position?' · '+r.queue_position+' in queue':''):
-      r.status==='writing'?'AI Processing (Ollama running)':'Original Restored';
-    label.title=r.reason||'';
-    const reason=document.querySelector('[data-ai-reason-wo="'+CSS.escape(label.dataset.aiWo)+'"]');
-    if(reason){
-      reason.textContent=eligible && r.status==='original' ? (r.reason||'AI rewrite did not pass verification') : '';
-      reason.hidden=!(eligible && r.status==='original');
-    }
-    if(summary && eligible){
-      if(safe)summary.textContent=r.draft;
-      else summary.textContent=summary.dataset.aiOriginal||'No technician remarks recorded.';
-    }
+   for(const summary of summaries){
+     if(summary.dataset.aiEligible!=='1')continue;
+     const result=byWo.get(summary.dataset.aiRemarkWo);
+     if(!result)continue;
+     const verified=result.status==='passed' && Number(result.approved)===1 && Boolean(result.draft);
+     summary.textContent=verified ? result.draft : (summary.dataset.aiOriginal||'No technician remarks recorded.');
    }
-  }catch(e){}
+  }catch(e){/* Preserve the last trusted paragraph when polling is unavailable. */}
  }
  refresh();setInterval(refresh,5000);
 })();

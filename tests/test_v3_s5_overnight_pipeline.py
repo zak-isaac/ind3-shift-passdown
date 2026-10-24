@@ -92,11 +92,10 @@ def test_s5_saturday_shift_credits_sunday_early_work_and_imports_nonduplicates(t
         assert "Choose the owning shift" not in done.text
         screen=client.get(f"/v3?shift_id={shift_id}")
         assert screen.status_code==200
-        assert "Already credited to another shift (not counted)" in screen.text
-        assert "after-midnight WOs in file" in screen.text
-        assert "after-midnight included" in screen.text
-        assert "4</strong> after-midnight WOs in file" in screen.text
-        assert "3</strong> after-midnight included" in screen.text
+        # Historical ignored WO reasons remain in the DB audit but are no
+        # longer shown as thousands of rows in the MST workspace.
+        assert "Show 3210 ignored" not in screen.text
+        assert "3 accepted after midnight" in screen.text
         assert "S5-AM" in screen.text
         assert "S5-REVIEW" in screen.text
         assert {e["wo_number"] for e in db.get_entries(shift_id)} == {
@@ -106,8 +105,8 @@ def test_s5_saturday_shift_credits_sunday_early_work_and_imports_nonduplicates(t
         assert db.get_pm_count(other)==1
         # Technician-supported equipment-return time is kept separately from
         # administrative closure and survives importing another XLSX later.
-        assert "Oct 25, 1:18 AM" in screen.text
-        assert "Next day" in screen.text
+        assert "Oct 25, 1:18 AM" not in screen.text
+        assert "Completed at</th>" not in screen.text
         with db._conn() as conn:
             saved=conn.execute(
                 "SELECT completed_at FROM v3_wo_completion_times WHERE shift_id=? AND wo_number=?",
@@ -129,7 +128,11 @@ def test_s5_saturday_shift_credits_sunday_early_work_and_imports_nonduplicates(t
         assert imported.status_code==303
         after=client.get(f"/v3?shift_id={shift_id}")
         assert "S5-AM" in after.text
-        assert "Oct 25, 1:18 AM" in after.text
+        assert "Oct 25, 1:18 AM" not in after.text
+        with db._conn() as c:
+            preserved=c.execute("SELECT completed_at FROM v3_wo_completion_times WHERE shift_id=? AND wo_number=?",
+                (shift_id,"S5-AM")).fetchone()
+        assert preserved and preserved[0].startswith("2026-10-25T01:18")
         assert "S5-LATER" in after.text
 
 
@@ -189,5 +192,8 @@ def test_s5_breakdown_in_process_is_oos_and_later_closed_becomes_rts(tmp_path,mo
         assert set(db.get_rts_events(sid))=={"MIP-400","MCLOSED-401"}
         assert db.get_rts_events(sid).count("MIP-400")==1
         again=client.get("/v3",params={"shift_id":sid})
-        assert "Oct 26, 4:28 AM" in again.text
-        assert "Next day" in again.text
+        assert "Oct 26, 4:28 AM" not in again.text
+        with db._conn() as c:
+            tracked=c.execute("SELECT completed_at FROM v3_wo_completion_times WHERE shift_id=? AND wo_number=?",
+                (sid,"IP-400")).fetchone()
+        assert tracked and tracked[0].startswith("2026-10-26T04:28")
