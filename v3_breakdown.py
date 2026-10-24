@@ -42,10 +42,11 @@ def _maybe_rts(db, c, wo, asset, shift_id):
     c.execute("UPDATE v3_breakdown_state SET rts_logged=1 WHERE wo_number=?", (wo,))
     return bool(present)
 
-def sync(db, rows, selected, shift_id):
-    """Apply same-WO status updates. Unselected staff can update tracked WOs only."""
+def sync(db, rows, selected, shift_id, allowed_new_wos=None):
+    """Apply tracked-WO status updates from later exports without leaking new WOs from other shifts."""
     ensure_tables(db)
     priority={"in process":1,"completed":2,"closed":3}
+    allowed_new_wos = None if allowed_new_wos is None else set(allowed_new_wos)
     selected_wos={}
     with db._conn() as c:
         tracked={r[0] for r in c.execute("SELECT wo_number FROM v3_breakdown_state")}
@@ -55,7 +56,9 @@ def sync(db, rows, selected, shift_id):
         status=str(r.get("status","")).strip().casefold()
         asset=str(r.get("asset_id","")).strip()
         if not wo or not asset or status not in priority: continue
-        if r.get("tech_name") not in selected and wo not in tracked: continue
+        if wo not in tracked and (r.get("tech_name") not in selected or
+                                  (allowed_new_wos is not None and wo not in allowed_new_wos)):
+            continue
         previous=selected_wos.get(wo)
         if previous is None or priority[status]>priority[previous[0]]:
             selected_wos[wo]=(status,asset)

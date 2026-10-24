@@ -715,22 +715,65 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         window=shift_window(shift["shift_type"],date.fromisoformat(shift["date"]))
         if not window:
             return render(request,shift,warning="Shift timing is not configured. Import cannot continue.")
-        split_selected=set(split_techs) & selected if shift["shift_type"] in ("S4","S5") else set()
+        # Every shift (including Thursday S3 carried into Friday morning)
+        # uses the same WO ownership engine. Roster home shifts resolve
+        # overlapping handovers; explicit selected OT still remains selectable.
+        split_selected=set(split_techs) & selected if shift["shift_type"]=="S5" else set()
+        roster_shifts={}
+        if get_mst_roster is not None:
+            import re
+            def name_key(value):
+                return tuple(sorted(re.findall(r"[a-z]+",str(value or "").casefold())))
+            by_name={name_key(name):name for name in allowed}
+            for profile in get_mst_roster().values():
+                home=str(profile.get("shift") or "").strip().upper()
+                if home not in ("S1","S2","S3","S4","S5"):
+                    continue
+                for label in (profile.get("full_name"),profile.get("display_name")):
+                    match=by_name.get(name_key(label))
+                    if match:
+                        roster_shifts[match]=home
         submitted=await request.form()
         decisions={key[len("split_wo_"):]:value for key,value in submitted.multi_items()
-                   if key.startswith("split_wo_") and value in ("S4","S5")}
-        attributed,unresolved=v3_split.assign(rows,split_selected,shift["shift_type"],
-                                              shift["date"],decisions)
+                   if key.startswith("split_wo_") and value in ("S1","S2","S3","S4","S5")}
+        attributed,unresolved=v3_split.assign(
+            rows, selected, shift["shift_type"], shift["date"], decisions,
+            confirmed_s5_techs=split_selected, roster_shifts=roster_shifts)
         if unresolved:
             return render(request,shift,
-                warning="Choose the owning shift for each ambiguous S4/S5 work order.",
+                warning="Choose the owning shift for each ambiguous work order.",
                 staged={"token":token,"filename":batch["filename"],
                         "counts":technician_counts(rows),"total_rows":len(rows),
                         "split_review":unresolved,
                         "checked_techs":sorted(selected),
                         "checked_split_techs":sorted(split_selected)})
         records,stats=select_records(attributed,selected,*window)
-        v3_breakdown.sync(db,rows,selected,shift_id)
+        # Cross-shift completion credit must be unique across the database,
+        # including older PM records. Never silently overwrite another shift.
+        completed_wos={r["wo_number"] for r in records if r["kind"] in ("pm","happening")}
+        cross_shift=[]
+        if completed_wos:
+            placeholders=",".join("?" for _ in completed_wos)
+            with db._conn() as c:
+                cross_shift=c.execute(f"""
+                    SELECT DISTINCT wo_number,shift_id FROM pm_wos
+                    WHERE shift_id<>? AND wo_number IN ({placeholders})
+                    UNION
+                    SELECT DISTINCT wo_number,shift_id FROM entries
+                    WHERE shift_id<>? AND excluded=0 AND wo_number IN ({placeholders})
+                """,(shift_id,*sorted(completed_wos),shift_id,*sorted(completed_wos))).fetchall()
+        if cross_shift:
+            labels=", ".join(f"WO {r['wo_number']} (shift #{r['shift_id']})" for r in cross_shift[:8])
+            return render(request,shift,
+                warning="Import blocked to prevent double-credit across shifts: "+labels+
+                        (f" and {len(cross_shift)-8} more" if len(cross_shift)>8 else "")+
+                        ". Review the existing shift's WO before retrying.",
+                staged={"token":token,"filename":batch["filename"],
+                        "counts":technician_counts(rows),"total_rows":len(rows),
+                        "checked_techs":sorted(selected),
+                        "checked_split_techs":sorted(split_selected)})
+        v3_breakdown.sync(db,rows,selected,shift_id,
+                          allowed_new_wos={r["wo_number"] for r in attributed})
         added,unchanged,pending=0,0,0
         # Use short transactions. Existing db helpers open their own connections;
         # nesting them inside an active SQLite write transaction risks 'database locked'.

@@ -41,6 +41,19 @@ def test_parser_reads_actual_wo_close_column():
     assert row["closed_at"]=="2026-10-22T20:00:00"
     assert row["reported_issue"]=="Guide stuck"
 
+def test_parser_in_service_fallback_keeps_close_missing():
+    wb=Workbook(); sh=wb.active
+    sh.append(["WO Number","Asset #","WO Status","Primary RFR",
+               "Service/Repair Description","Technician","Technician Remarks",
+               "In Service Date / Time"])
+    sh.append(["101","VOIDFILL0501","Closed","Proactive Repair",
+               "Guide stuck","Tech A","Repaired",datetime(2026,10,23,22,10)])
+    buf=BytesIO(); wb.save(buf)
+    row=parse_excel(buf.getvalue())[0]
+    assert row["closed_at"]==""
+    assert row["in_service_at"]=="2026-10-23T22:10:00"
+
+
 def test_breakdown_state_tracks_same_wo_and_requires_confirmation(tmp_path):
     db.set_db_path(tmp_path/"test.db");db.init_db()
     selected={"Tech A"}
@@ -73,3 +86,21 @@ def test_manual_hold_blocks_closed_breakdown_rts(tmp_path):
     v3_breakdown.sync(db,[sample(wo="B1",status="Closed",rfr="Breakdown")],{"Tech A"},3)
     assert "VOIDFILL0501" in db.get_oos_units()
     assert db.get_rts_events(3)==[]
+
+
+def test_breakdown_tracked_wo_closes_on_later_shift_even_with_unselected_tech(tmp_path):
+    db.set_db_path(tmp_path/"tracked_later.db");db.init_db()
+    v3_breakdown.sync(db,[sample(wo="CROSS",status="In Process",rfr="Breakdown",
+                                  tech="Tech S3")],{"Tech S3"},1,
+                      allowed_new_wos={"CROSS"})
+    assert "VOIDFILL0501" in db.get_oos_units()
+    # New shift selects a different technician. The old tracked WO can
+    # transition to Closed, but a brand-new unrelated WO must not be added.
+    v3_breakdown.sync(db,[
+        sample(wo="CROSS",status="Closed",rfr="Breakdown",tech="Tech S3"),
+        sample(wo="OTHER",status="In Process",rfr="Breakdown",tech="Tech S4")
+    ],{"Tech S4"},2,allowed_new_wos=set())
+    assert "VOIDFILL0501" not in db.get_oos_units()
+    assert db.get_rts_events(2)==["VOIDFILL0501"]
+    with db._conn() as c:
+        assert c.execute("SELECT 1 FROM v3_breakdown_state WHERE wo_number='OTHER'").fetchone() is None

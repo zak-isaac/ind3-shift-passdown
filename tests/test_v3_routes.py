@@ -162,7 +162,7 @@ def test_unfamiliar_rfr_imports_and_reopened_wo_is_excluded(app_client):
     client.get('/v3')
     base={"wo_number":"98765","tech_name":"Ssaku, Isaac","asset_id":"ASSET987",
           "status":"Closed","rfr":"Safety Inspection","reported_issue":"Check guarding",
-          "cause":"","remarks":"Guard inspected","start_at":"2026-10-20T13:00:00"}
+          "cause":"","remarks":"Guard inspected","start_at":"2026-10-20T18:00:00"}
     def send(rows):
         token=uuid.uuid4().hex
         with db._conn() as c:
@@ -190,7 +190,7 @@ def test_cumulative_reimport_keeps_work_orders_absent_from_later_file(app_client
     client.get('/v3')
     base={"tech_name":"Tech A","asset_id":"M1","status":"Closed",
           "reported_issue":"Reported issue","cause":"WRONG COLUMN",
-          "remarks":"Fixed","start_at":"2020-01-01T10:00:00"}
+          "remarks":"Fixed","start_at":"2026-10-20T18:00:00"}
     def confirm(rows):
         token=uuid.uuid4().hex
         with db._conn() as c:
@@ -206,3 +206,99 @@ def test_cumulative_reimport_keeps_work_orders_absent_from_later_file(app_client
     assert db.get_pm_count(sid)==1
     active={e['wo_number'] for e in db.get_entries(sid) if not e['excluded']}
     assert active=={'100','300'}
+
+
+def test_s2_import_route_filters_out_s1_work(app_client):
+    """S1 and S2 overlap, but the S2 import must not absorb S1 work."""
+    import json, uuid
+    client,sid=app_client
+    client.get('/v3')
+    rows=[
+        {"wo_number":"S2-ONLY","asset_id":"M2","tech_name":"Tech S2","status":"Closed",
+         "rfr":"Proactive Repair","reported_issue":"S2 repair","remarks":"RTS","cause":"",
+         "start_at":"2026-10-20T18:00:00","in_service_at":"2026-10-20T18:10:00"},
+        {"wo_number":"S1-ONLY","asset_id":"M1","tech_name":"Tech S1","status":"Closed",
+         "rfr":"Proactive Repair","reported_issue":"S1 repair","remarks":"RTS","cause":"",
+         "start_at":"2026-10-20T07:00:00","in_service_at":"2026-10-20T07:10:00"},
+    ]
+    token=uuid.uuid4().hex
+    with db._conn() as c:
+        c.execute("INSERT INTO v3_import_batches(token,shift_id,filename,created_at,rows_json) VALUES (?,?,?,?,?)",
+                  (token,sid,"all_shifts.xlsx",datetime.now().isoformat(timespec="seconds"),json.dumps(rows)))
+    response=client.post(f'/v3/import/{token}/confirm',
+                         data={'shift_id':str(sid),'techs':['Tech S1','Tech S2']},
+                         follow_redirects=False)
+    assert response.status_code==303, response.text[:500]
+    wos={e['wo_number'] for e in db.get_entries(sid) if not e['excluded']}
+    assert "S2-ONLY" in wos
+    assert "S1-ONLY" not in wos
+
+
+def test_s3_import_route_keeps_friday_morning_ray_work(tmp_path):
+    """Full route and DB: Thursday S3 owns Ray's Friday overlap work."""
+    import json, uuid
+    db.set_db_path(tmp_path/'s3_route.db')
+    db.init_db()
+    sid=db.start_shift('2026-10-22','S3','Test MST')
+    app=FastAPI()
+    app.mount('/static',StaticFiles(directory=str(DIR/'static')),name='static')
+    templates=Jinja2Templates(directory=str(DIR/'templates'))
+    app.include_router(create_v3_router(
+        templates,
+        is_lead_authed=lambda req: req.cookies.get('lead_auth')=='test',
+        can_manage_shift=lambda req,candidate: candidate==sid,
+        resolve_my_shift=lambda req: db.get_shift(sid),
+        shift_window=lambda code,d:(datetime.combine(d,time(20,30)),
+                                    datetime.combine(d+timedelta(days=1),time(8))),
+        lead_redirect=lambda dest: RedirectResponse('/lead/login?next='+dest,status_code=303)))
+    rows=[
+        {"wo_number":"S3-EARLY","asset_id":"BALER0002","tech_name":"Stamps, Ray",
+         "status":"Closed","rfr":"Preventive Maintenance","reported_issue":"PM",
+         "remarks":"Completed","cause":"","start_at":"2026-10-23T03:00:00",
+         "in_service_at":"2026-10-23T03:10:00"},
+        {"wo_number":"28025279","asset_id":"VOIDFILL1201","tech_name":"Stamps, Ray",
+         "status":"Closed","rfr":"Preventive Maintenance","reported_issue":"PM",
+         "remarks":"Completed","cause":"","start_at":"2026-10-23T05:55:00",
+         "in_service_at":"2026-10-23T06:53:00"},
+        {"wo_number":"S4-ONLY","asset_id":"M4","tech_name":"Tech S4",
+         "status":"Closed","rfr":"Proactive Repair","reported_issue":"S4 repair",
+         "remarks":"RTS","cause":"","start_at":"2026-10-23T08:00:00",
+         "in_service_at":"2026-10-23T08:10:00"},
+    ]
+    with TestClient(app) as client:
+        client.cookies.set('lead_auth','test')
+        client.get('/v3',params={'shift_id':sid})
+        token=uuid.uuid4().hex
+        with db._conn() as c:
+            c.execute("INSERT INTO v3_import_batches(token,shift_id,filename,created_at,rows_json) VALUES (?,?,?,?,?)",
+                      (token,sid,"mixed.xlsx",datetime.now().isoformat(timespec="seconds"),json.dumps(rows)))
+        response=client.post(f'/v3/import/{token}/confirm',
+                             data={'shift_id':str(sid),'techs':['Stamps, Ray','Tech S4']},
+                             follow_redirects=False)
+        assert response.status_code==303, response.text[:500]
+        assert db.get_pm_count(sid)==2
+        assert all(e['wo_number']!="S4-ONLY" for e in db.get_entries(sid))
+
+
+def test_duplicate_completed_wo_cannot_credit_another_shift(app_client):
+    """A previously credited WO cannot be counted as an S2 PM or happening."""
+    import json,uuid
+    client,sid=app_client
+    client.get('/v3')
+    other=db.start_shift('2026-10-20','S1','Other MST')
+    db.upsert_pm_wo(other,'DUPLICATE-PM','M1','Tech S1')
+    rows=[{"wo_number":"DUPLICATE-PM","asset_id":"M1","tech_name":"Tech S2",
+           "status":"Closed","rfr":"Preventive Maintenance","reported_issue":"PM",
+           "cause":"","remarks":"Done","start_at":"2026-10-20T18:00:00",
+           "in_service_at":"2026-10-20T18:15:00"}]
+    token=uuid.uuid4().hex
+    with db._conn() as c:
+        c.execute("INSERT INTO v3_import_batches(token,shift_id,filename,created_at,rows_json) VALUES (?,?,?,?,?)",
+                  (token,sid,'dup.xlsx',datetime.now().isoformat(timespec='seconds'),json.dumps(rows)))
+    response=client.post(f'/v3/import/{token}/confirm',
+                         data={'shift_id':str(sid),'techs':['Tech S2']},
+                         follow_redirects=False)
+    assert response.status_code==200
+    assert 'Import blocked to prevent double-credit' in response.text
+    assert db.get_pm_count(sid)==0
+    assert db.get_pm_count(other)==1
