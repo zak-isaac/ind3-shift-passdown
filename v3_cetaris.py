@@ -49,7 +49,14 @@ REQUIRED = (
 # per 2026-10-23 facility feedback, so it's preferred wherever both exist
 # (see select_records() and v3_split.owner_for_close()). Optional, not
 # required: older exports predate this column.
-_OPTIONAL = ("Primary RFR", "Update Date / Time")
+# "WO Date / Time" (opened_at), "In Service Date / Time" (in_service_at), and
+# "WO Last Complete Date / Time" (last_complete_at) feed v3_split.py's
+# S1-S5 technician-evidence attribution engine (2026-10-24 facility-confirmed
+# columns). opened_at is WO creation, not labor evidence -- fallback only.
+# in_service_at is equipment-return evidence, used to resolve handovers.
+# last_complete_at is preserved for display/audit, never a labor substitute.
+_OPTIONAL = ("Primary RFR", "Update Date / Time", "WO Date / Time",
+             "In Service Date / Time", "WO Last Complete Date / Time")
 
 DATE_FORMATS = ("%m/%d/%Y %I:%M %p", "%m/%d/%Y %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d")
 MAX_SIZE = 12 * 1024 * 1024
@@ -142,6 +149,12 @@ def parse_excel(data: bytes) -> list[dict]:
             # 2026-10-23 facility feedback. Optional column; absent on older
             # exports, in which case callers fall back to closed_at.
             updated_at = _parse_dt(get(row, "Update Date / Time"))
+            # WO-level administrative/equipment-evidence timestamps (same
+            # value across every labor row on a given WO). Feed v3_split.py's
+            # S1-S5 attribution; never substituted for technician start_at.
+            opened_at = _parse_dt(get(row, "WO Date / Time"))
+            in_service_at = _parse_dt(get(row, "In Service Date / Time"))
+            last_complete_at = _parse_dt(get(row, "WO Last Complete Date / Time"))
             # Asset ID comes from 'Asset ID', falling back to 'Asset #' only
             # when Asset ID is missing -- real exports leave Asset ID blank
             # for most rows, so Asset # is the common case, not the fallback.
@@ -157,6 +170,9 @@ def parse_excel(data: bytes) -> list[dict]:
                 "start_at": started.isoformat(timespec="seconds") if started else "",
                 "closed_at": closed_at.isoformat(timespec="seconds") if closed_at else "",
                 "updated_at": updated_at.isoformat(timespec="seconds") if updated_at else "",
+                "opened_at": opened_at.isoformat(timespec="seconds") if opened_at else "",
+                "in_service_at": in_service_at.isoformat(timespec="seconds") if in_service_at else "",
+                "last_complete_at": last_complete_at.isoformat(timespec="seconds") if last_complete_at else "",
                 "cause": _text(get(row, "Cause")),
                 "last_shift": _text(get(row, "Last Shift")),
                 "rfr": _text(get(row, "Primary RFR")),
@@ -182,12 +198,24 @@ def _is_pm(r: dict) -> bool:
     return bool(r["pm_code"].strip())
 
 
-def select_records(rows: list[dict], selected: set[str], start: datetime, end: datetime):
+def select_records(rows: list[dict], selected: set[str], start: datetime, end: datetime,
+                    trust_attribution: bool = False):
     """Include every Closed non-PM work order; route only PMs to the PM summary.
 
     Where Start Date and WO Closed Date/Time disagree about which shift a WO
     belongs to (or Start Date is missing/unparseable), the record is routed
     to `ambiguous` for MST review instead of being guessed either way.
+
+    `trust_attribution=True` (2026-10-24, S1-S5 ownership engine): `rows` has
+    already been through v3_split.assign(), which decides shift ownership
+    from technician work-time evidence -- a strictly better signal than this
+    function's own simple start/close-vs-window check. Re-applying that
+    check here would re-reject WOs v3_split just correctly attributed (e.g.
+    the S5 06:00-06:30 grace window, or a roster/continuity-resolved
+    overlap) purely because its start_at sits slightly outside this
+    function's naive window math. When true, every row that reaches here is
+    trusted as already belonging to this shift; only the status/PM/Happening
+    classification below still applies.
     """
     summary = Counter()
     eligible = []
@@ -203,9 +231,9 @@ def select_records(rows: list[dict], selected: set[str], start: datetime, end: d
         # Prefer it when present; fall back to WO Closed Date/Time for older
         # exports that predate this column.
         closed_at = _parse_dt(r.get("updated_at") or r["closed_at"])
-        in_window = started is not None and start <= started <= end
+        in_window = trust_attribution or (started is not None and start <= started <= end)
         closed_in_window = closed_at is not None and start <= closed_at <= end
-        if started is None:
+        if not trust_attribution and started is None:
             summary["ambiguous_shift"] += 1
             ambiguous.append({**r, "reason": "Start Date is missing or unreadable -- cannot confirm shift."})
             continue

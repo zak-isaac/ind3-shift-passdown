@@ -199,7 +199,7 @@ def test_unfamiliar_rfr_imports_and_reopened_wo_is_excluded(app_client):
     client.get('/v3')
     base={"wo_number":"98765","tech_name":"Ssaku, Isaac","asset_id":"ASSET987",
           "status":"Closed","rfr":"Safety Inspection","reported_issue":"Check guarding",
-          "cause":"","remarks":"Guard inspected","start_at":"2026-10-20T13:00:00",
+          "cause":"","remarks":"Guard inspected","start_at":"2026-10-20T18:00:00",
           "closed_at":"","repair_class":"","pm_code":"","last_shift":""}
     def send(rows):
         token=uuid.uuid4().hex
@@ -230,7 +230,7 @@ def test_breakdown_wo_tracked_as_oos_then_rts_decision(app_client):
     client.get('/v3')
     base={"wo_number":"55001","tech_name":"Ssaku, Isaac","asset_id":"VOIDFILL0500",
           "status":"In Process","rfr":"Breakdown","reported_issue":"Conveyor jam",
-          "cause":"","remarks":"Working it","start_at":"2026-10-20T13:00:00",
+          "cause":"","remarks":"Working it","start_at":"2026-10-20T18:00:00",
           "closed_at":"","repair_class":"Unplanned","pm_code":"","last_shift":"S2"}
     def send(rows):
         token=uuid.uuid4().hex
@@ -262,11 +262,12 @@ def test_import_review_surfaces_skipped_wo_and_can_be_included(app_client):
     import json, uuid
     client,sid=app_client
     client.get('/v3')
-    # app_client's window is 2026-10-20 00:00 -> 2026-10-21 00:00; this
-    # start_at is the day before, outside the window.
+    # 1pm Tuesday sits in the genuine S1(5:30-16:00)/S2(12:00-22:30) overlap.
+    # app_client's roster is empty, so v3_split.py's engine can't disambiguate
+    # from roster/continuity alone -- a real "needs an MST shift call" case.
     row=dict(wo_number="77001",tech_name="Ssaku, Isaac",asset_id="TSP0009",status="Closed",
              rfr="Process Interruption",reported_issue="Belt jam",cause="",remarks="Cleared jam",
-             start_at="2026-10-19T23:00:00",closed_at="2026-10-19T23:30:00",
+             start_at="2026-10-20T13:00:00",closed_at="2026-10-20T13:30:00",
              repair_class="Unplanned",pm_code="",last_shift="S2")
     token=uuid.uuid4().hex
     with db._conn() as c:
@@ -279,25 +280,38 @@ def test_import_review_surfaces_skipped_wo_and_can_be_included(app_client):
     workspace=client.get(f'/v3?shift_id={sid}')
     assert 'WO #77001' in workspace.text
     assert 'TSP0009' in workspace.text
-    assert "Outside this shift" in workspace.text and "reporting window" in workspace.text
-    assert db.get_entries(sid)==[], 'must not silently appear as a happening before a decision is made'
+    assert db.get_entries(sid)==[], 'must not silently appear as a happening before ownership is resolved'
 
     import v3_import_review
     [item]=v3_import_review.pending(db,sid)
-    included=client.post(f'/v3/import-review/{item["id"]}/include',data={'shift_id':str(sid)},follow_redirects=True)
-    assert included.status_code==200
+    assert item['kind']=='ownership'
+    assigned=client.post(f'/v3/import-review/{item["id"]}/assign-shift',
+                         data={'shift_id':str(sid),'shift_type':'S2'},follow_redirects=True)
+    assert assigned.status_code==200
+    assert v3_import_review.pending(db,sid)==[], 'resolved item must drop off the pending list'
+    assert db.get_entries(sid)==[], 'assign_shift only records the decision -- it never inserts an entry itself'
+
+    # The standing decision is honored on the NEXT import of this WO, by
+    # whichever shift re-uploads it -- the MST is never asked twice.
+    token2=uuid.uuid4().hex
+    with db._conn() as c:
+        c.execute('INSERT INTO v3_import_batches(token,shift_id,filename,created_at,rows_json) VALUES (?,?,?,?,?)',
+                  (token2,sid,'sample.xlsx',datetime.now().isoformat(timespec='seconds'),json.dumps([row])))
+    resp2=client.post(f'/v3/import/{token2}/confirm',data={'shift_id':str(sid),'techs':['Ssaku, Isaac']},follow_redirects=True)
+    assert resp2.status_code==200,resp2.text[:500]
     entries=db.get_entries(sid)
     assert len(entries)==1 and entries[0]['unit']=='TSP0009'
-    assert v3_import_review.pending(db,sid)==[], 'resolved item must drop off the pending list'
 
 
 def test_import_review_dismiss_does_not_create_entry(app_client):
     client,sid=app_client
     client.get('/v3')
     import json, uuid, v3_import_review
+    # 1pm Tuesday: genuine S1/S2 overlap, unresolvable without roster data --
+    # same scenario as the include/assign-shift test above.
     row=dict(wo_number="77002",tech_name="Ssaku, Isaac",asset_id="TSP0010",status="Closed",
              rfr="Process Interruption",reported_issue="False alarm",cause="",remarks="N/A",
-             start_at="2026-10-19T23:00:00",closed_at="2026-10-19T23:30:00",
+             start_at="2026-10-20T13:00:00",closed_at="2026-10-20T13:30:00",
              repair_class="Unplanned",pm_code="",last_shift="S2")
     token=uuid.uuid4().hex
     with db._conn() as c:
@@ -312,13 +326,19 @@ def test_import_review_dismiss_does_not_create_entry(app_client):
 
 
 def test_s4_s5_split_shift_ownership(tmp_path):
-    """A WO closed inside S4's window must not be credited to an S5 import of
-    the same 24-hour Cetaris export; an ambiguous close time is held out and
-    surfaced to the MST instead of being guessed."""
+    """A WO whose technician work-start time falls squarely in S4's window
+    must not be credited to an S5 import of the same weekend's Cetaris
+    export; a work-start inside the genuine 17:30-18:00 S4/S5 overlap, with
+    no roster to disambiguate, is held out for an explicit MST shift call
+    instead of being guessed.
+    """
     import json, uuid
     db.set_db_path(tmp_path / 'test_split.db')
     db.init_db()
-    s5_sid=db.start_shift('2026-10-20','S5','Test MST S5')
+    # 2026-10-23 is a real Friday -- v3_split.py's engine keys its S4/S5
+    # schedule off actual weekday, so the test date must really be a
+    # Fri/Sat/Sun or the whole scenario silently resolves to S1/S2/S3 instead.
+    s5_sid=db.start_shift('2026-10-23','S5','Test MST S5')
     app=FastAPI()
     app.mount('/static', StaticFiles(directory=str(DIR/'static')), name='static')
     templates=Jinja2Templates(directory=str(DIR/'templates'))
@@ -333,20 +353,79 @@ def test_s4_s5_split_shift_ownership(tmp_path):
     client=TestClient(app)
     client.cookies.set('lead_auth','test')
     client.get('/v3')
+    # Unambiguously S4: 10am Friday is nowhere near S5's 17:30 start.
     row_for_s4=dict(wo_number="66001",tech_name="Ssaku, Isaac",asset_id="M1",status="Closed",
                      rfr="Process Interruption",reported_issue="Fixed",cause="",remarks="Done",
-                     start_at="2026-10-20T10:00:00",closed_at="2026-10-20T10:30:00",
+                     start_at="2026-10-23T10:00:00",closed_at="2026-10-23T10:30:00",
                      repair_class="",pm_code="",last_shift="S4")
-    ambiguous_row=dict(row_for_s4,wo_number="66002",closed_at="")
+    # Genuinely ambiguous: 5:45pm Friday is inside the real S4(5:30-18:00)/
+    # S5(17:30-06:00) overlap, this test's router has no roster data to break
+    # the tie, and this is a DIFFERENT technician with no other unambiguous
+    # work-start of their own this file -- so there's no continuity evidence
+    # to resolve it either (unlike row_for_s4's own tech, whose earlier 10am
+    # S4 start would otherwise "cover" a later ambiguous entry of theirs).
+    ambiguous_row=dict(row_for_s4,wo_number="66002",tech_name="Lin, Priya",
+                       start_at="2026-10-23T17:45:00",closed_at="")
     def send(sid,rows):
         token=uuid.uuid4().hex
         with db._conn() as c:
             c.execute('INSERT INTO v3_import_batches(token,shift_id,filename,created_at,rows_json) VALUES (?,?,?,?,?)',
                       (token,sid,'sample.xlsx',datetime.now().isoformat(timespec='seconds'),json.dumps(rows)))
-        return client.post(f'/v3/import/{token}/confirm',data={'shift_id':str(sid),'techs':['Ssaku, Isaac']},follow_redirects=True)
+        return client.post(f'/v3/import/{token}/confirm',data={'shift_id':str(sid),'techs':['Ssaku, Isaac','Lin, Priya']},follow_redirects=True)
     resp=send(s5_sid,[row_for_s4,ambiguous_row])
     assert resp.status_code==200,resp.text[:500]
     s5_entries=db.get_entries(s5_sid)
-    assert not any(e['wo_number']=='66001' for e in s5_entries), 'closed during S4 window, must not count toward S5'
-    assert not any(e['wo_number']=='66002' for e in s5_entries), 'ambiguous close time must not be guessed'
-    assert 'explicit S4/S5 ownership call' in resp.text
+    assert not any(e['wo_number']=='66001' for e in s5_entries), 'work-start during S4 window, must not count toward S5'
+    assert not any(e['wo_number']=='66002' for e in s5_entries), 'ambiguous overlap start must not be guessed'
+    assert 'explicit shift ownership call' in resp.text
+
+    import v3_import_review
+    [item]=v3_import_review.pending(db,s5_sid)
+    assert item['kind']=='ownership' and item['wo_number']=='66002'
+
+
+def test_cross_shift_duplicate_wo_is_blocked_not_double_credited(tmp_path):
+    """The same completed WO must never be credited to two different
+    shifts. If a WO already belongs to another shift's entries (or PMs),
+    a later import that would also claim it is blocked with a clear
+    message, never silently overwritten or double-counted.
+    """
+    import json, uuid
+    db.set_db_path(tmp_path / 'test_cross_shift.db')
+    db.init_db()
+    s2_sid=db.start_shift('2026-10-20','S2','Test MST S2')
+    s3_sid=db.start_shift('2026-10-19','S3','Test MST S3')
+    # Seed WO 71001 as already belonging to S3 -- bypassing the import
+    # pipeline entirely, since the point of this test is the cross-shift
+    # guard itself, not re-deriving S3 ownership from scratch.
+    db.upsert_cmms_entry(s3_sid,'71001','BALER0002','Jam','[]','Ray Stamps')
+    app=FastAPI()
+    app.mount('/static', StaticFiles(directory=str(DIR/'static')), name='static')
+    templates=Jinja2Templates(directory=str(DIR/'templates'))
+    app.include_router(create_v3_router(
+        templates,
+        is_lead_authed=lambda req: req.cookies.get('lead_auth')=='test',
+        can_manage_shift=lambda req, candidate: candidate in (s2_sid,s3_sid),
+        resolve_my_shift=lambda req: db.get_shift(s2_sid),
+        shift_window=lambda shift,d:(datetime.combine(d,time(0)),datetime.combine(d+timedelta(days=1),time(0))),
+        lead_redirect=lambda dest: RedirectResponse('/lead/login?next='+dest,status_code=303)
+    ))
+    client=TestClient(app)
+    client.cookies.set('lead_auth','test')
+    client.get('/v3')
+    # Clean S2-only work-start (6pm Tuesday) for the SAME wo_number -- would
+    # normally import cleanly into S2 on its own merits.
+    row=dict(wo_number="71001",tech_name="Ray Stamps",asset_id="BALER0002",status="Closed",
+             rfr="Process Interruption",reported_issue="Jam",cause="",remarks="Cleared",
+             start_at="2026-10-20T18:00:00",closed_at="",repair_class="",pm_code="",last_shift="S2")
+    token=uuid.uuid4().hex
+    with db._conn() as c:
+        c.execute('INSERT INTO v3_import_batches(token,shift_id,filename,created_at,rows_json) VALUES (?,?,?,?,?)',
+                  (token,s2_sid,'sample.xlsx',datetime.now().isoformat(timespec='seconds'),json.dumps([row])))
+    resp=client.post(f'/v3/import/{token}/confirm',data={'shift_id':str(s2_sid),'techs':['Ray Stamps']},follow_redirects=True)
+    assert resp.status_code==200
+    assert 'Import blocked to prevent double-credit' in resp.text
+    assert 'WO 71001' in resp.text
+    # The original S3 entry must be untouched -- no overwrite, no new S2 entry.
+    assert any(e['wo_number']=='71001' for e in db.get_entries(s3_sid))
+    assert not any(e['wo_number']=='71001' for e in db.get_entries(s2_sid))

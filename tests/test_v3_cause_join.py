@@ -90,7 +90,7 @@ def test_cause_file_upload_joins_into_workspace_happenings(client_and_shift):
          "Last Shift", "Service/Repair Description", "Technician", "Technician Remarks",
          "Cause", "Start Date", "WO Closed Date/Time", "Primary RFR"],
         [[28017126, None, "TRKGATE0002", "Closed", None, "Unplanned", "S2", "Gate won't open",
-          "Smith, John", "Replaced sensor", None, "2026-10-20 08:00:00", "2026-10-20 09:00:00", "Breakdown"]],
+          "Smith, John", "Replaced sensor", None, "2026-10-20 18:00:00", "2026-10-20 18:30:00", "Breakdown"]],
     )
     cause_xlsx = _xlsx_bytes(["WO Number", "Repair Description"], [[28017126, "Sensor failure"]])
 
@@ -136,7 +136,7 @@ def test_main_import_cause_column_available_for_report_without_separate_file(cli
          "Cause", "Start Date", "WO Closed Date/Time", "Primary RFR"],
         [[28099999, None, "TRKGATE0003", "Closed", None, "Unplanned", "S2", "Gate won't open",
           "Smith, John", "Replaced sensor", "Sensor failure (from main file)",
-          "2026-10-20 08:00:00", "2026-10-20 09:00:00", "Breakdown"]],
+          "2026-10-20 18:00:00", "2026-10-20 18:30:00", "Breakdown"]],
     )
     staged = client.post("/v3/import", data={"shift_id": sid},
                           files={"file": ("timecard.xlsx", timecard_xlsx,
@@ -173,7 +173,7 @@ def test_empty_cause_column_falls_back_to_service_description(client_and_shift):
         [[28088888, None, "TRKGATE0004", "Closed", None, "Unplanned", "S2",
           "Conveyor belt jammed with debris", "Smith, John", "Cleared jam, inspected belt",
           None,  # Cause column left blank, as in real exports
-          "2026-10-20 08:00:00", "2026-10-20 09:00:00", "Breakdown"]],
+          "2026-10-20 18:00:00", "2026-10-20 18:30:00", "Breakdown"]],
     )
     staged = client.post("/v3/import", data={"shift_id": sid},
                           files={"file": ("timecard.xlsx", timecard_xlsx,
@@ -198,7 +198,7 @@ def test_upload_accepted_regardless_of_filename_extension(client_and_shift):
          "Last Shift", "Service/Repair Description", "Technician", "Technician Remarks",
          "Cause", "Start Date", "WO Closed Date/Time", "Primary RFR"],
         [[28077777, None, "TRKGATE0005", "Closed", None, "Unplanned", "S2", "Gate won't open",
-          "Smith, John", "Replaced sensor", None, "2026-10-20 08:00:00", "2026-10-20 09:00:00", "Breakdown"]],
+          "Smith, John", "Replaced sensor", None, "2026-10-20 18:00:00", "2026-10-20 18:30:00", "Breakdown"]],
     )
     # No .xlsx extension at all -- used to be hard-rejected before even
     # looking at the content.
@@ -260,7 +260,7 @@ def test_csv_upload_works_same_as_xlsx(client_and_shift):
          "Last Shift", "Service/Repair Description", "Technician", "Technician Remarks",
          "Cause", "Start Date", "WO Closed Date/Time", "Primary RFR"],
         [["28066666", "", "TRKGATE0006", "Closed", "", "Unplanned", "S2", "Gate won't open",
-          "Smith, John", "Replaced sensor", "", "2026-10-20 08:00:00", "2026-10-20 09:00:00", "Breakdown"]],
+          "Smith, John", "Replaced sensor", "", "2026-10-20 18:00:00", "2026-10-20 18:30:00", "Breakdown"]],
     )
     staged = client.post("/v3/import", data={"shift_id": sid},
                           files={"file": ("export.csv", timecard_csv, "text/csv")})
@@ -273,21 +273,24 @@ def test_csv_upload_works_same_as_xlsx(client_and_shift):
 
 
 def test_update_date_time_preferred_over_stale_wo_closed_date(client_and_shift):
-    """Real-world case: 'WO Closed Date/Time' can be stale/wrong; 'Update
-    Date / Time' reflects when the record was actually last touched/closed.
-    A WO whose Closed Date falls outside the shift window but whose Update
-    Date falls inside it must be included normally, not flagged ambiguous.
+    """Real-world case: a WO with no recorded technician Start Date (common
+    on older/partial exports) still needs a completion-evidence fallback for
+    shift attribution. 'Update Date / Time' reflects when the record was
+    actually last touched/closed, more reliably than 'WO Closed Date/Time'
+    (2026-10-23 facility feedback), so v3_split.py's attribution engine
+    tries it (via _completion_evidence()) ahead of the administrative close
+    time, which is never used for attribution at all.
     """
     client, sid = client_and_shift
     timecard_xlsx = _xlsx_bytes(
         ["WO Number", "Asset ID", "Asset #", "WO Status", "SJ / PM Code", "Repair Class",
          "Last Shift", "Service/Repair Description", "Technician", "Technician Remarks",
          "Cause", "Start Date", "WO Closed Date/Time", "Primary RFR", "Update Date / Time"],
-        # Closed Date/Time (stale, outside the 2026-10-20 window) vs
-        # Update Date / Time (accurate, inside the window).
+        # No Start Date at all; Update Date / Time (clean S2 window, no
+        # overlap) is the only usable evidence and must resolve ownership.
         [[28055555, None, "TRKGATE0007", "Closed", None, "Unplanned", "S2", "Gate won't open",
-          "Smith, John", "Replaced sensor", None, "2026-10-20 08:00:00", "2026-10-19 23:00:00",
-          "Breakdown", "2026-10-20 10:00:00"]],
+          "Smith, John", "Replaced sensor", None, "", "2026-10-19 23:00:00",
+          "Breakdown", "2026-10-20 18:00:00"]],
     )
     staged = client.post("/v3/import", data={"shift_id": sid},
                           files={"file": ("timecard.xlsx", timecard_xlsx,

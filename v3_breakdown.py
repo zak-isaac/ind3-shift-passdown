@@ -2,12 +2,7 @@
 
 Ported from the personal-GitHub operational-integration branch
 (github.com/zak-isaac/ind3-shift-passdown, commits 02caf40/bb73c86/c18dd00).
-
-NOT WIRED IN YET: this module is a standalone, reviewed building block.
-Hooking it into the live Cetaris import pipeline (v3_cetaris.py/v3_routes.py)
-needs a follow-up pass because local's select_records() doesn't currently
-carry a "breakdown" classification (RFR) on parsed rows the way this
-module's sync() expects -- that needs a deliberate decision, not a guess.
+Wired into v3_routes.py's confirm_import() for every shift type.
 """
 from __future__ import annotations
 from datetime import datetime, timezone
@@ -57,11 +52,20 @@ def _maybe_rts(db, c, wo, asset, shift_id):
     c.execute("UPDATE v3_breakdown_state SET rts_logged=1 WHERE wo_number=?", (wo,))
     return True
 
-def sync(db, rows, selected, shift_id):
+def sync(db, rows, selected, shift_id, allowed_new_wos=None):
     """Apply same-WO status updates. Unselected staff can update tracked WOs only.
 
     `rows` are raw parsed Cetaris rows (pre select_records filtering) that
     must carry an "rfr" field classifying breakdown WOs.
+
+    `allowed_new_wos` (2026-10-24, S1-S5 ownership engine): when given, a WO
+    NOT already tracked may only start being tracked here if its number is
+    in this set (i.e. v3_split.py's ownership engine attributed it to THIS
+    shift). A breakdown opened by a different shift must never start OOS
+    tracking here just because one of its labor rows' technician also
+    appears in this file. Already-tracked WOs are exempt -- OOS/RTS state
+    is shared infrastructure, so a status update (e.g. closing it out) must
+    still flow through regardless of which shift is doing the updating.
     """
     ensure_tables(db)
     priority={"in process":1,"completed":2,"closed":3}
@@ -84,6 +88,7 @@ def sync(db, rows, selected, shift_id):
         asset=str(r.get("asset_id","")).strip()
         if not wo or not asset or status not in priority: continue
         if r.get("tech_name") not in selected and wo not in tracked: continue
+        if wo not in tracked and allowed_new_wos is not None and wo not in allowed_new_wos: continue
         previous=selected_wos.get(wo)
         if previous is None or priority[status]>priority[previous[0]]:
             selected_wos[wo]=(status,asset)

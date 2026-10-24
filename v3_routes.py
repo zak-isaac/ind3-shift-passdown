@@ -433,6 +433,13 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             raise HTTPException(404,"Review item not found or already resolved")
         return return_workspace(shift_id,"Work order dismissed from review")
 
+    @router.post("/import-review/{review_id}/assign-shift")
+    async def v3_import_review_assign_shift(request:Request,review_id:int,shift_id:int=Form(...),shift_type:str=Form(...)):
+        secure(request,shift_id)
+        if not v3_import_review.assign_shift(db,shift_id,review_id,shift_type.strip().upper()):
+            raise HTTPException(404,"Review item not found, already resolved, or invalid shift")
+        return return_workspace(shift_id,f"Ownership assigned to {shift_type.strip().upper()}; honored on the next import of this WO")
+
     @router.post("/rts/undo")
     async def v3_undo_rts(request:Request,shift_id:int=Form(...),unit:str=Form(...)):
         secure(request,shift_id)
@@ -802,6 +809,24 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         import re as _re
         return " ".join(sorted(_re.sub(r"[,]", " ", name or "").lower().split()))
 
+    def _roster_home_shift_map(tech_names):
+        """Map each Cetaris tech_name to their roster home shift (S1-S5), for
+        v3_split.assign()'s overlap tie-breaking. Matches by normalized name
+        key so 'Last, First' (Cetaris) resolves against 'First Last' (roster).
+        """
+        if not get_mst_roster:
+            return {}
+        roster=get_mst_roster()
+        by_key={}
+        for profile in roster.values():
+            home=str(profile.get("shift") or "").strip().upper()
+            if home not in ("S1","S2","S3","S4","S5"):
+                continue
+            for label in (profile.get("full_name"),profile.get("display_name")):
+                if label:
+                    by_key[_name_key(label)]=home
+        return {name:by_key[_name_key(name)] for name in tech_names if _name_key(name) in by_key}
+
     def _roster_name_keys_for_shift(shift_type):
         """Normalized full-name keys for every roster associate assigned to this
         shift code, so a Cetaris 'Last, First' name can match a roster record
@@ -892,22 +917,72 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         if not window:
             return render(request,shift,warning="Shift timing is not configured. Import cannot continue.")
 
-        # S4/S5 share Cetaris's "24 HOUR" shift labeling and can both import the
-        # same WO export. Attribute closed/completed WOs to whichever shift's
-        # window the administrative WO Closed Date/Time actually falls in;
-        # anything ambiguous (overlap zone, missing timestamp) is held out
-        # here and surfaced to the MST instead of being double-counted or
-        # silently guessed either way.
+        # Every shift (S1-S5, including Thursday S3 carried into Friday
+        # morning, and the S4/S5 Friday-evening overlap) uses the same WO
+        # ownership engine: technician work-start evidence first, roster home
+        # shift and technician continuity to resolve overlaps, equipment-return
+        # evidence (In Service / Update Date) as a fallback, and an explicit
+        # MST shift choice when evidence is missing or genuinely conflicting.
+        # A later administrative WO Closed Date/Time never transfers ownership.
         split_pending=[]
-        if shift["shift_type"] in ("S4","S5"):
-            rows,split_pending=v3_split.assign(rows,selected,shift["shift_type"],date.fromisoformat(shift["date"]))
+        submitted=await request.form()
+        decisions={key[len("split_wo_"):]:value for key,value in submitted.multi_items()
+                   if key.startswith("split_wo_") and value in ("S1","S2","S3","S4","S5")}
+        # Standing MST ownership calls apply here too -- a decision made once
+        # (by any shift) is honored on every later re-upload of that WO,
+        # never re-asked, and this form's own explicit choice wins if both
+        # are present in the same submission.
+        decisions={**v3_import_review.ownership_decisions(db),**decisions}
+        roster_shifts=_roster_home_shift_map(allowed)
+        # S5's 06:00-06:30 morning grace only applies to technicians the MST
+        # has actually selected for THIS S5 import -- never blanket-applied.
+        confirmed_s5=selected if shift["shift_type"]=="S5" else set()
+        all_rows=rows
+        rows,split_pending=v3_split.assign(rows,selected,shift["shift_type"],date.fromisoformat(shift["date"]),
+                                           decisions,confirmed_s5_techs=confirmed_s5,roster_shifts=roster_shifts)
+        if split_pending:
+            v3_import_review.record(db,shift_id,{"ownership":split_pending})
 
         # Breakdown WOs get sidecar OOS/RTS lifecycle tracking independent of
         # the happenings/PM report -- runs on every import, every shift type.
         # Shares the existing oos_units/rts_log tables, so a WO going "in
         # process" shows up in the OOS panel you already have.
-        breakdown_updates=v3_breakdown.sync(db,rows,selected,shift_id)
-        records,stats=select_records(rows,selected,*window)
+        # allowed_new_wos restricts tracking to WOs the ownership engine just
+        # attributed to THIS shift -- a breakdown opened by another shift must
+        # never start being tracked here just because its technician also
+        # appears in this file. all_rows (pre-attribution) is still what gets
+        # scanned, so a STATUS UPDATE to an already-tracked WO (e.g. someone
+        # closing out a breakdown that belongs to a different shift) still
+        # flows through -- OOS/RTS state is shared infrastructure, not
+        # shift-exclusive; only *starting* new tracking is ownership-gated.
+        breakdown_updates=v3_breakdown.sync(db,all_rows,selected,shift_id,
+                                            allowed_new_wos={r["wo_number"] for r in rows})
+        records,stats=select_records(rows,selected,*window,trust_attribution=True)
+        # Cross-shift completion credit must be unique across the database --
+        # the ownership engine above already decides which ONE shift a WO
+        # belongs to, but a stale concurrent upload on another shift could
+        # still have beaten this one to the punch. Block rather than silently
+        # double-credit or overwrite the other shift's record.
+        completed_wos={r["wo_number"] for r in records if r["kind"] in ("pm","happening")}
+        cross_shift=[]
+        if completed_wos:
+            placeholders=",".join("?" for _ in completed_wos)
+            with db._conn() as c:
+                cross_shift=c.execute(f"""
+                    SELECT DISTINCT wo_number,shift_id FROM pm_wos
+                    WHERE shift_id<>? AND wo_number IN ({placeholders})
+                    UNION
+                    SELECT DISTINCT wo_number,shift_id FROM entries
+                    WHERE shift_id<>? AND excluded=0 AND wo_number IN ({placeholders})
+                """,(shift_id,*sorted(completed_wos),shift_id,*sorted(completed_wos))).fetchall()
+        if cross_shift:
+            labels=", ".join(f"WO {r['wo_number']} (shift #{r['shift_id']})" for r in cross_shift[:8])
+            return render(request,shift,
+                warning="Import blocked to prevent double-credit across shifts: "+labels+
+                        (f" and {len(cross_shift)-8} more" if len(cross_shift)>8 else "")+
+                        ". Review the existing shift's WO before retrying.",
+                staged={"token":token,"filename":batch["filename"],
+                        "counts":technician_counts(rows),"total_rows":len(rows)})
         # Persist WHICH WOs were excluded/ambiguous, with their close time and
         # reason, not just an aggregate count -- an MST couldn't previously
         # see or act on anything beyond "N skipped". Hits overnight shifts
@@ -1044,7 +1119,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         if stats.get("ambiguous_shift"):
             skipped_parts.append(f"{stats['ambiguous_shift']} flagged for MST review (timestamps don't clearly establish the shift)")
         if split_pending:
-            skipped_parts.append(f"{len(split_pending)} need an explicit S4/S5 ownership call (ambiguous close time)")
+            skipped_parts.append(f"{len(split_pending)} need an explicit shift ownership call (see Needs Review)")
         if skipped_parts:
             notice += " Skipped " + " and ".join(skipped_parts) + " (not counted as happenings -- see Needs Review for details)."
         if breakdown_updates:
