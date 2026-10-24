@@ -22,7 +22,7 @@ try {
         if (-not (Test-Path -LiteralPath $DatabaseFile)) { throw "Database path does not exist: $DatabaseFile" }
         $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
         $backup = "$DatabaseFile.pre-v3-$stamp.bak"
-        Copy-Item -LiteralPath $DatabaseFile -Destination $backup -ErrorAction Stop
+        # SQLite online backup is consistent even if the V3 service is running.\n        python -c "import sqlite3,sys; src=sqlite3.connect(sys.argv[1]); dst=sqlite3.connect(sys.argv[2]); src.backup(dst); dst.close(); src.close()" $DatabaseFile $backup\n        if ($LASTEXITCODE -ne 0) { throw "SQLite backup failed." }
         Write-Host "Database backup created: $backup"
     }
 
