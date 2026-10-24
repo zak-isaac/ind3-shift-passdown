@@ -96,7 +96,7 @@ def technician_counts(rows: list[dict]) -> list[dict]:
 
 
 def select_records(rows: list[dict], selected: set[str], start: datetime, end: datetime):
-    """Include every Closed non-PM work order; route only PMs to the PM summary."""
+    """Select Completed/Closed work; caller must first authorize ambiguous ownership and Completed non-PM work."""
     summary = Counter()
     eligible = []
     for r in rows:
@@ -110,7 +110,7 @@ def select_records(rows: list[dict], selected: set[str], start: datetime, end: d
             summary["breakdown_in_process"] += 1
             eligible.append({**r, "kind": "oos"})
             continue
-        if status != "closed" and not (category == "breakdown" and status == "completed"):
+        if status not in ("closed", "completed"):
             summary["not_closed"] += 1
             continue
         if category in {"preventive maintenance", "preventative maintenance"}:
