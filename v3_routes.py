@@ -282,6 +282,17 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                   reviewed_by TEXT NOT NULL DEFAULT '',
                   reviewed_at TEXT NOT NULL DEFAULT ''
                 );
+                CREATE TABLE IF NOT EXISTS v3_wo_review_audit (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  wo_number TEXT NOT NULL,
+                  review_shift_id INTEGER NOT NULL,
+                  owner_shift TEXT NOT NULL,
+                  decision TEXT NOT NULL,
+                  verified INTEGER NOT NULL,
+                  rts INTEGER NOT NULL,
+                  reviewed_by TEXT NOT NULL,
+                  reviewed_at TEXT NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS v3_pm_tracking (
                   shift_id INTEGER NOT NULL, wo_number TEXT NOT NULL,
                   was_preexisting INTEGER NOT NULL DEFAULT 0,
@@ -782,6 +793,12 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                         owner_shift=excluded.owner_shift,decision=excluded.decision,
                         verified=excluded.verified,rts=excluded.rts,
                         reviewed_by=excluded.reviewed_by,reviewed_at=excluded.reviewed_at""",
+                        (wo,shift_id,owner,action,int(verified),int(rts),str(reviewed_by),
+                         datetime.now(timezone.utc).isoformat()))
+                with db._conn() as c:
+                    c.execute("""INSERT INTO v3_wo_review_audit
+                        (wo_number,review_shift_id,owner_shift,decision,verified,rts,reviewed_by,reviewed_at)
+                        VALUES (?,?,?,?,?,?,?,?)""",
                         (wo,shift_id,owner,action,int(verified),int(rts),str(reviewed_by),
                          datetime.now(timezone.utc).isoformat()))
                 saved[wo]={"owner_shift":owner,"decision":action,"verified":int(verified),"rts":int(rts)}
