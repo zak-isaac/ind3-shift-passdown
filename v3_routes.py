@@ -784,6 +784,22 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                     or (str(r.get("status","")).strip().casefold()=="in process"
                         and str(r.get("rfr","")).strip().casefold()=="breakdown")]
         records,stats=select_records(attributed,selected,*window)
+        # Retain the full WO's technician remarks even when a previous-shift
+        # contributor is not selected for completion credit.
+        all_remarks={}
+        for source_row in rows:
+            wo=source_row.get("wo_number")
+            remark=str(source_row.get("remarks") or "").strip()
+            if wo and remark:
+                bucket=all_remarks.setdefault(wo,[])
+                if remark not in bucket:
+                    bucket.append(remark)
+        first_for_wo=set()
+        for record in records:
+            wo=record["wo_number"]
+            if record["kind"]=="happening" and wo not in first_for_wo:
+                record["remarks_list"]=all_remarks.get(wo,record["remarks_list"])
+                first_for_wo.add(wo)
         v3_breakdown.sync(db,rows,selected,shift_id)
         for item in planned:
             review=saved.get(item["wo_number"]) or {}
