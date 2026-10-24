@@ -47,78 +47,141 @@ def _owners(items, field, day, confirmed):
         for r in items)) for v in values} if values else set()
 
 
-def assign(rows, selected_split, shift_code, shift_day, decisions=None,
-           confirmed_s5_techs=None):
-    """Credit a completed WO to one shift using actual technician work evidence.
+def _windows(when):
+    """Return all scheduled shift/date pairs covering a work timestamp."""
+    found = []
+    for day in (when.date() - timedelta(days=1), when.date()):
+        if day.weekday() < 4:
+            spec = (("S1", time(5, 30), time(16), False),
+                    ("S2", time(12), time(22, 30), False),
+                    ("S3", time(20, 30), time(7), True))
+        else:
+            spec = (("S4", time(5, 30), time(18), False),
+                    ("S5", time(17, 30), time(6), True))
+        for shift, start, end, overnight in spec:
+            a = datetime.combine(day, start)
+            b = datetime.combine(day + timedelta(days=1) if overnight else day, end)
+            if a <= when < b:
+                found.append((shift, day.isoformat()))
+    return found
 
-    Precedence: labor start + equipment In Service, then either available
-    work timestamp with cross-checks against WO opening/completion, then
-    manual review. WO close is never allowed to override clear work times.
+
+def _resolve(when, tech, work_history, roster_shifts):
+    options = _windows(when)
+    if len(options) == 1:
+        return options[0]
+    if not options:
+        return None
+    # Explicit, shift-date-scoped roster takes precedence in overlaps.
+    roster = roster_shifts.get((tech, when.date().isoformat()))
+    if roster is None:
+        roster = roster_shifts.get(tech)
+    if roster:
+        hits = [o for o in options if o[0] == roster or o == roster]
+        if len(hits) == 1:
+            return hits[0]
+    # An earlier unambiguous work start by the same technician is evidence
+    # of their continuing shift, not proof of an unrecorded handover.
+    previous = [(dt, pair) for dt, pair in work_history.get(tech, [])
+                if dt < when and when - dt <= timedelta(hours=8) and pair in options]
+    if previous:
+        return max(previous, key=lambda x: x[0])[1]
+    return None
+
+
+def assign(rows, selected_split, shift_code, shift_day, decisions=None,
+           confirmed_s5_techs=None, roster_shifts=None):
+    """Select completed WOs for one S1-S5 shift, using technician work evidence.
+
+    A technician's confirmed shift and nearby unambiguous labor start resolve
+    overlaps. A later administrative WO close never transfers work ownership.
     """
-    if shift_code not in ("S4", "S5") or not selected_split:
+    if shift_code not in ("S1", "S2", "S3", "S4", "S5") or not selected_split:
         return rows, []
-    decisions = decisions or {}
+    day = shift_day.isoformat() if isinstance(shift_day, date) else str(shift_day)
     selected = set(selected_split)
-    confirmed = set(confirmed_s5_techs or ())
+    decisions = decisions or {}
+    roster_shifts = roster_shifts or {}
+    history = defaultdict(list)
     by_wo = defaultdict(list)
-    for row in rows:
-        status = str(row.get("status", "")).strip().casefold()
-        if row.get("tech_name") in selected and status in ("closed", "completed"):
-            by_wo[str(row.get("wo_number", ""))].append(row)
+    for r in rows:
+        tech = r.get("tech_name", "")
+        when = parse_close(r.get("start_at"))
+        if when and len(_windows(when)) == 1:
+            history[tech].append((when, _windows(when)[0]))
+        if tech in selected and str(r.get("status", "")).strip().casefold() in ("closed", "completed"):
+            by_wo[str(r.get("wo_number", ""))].append(r)
     ownership = {}
     pending = []
     for wo, items in by_wo.items():
-        start = _owners(items, "start_at", shift_day, confirmed)
-        service = _owners(items, "in_service_at", shift_day, confirmed)
-        opened = _owners(items, "opened_at", shift_day, confirmed)
-        closed = _owners(items, "closed_at", shift_day, confirmed)
-        last_complete = _owners(items, "last_complete_at", shift_day, confirmed)
+        starts = []
+        ambiguous = False
+        for r in items:
+            dt = parse_close(r.get("start_at"))
+            if dt:
+                label = _resolve(dt, r.get("tech_name", ""), history, roster_shifts)
+                if label:
+                    starts.append((dt, r.get("tech_name", ""), label))
+                else:
+                    ambiguous = True
         owner = None
         reason = ""
-        source = ""
-        # Multiple labor rows can have different timestamps; agreement on
-        # owning shift is sufficient, but cross-shift evidence needs review.
-        if len(start) > 1 or len(service) > 1 or (start and service and start != service):
-            reason = "Technician work or equipment return spans shifts"
-        elif start and None not in start and len(start) == 1:
-            candidate = next(iter(start))
-            if service and (None in service or service != start):
-                reason = "Equipment return conflicts with technician start"
-            elif not service and closed and closed != start:
-                reason = "No return time; administrative closure differs from work shift"
+        if starts and not ambiguous:
+            shifts = {x[2] for x in starts}
+            if len(shifts) == 1:
+                owner = starts[0][2]
+            elif len({x[1] for x in starts}) > 1:
+                # Distinct technician handover: latest labor start owns finish.
+                owner = max(starts, key=lambda x: x[0])[2]
             else:
-                owner, source = candidate, "Technician Start Date + In Service" if service else "Technician Start Date"
-        elif service and None not in service and len(service) == 1:
-            candidate = next(iter(service))
-            if opened and None not in opened and opened != service:
-                reason = "No technician start; WO opened on another shift"
-            else:
-                owner, source = candidate, "In Service Date / Time"
-        elif start or service:
-            reason = "Work timestamp outside configured shift or unconfirmed S5 grace"
-        elif opened and len(opened) == 1 and None not in opened and closed and opened == closed:
-            # Opening time alone is not evidence that a technician finished
-            # the repair. Require MST review even if administrative times agree.
-            reason = "Only WO opened and administrative close times available"
+                reason = "Same technician worked across shifts; confirm finish owner"
+        elif ambiguous:
+            reason = "Overlapping technician start without confirmed shift evidence"
         else:
-            reason = "Missing technician work and equipment return times"
-        if owner is None and decisions.get(wo) in ("S4", "S5"):
-            owner, source = decisions[wo], "MST ownership decision"
-        if owner is None:
-            pending.append({
-                "wo_number": wo,
-                "asset_id": items[0].get("asset_id", ""),
-                "closed_at": items[0].get("closed_at") or items[0].get("in_service_at") or "",
-                "time_source": source or "Technician / In Service / Opened / Closed",
-                "technicians": ", ".join(sorted({r.get("tech_name", "") for r in items})),
-                "reason": reason,
-            })
+            labels = [_resolve(parse_close(r.get("in_service_at")), r.get("tech_name", ""),
+                               history, roster_shifts)
+                      for r in items if parse_close(r.get("in_service_at"))]
+            labels = [v for v in labels if v]
+            if len(set(labels)) == 1:
+                owner = labels[0]
+            else:
+                reason = "Missing or conflicting work-start and in-service evidence"
+        # A recorded equipment return during the technician's scheduled
+        # shift (including S3/S4 overlap) does not transfer ownership.
+        if owner:
+            for r in items:
+                service = parse_close(r.get("in_service_at"))
+                if service and owner not in _windows(service):
+                    owner = None
+                    reason = "Equipment returned outside technician's owning shift"
+                    break
+        override = decisions.get(wo)
+        if override:
+            if isinstance(override, (tuple, list)) and len(override) == 2:
+                owner = tuple(override)
+            elif isinstance(override, str):
+                candidates = [(s, d) for r in items for field in
+                              ("start_at", "in_service_at", "opened_at")
+                              for dt in [parse_close(r.get(field))] if dt
+                              for s, d in _windows(dt) if s == override]
+                if candidates:
+                    owner = candidates[0]
         ownership[wo] = owner
-    accepted = []
-    for row in rows:
-        wo = str(row.get("wo_number", ""))
-        if row.get("tech_name") not in selected or wo not in by_wo:
-            accepted.append(row)
-        elif ownership.get(wo) == shift_code:
-            accepted.append(row)
+        if owner is None:
+            # Do not ask S4 MST to review an S3 WO whose technician was not
+            # selected for S4. For genuinely ambiguous selected labor, review.
+            evidence = [parse_close(r.get(k)) for r in items for k in
+                        ("start_at", "in_service_at", "opened_at")]
+            relevant = any((shift_code, day) in _windows(dt) for dt in evidence if dt)
+            if relevant:
+                pending.append({
+                    "wo_number": wo, "asset_id": items[0].get("asset_id", ""),
+                    "closed_at": items[0].get("closed_at") or "",
+                    "time_source": "Technician Start / In Service / Roster",
+                    "technicians": ", ".join(sorted({r.get("tech_name", "") for r in items})),
+                    "reason": reason,
+                })
+    accepted = [r for r in rows if r.get("tech_name") in selected and
+                (str(r.get("status", "")).strip().casefold() not in ("closed", "completed")
+                 or ownership.get(str(r.get("wo_number", ""))) == (shift_code, day))]
     return accepted, pending
