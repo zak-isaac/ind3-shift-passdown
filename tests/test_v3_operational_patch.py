@@ -41,6 +41,19 @@ def test_parser_reads_actual_wo_close_column():
     assert row["closed_at"]=="2026-10-22T20:00:00"
     assert row["reported_issue"]=="Guide stuck"
 
+def test_parser_in_service_fallback_keeps_close_missing():
+    wb=Workbook(); sh=wb.active
+    sh.append(["WO Number","Asset #","WO Status","Primary RFR",
+               "Service/Repair Description","Technician","Technician Remarks",
+               "In Service Date / Time"])
+    sh.append(["101","VOIDFILL0501","Closed","Proactive Repair",
+               "Guide stuck","Tech A","Repaired",datetime(2026,10,23,22,10)])
+    buf=BytesIO(); wb.save(buf)
+    row=parse_excel(buf.getvalue())[0]
+    assert row["closed_at"]==""
+    assert row["in_service_at"]=="2026-10-23T22:10:00"
+
+
 def test_breakdown_state_tracks_same_wo_and_requires_confirmation(tmp_path):
     db.set_db_path(tmp_path/"test.db");db.init_db()
     selected={"Tech A"}
