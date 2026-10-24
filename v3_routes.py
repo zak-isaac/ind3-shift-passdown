@@ -805,9 +805,11 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             review=saved.get(item["wo_number"]) or {}
             if (item["status"]=="completed" and item["kind"]!="pm"
                     and review.get("decision")=="include" and review.get("rts")
-                    and review.get("owner_shift")==shift["shift_type"]
-                    and item["rfr"]=="breakdown"):
-                v3_breakdown.decide(db,shift_id,{item["wo_number"]:"rts"})
+                    and review.get("owner_shift")==shift["shift_type"]):
+                if item["rfr"]=="breakdown":
+                    v3_breakdown.decide(db,shift_id,{item["wo_number"]:"rts"})
+                else:
+                    v3_breakdown.confirm_other_work_rts(db,item["asset_id"],shift_id)
         split_selected=set()
         added,unchanged,pending=0,0,0
         # Use short transactions. Existing db helpers open their own connections;
