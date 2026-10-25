@@ -1,7 +1,7 @@
 """S4/S5 attribution by technician work time, not administrative WO closure.
 
 S4 owns 17:30-18:00 overlap; S5 owns 18:00-06:00, with a confirmed
-technician grace through 06:30. Ambiguous cross-shift work requires MST review.
+technician grace through 06:30. Unverifiable completion is excluded and explained by the import audit.
 """
 from __future__ import annotations
 from collections import defaultdict
@@ -97,191 +97,211 @@ def _resolve(when, tech, work_history, roster_shifts, confirmed_s5=False):
     return None
 
 
+def _person_key(name):
+    """Match 'Last, First' with 'First Last' without fuzzy name guessing."""
+    import re
+    return tuple(sorted(re.findall(r"[a-z0-9]+", str(name or "").casefold())))
+
+
+def _grace_requires_confirmation(when, owner, confirmed_tech, tech):
+    if not owner or owner[0] != "S5":
+        return False
+    day = date.fromisoformat(owner[1]) + timedelta(days=1)
+    return (datetime.combine(day, time(6)) <= when <=
+            datetime.combine(day, time(6, 30)) and tech not in confirmed_tech)
+
+
+def _choose_completion_owner(when, tech, items, history, roster_shifts, confirmed):
+    """Resolve recorded *work completion*, never an administrative close.
+
+    Overlaps retain established site policy: S4 until 18:00, S3 until
+    07:00 when S3 technician labor is documented, and confirmed S5 grace.
+    """
+    options = _windows(when)
+    options = [pair for pair in options
+               if not _grace_requires_confirmation(when, pair, confirmed, tech)]
+    if not options:
+        return None
+
+    # On the weekend evening handover, S4 retains credits through 17:59.
+    s4 = [pair for pair in options if pair[0] == "S4" and
+          when.date() == date.fromisoformat(pair[1]) and
+          time(17, 30) <= when.time() < time(18)]
+    if s4:
+        return s4[0]
+
+    # S3 gets joint work before its 07:00 boundary, provided the export
+    # actually contains an S3 technician / labor start (no inferred claim).
+    s3 = [pair for pair in options if pair[0] == "S3"]
+    if s3:
+        def has_s3_evidence(pair):
+            for r in items:
+                worker = r.get("tech_name") or ""
+                home = roster_shifts.get(worker)
+                start = parse_close(r.get("start_at"))
+                if home == "S3" and start and start <= when:
+                    return True
+                if start and start <= when and pair in _windows(start):
+                    # A unique S3 start is strong; no reliance on admin close.
+                    if len(_windows(start)) == 1:
+                        return True
+            return False
+        for pair in s3:
+            if has_s3_evidence(pair):
+                return pair
+
+    # Prefer completing technician's shift when two daypart windows overlap.
+    result = _resolve(when, tech, history, roster_shifts,
+                      confirmed_s5=tech in confirmed)
+    if result in options:
+        return result
+    if len(options) == 1:
+        return options[0]
+    return None
+
+
+def _actual_completion(items):
+    """Determine whom Cetaris says completed the WO, and at what time.
+
+    'Completed By' can describe an administrative action. Trust the WO Last
+    Complete timestamp only when that person is an actual labor participant.
+    In Service is an equipment-return fallback if consistent with the
+    participating technician's work start. Never consult WO Closed Date/Time
+    to assign a shift or assert a technician completed the repair.
+    """
+    participant_by_key = {
+        _person_key(r.get("tech_name")): r.get("tech_name")
+        for r in items if _person_key(r.get("tech_name"))
+    }
+    verified = []
+    seen = set()
+    for r in items:
+        completer_key = _person_key(r.get("completed_by"))
+        technician = participant_by_key.get(completer_key)
+        moment = parse_close(r.get("last_complete_at"))
+        if technician and moment:
+            key = ("technician_completion", technician, moment)
+            if key not in seen:
+                verified.append((moment, technician,
+                                 "WO Last Complete + matching Completed By"))
+                seen.add(key)
+    if verified:
+        # When a separate, earlier In Service event is supported by the
+        # completer's labor, it marks the real equipment return. Do not
+        # transfer that work merely because WO Last Complete equals a later
+        # administrative closure timestamp.
+        returns = []
+        for r in items:
+            if _person_key(r.get("tech_name")) != _person_key(verified[-1][1]):
+                continue
+            start = parse_close(r.get("start_at"))
+            service = parse_close(r.get("in_service_at"))
+            if service and (start is None or start <= service):
+                returns.append((service, r.get("tech_name"), "In Service + technician labor"))
+        if returns:
+            return max(returns, key=lambda p:p[0])
+        return max(verified,key=lambda p:p[0])
+
+    # Missing / mismatched Completed By is not evidence that the closer
+    # performed the work. Require an In Service timestamp compatible with
+    # labor, not one preceding the labor start (as in BALER0003 WO 27999099).
+    returns = []
+    for r in items:
+        service = parse_close(r.get("in_service_at"))
+        start = parse_close(r.get("start_at"))
+        if service and (start is None or start <= service):
+            returns.append((service,r.get("tech_name") or "", "In Service + technician labor"))
+    if returns:
+        return max(returns,key=lambda p:p[0])
+    return None
+
+
 def assign(rows, selected_split, shift_code, shift_day, decisions=None,
            confirmed_s5_techs=None, roster_shifts=None):
-    """Select completed WOs for one S1-S5 shift, using technician work evidence.
+    """Attribute finished WOs using documented technician + completion time.
 
-    A technician's confirmed shift and nearby unambiguous labor start resolve
-    overlaps. A later administrative WO close never transfers work ownership.
+    No ownership dialog or MST guesswork. Ambiguous/incomplete evidence
+    produces an ignored-WO audit reason; it cannot block valid WOs.
+    Legacy decisions are intentionally ignored: an administrative choice
+    cannot override Cetaris technician completion evidence.
     """
     if shift_code not in ("S1", "S2", "S3", "S4", "S5") or not selected_split:
         return rows, []
-    day = shift_day.isoformat() if isinstance(shift_day, date) else str(shift_day)
+    day = shift_day.isoformat() if isinstance(shift_day,date) else str(shift_day)
     selected = set(selected_split)
-    decisions = decisions or {}
     roster_shifts = roster_shifts or {}
     confirmed = set(confirmed_s5_techs or ())
     history = defaultdict(list)
     by_wo = defaultdict(list)
-    # The selected technician controls which WOs are eligible to appear.
-    # Ownership must inspect ALL labor participants on those WOs, including
-    # incoming-shift collaborators who are not selected for this passdown.
-    participating_wos = {
-        str(r.get("wo_number", "")) for r in rows
+    selected_completed = {
+        str(r.get("wo_number") or "") for r in rows
         if r.get("tech_name") in selected and
-           str(r.get("status", "")).strip().casefold() in ("closed", "completed")
+        str(r.get("status") or "").strip().casefold() in ("closed","completed")
     }
+    # Include all participants in each selected WO when deciding its owner.
     for r in rows:
-        tech = r.get("tech_name", "")
-        when = parse_close(r.get("start_at"))
-        if when and len(_windows(when)) == 1:
-            history[tech].append((when, _windows(when)[0]))
-        if (str(r.get("wo_number", "")) in participating_wos and
-            str(r.get("status", "")).strip().casefold() in ("closed", "completed")):
-            by_wo[str(r.get("wo_number", ""))].append(r)
-    ownership = {}
+        tech = str(r.get("tech_name") or "")
+        begin = parse_close(r.get("start_at"))
+        if begin and len(_windows(begin)) == 1:
+            history[tech].append((begin, _windows(begin)[0]))
+        if (str(r.get("wo_number") or "") in selected_completed and
+            str(r.get("status") or "").strip().casefold() in ("closed","completed")):
+            by_wo[str(r.get("wo_number") or "")].append(r)
+
+    owners = {}
     pending = []
     for wo, items in by_wo.items():
-        starts = []
-        ambiguous = False
-        for r in items:
-            dt = parse_close(r.get("start_at"))
-            if dt:
-                label = _resolve(dt, r.get("tech_name", ""), history, roster_shifts,
-                                 confirmed_s5=r.get("tech_name", "") in confirmed)
-                if label:
-                    starts.append((dt, r.get("tech_name", ""), label))
-                else:
-                    ambiguous = True
+        evidence = _actual_completion(items)
         owner = None
-        reason = ""
-        if starts and not ambiguous:
-            shifts = {x[2] for x in starts}
-            if len(shifts) == 1:
-                owner = starts[0][2]
-            elif len({x[1] for x in starts}) > 1:
-                # Distinct technician handover: latest labor start owns finish.
-                owner = max(starts, key=lambda x: x[0])[2]
-            else:
-                reason = "Same technician worked across shifts; confirm finish owner"
-        elif ambiguous:
-            reason = "Overlapping technician start without confirmed shift evidence"
-        else:
-            # Cetaris can have a recorded WO Last Complete timestamp without
-            # an In Service timestamp or a fresh labor Start Date. This is
-            # completion evidence, not delayed administrative WO closure.
-            labels = [
-                _resolve(finished, r.get("tech_name", ""), history, roster_shifts,
-                         confirmed_s5=r.get("tech_name", "") in confirmed)
-                for r in items
-                for finished in [parse_close(r.get("in_service_at")) or
-                                 parse_close(r.get("last_complete_at"))]
-                if finished
-            ]
-            labels = [v for v in labels if v]
-            if len(set(labels)) == 1:
-                owner = labels[0]
-            else:
-                reason = "Missing or conflicting work-start and in-service evidence"
-        # Shared S3 work completed before the 07:00 boundary belongs to S3,
-        # even if an arriving S1/S4 technician has the latest labor start.
-        # Require actual return/completion evidence instead of guessing from
-        # an administratively delayed WO close.
-        finish_times = [
-            parse_close(r.get("in_service_at")) or parse_close(r.get("last_complete_at"))
-            for r in items
-        ]
-        final_times = [value for value in finish_times if value]
-        final_work_time = max(final_times) if final_times else None
-        if owner is None and final_work_time and _windows(final_work_time):
-            reason = ("Recorded completion needs shift-owner review because "
-                      "the technician's work-start shift is ambiguous")
-        participant_shifts = {pair for _, _, pair in starts}
-        s3_pairs = [pair for pair in participant_shifts if pair[0] == "S3"]
-        s3_priority = False
-        incoming_pairs = [pair for pair in participant_shifts if pair[0] in ("S1", "S4")]
-        if s3_pairs and incoming_pairs:
-            s3_pair = s3_pairs[0]
-            s3_day = date.fromisoformat(s3_pair[1])
-            end_s3 = datetime.combine(s3_day + timedelta(days=1), time(7))
-            if final_work_time is None:
+        if evidence:
+            when, completing_tech, source = evidence
+            owner = _choose_completion_owner(
+                when, completing_tech, items, history, roster_shifts, confirmed)
+            if owner is None:
+                reason = "Completion timestamp falls in overlapping shifts without reliable technician shift evidence"
+            elif _grace_requires_confirmation(when, owner, confirmed, completing_tech):
                 owner = None
-                reason = "Shared S3 work needs a recorded completion or In Service time"
-            elif final_work_time < end_s3 and s3_pair in _windows(final_work_time):
-                owner = s3_pair
-                s3_priority = True
-            # After 07:00 the later-shift attribution remains subject to
-            # technician evidence and the normal conflict checks.
-
-        # For S4/S5, equipment actually returned after 18:00 belongs to S5
-        # even if its technician began the WO during S4. Finishing during
-        # the S4 overlap before 18:00 remains S4 work.
-        s4_pairs = [pair for pair in participant_shifts if pair[0] == "S4"]
-        if final_work_time and s4_pairs and not s3_priority:
-            candidates = _windows(final_work_time)
-            s5_candidates = [pair for pair in candidates if pair[0] == "S5"]
-            if s5_candidates and not any(pair in candidates for pair in s4_pairs):
-                owner = s5_candidates[0]
-            elif any(pair in candidates for pair in s4_pairs):
-                # S4 has priority until 18:00 in the shared evening window.
-                owner = next(pair for pair in s4_pairs if pair in candidates)
-        # Never silently assign an older work-start shift when recorded
-        # completion is in a different shift. Such cross-date WOs require
-        # an explicit MST owner decision, rather than disappearing on S5.
-        if owner and final_work_time and owner not in _windows(final_work_time):
-            owner = None
-            reason = "Work began on another shift; recorded completion needs shift-owner review"
-        # A recorded equipment return during the technician's scheduled
-        # shift (including S3/S4 overlap) does not transfer ownership.
-        if owner:
-            for r in items:
-                service = parse_close(r.get("in_service_at"))
-                if service and owner not in _windows(service) and not (
-                    owner[0] == "S5" and r.get("tech_name") in confirmed and
-                    datetime.combine(date.fromisoformat(owner[1]) + timedelta(days=1), time(6)) <= service <=
-                    datetime.combine(date.fromisoformat(owner[1]) + timedelta(days=1), time(6, 30))
-                ):
-                    owner = None
-                    reason = "Equipment returned outside technician's owning shift"
-                    break
-        override = decisions.get(wo)
-        if override:
-            if isinstance(override, (tuple, list)) and len(override) == 2:
-                owner = tuple(override)
-            elif isinstance(override, str):
-                candidates = [(s, d) for r in items for field in
-                              ("start_at", "in_service_at", "last_complete_at", "opened_at")
-                              for dt in [parse_close(r.get(field))] if dt
-                              for s, d in _windows(dt) if s == override]
-                if candidates:
-                    owner = candidates[0]
-        ownership[wo] = owner
+                reason = "S5 completion during grace requires confirmed S5 technician"
+            else:
+                reason = ""
+        else:
+            reason = ("No verified technician completion timestamp. "
+                      "Administrative WO closure and a different Completed By person do not establish ownership")
+            source = "None"
+        owners[wo] = owner
         if owner is None:
-            # Do not ask S4 MST to review an S3 WO whose technician was not
-            # selected for S4. For genuinely ambiguous selected labor, review.
-            evidence = [parse_close(r.get(k)) for r in items for k in
-                        ("start_at", "in_service_at", "last_complete_at", "opened_at")]
-            relevant = any((shift_code, day) in _windows(dt) for dt in evidence if dt)
-            if not any(evidence):
-                # A selected completed WO with no timing evidence must never
-                # disappear silently; MST confirms its ownership.
-                relevant = True
-            if shift_code == "S5" and any(r.get("tech_name") in confirmed for r in items):
-                relevant = relevant or any(
-                    datetime.combine(date.fromisoformat(day) + timedelta(days=1), time(6)) <= dt <=
-                    datetime.combine(date.fromisoformat(day) + timedelta(days=1), time(6, 30))
-                    for dt in evidence if dt)
+            # List only WOs plausibly relevant to the current shift; other
+            # shifts' WOs are still visible in the general audit after import.
+            times = [parse_close(r.get(f)) for r in items for f in
+                     ("start_at","in_service_at","last_complete_at")]
+            relevant = (not any(times) or
+                        any((shift_code,day) in _windows(t) for t in times if t))
             if relevant:
                 pending.append({
-                    "wo_number": wo, "asset_id": items[0].get("asset_id", ""),
-                    "closed_at": items[0].get("closed_at") or "",
-                    "time_source": "Technician Start / In Service / Roster",
-                    "technicians": ", ".join(sorted({r.get("tech_name", "") for r in items})),
-                    "reason": reason,
+                    "wo_number":wo, "asset_id":items[0].get("asset_id",""),
+                    "closed_at":items[0].get("closed_at") or "",
+                    "time_source":source,
+                    "technicians":", ".join(sorted({r.get("tech_name","") for r in items})),
+                    "completed_by":", ".join(sorted({r.get("completed_by","") for r in items
+                                                  if r.get("completed_by")})),
+                    "reason":reason,
                 })
+
     accepted = []
     for r in rows:
-        if r.get("tech_name") not in selected:
+        tech = r.get("tech_name")
+        if tech not in selected:
             continue
-        status = str(r.get("status", "")).strip().casefold()
-        if status in ("closed", "completed"):
-            if ownership.get(str(r.get("wo_number", ""))) == (shift_code, day):
+        wo = str(r.get("wo_number") or "")
+        status = str(r.get("status") or "").strip().casefold()
+        if status in ("closed","completed"):
+            if owners.get(wo) == (shift_code, day):
                 accepted.append(r)
-        else:
-            # OOS is shift-specific too; a breakdown opened by another shift
-            # must not leak into the active shift's status tracking.
+        elif status == "in process":
+            # Breakdown OOS retains start-time ownership, because an active
+            # breakdown naturally has no completion timestamp yet.
             when = parse_close(r.get("start_at")) or parse_close(r.get("opened_at"))
-            if when and _resolve(when, r.get("tech_name", ""), history, roster_shifts,
-                                 confirmed_s5=r.get("tech_name", "") in confirmed) == (shift_code, day):
+            if when and _resolve(when,tech,history,roster_shifts,
+                                 confirmed_s5=tech in confirmed) == (shift_code, day):
                 accepted.append(r)
     return accepted, pending
