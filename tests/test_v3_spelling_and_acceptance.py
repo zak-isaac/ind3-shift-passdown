@@ -39,6 +39,18 @@ def test_shared_s3_s4_finish_before_0700_credits_s3_once():
     assert assign(rows,selected,"S4","2026-10-23",roster_shifts=roster)==([],[])
 
 
+def test_incoming_shift_selection_cannot_steal_shared_s3_wo():
+    rows = [
+        wo("28025284", "Tech S3", "2026-10-23T06:05:00", "2026-10-23T06:53:00"),
+        wo("28025284", "Tech S4", "2026-10-23T06:15:00", "2026-10-23T06:53:00"),
+    ]
+    roster = {"Tech S3": "S3", "Tech S4": "S4"}
+    # S4 MST selects only their own team, but the full Cetaris file still
+    # contains the collaborating S3 labor; S4 may not claim the same WO.
+    assert assign(rows,{"Tech S4"},"S4","2026-10-23",roster_shifts=roster)==([],[])
+    assert assign(rows,{"Tech S3"},"S3","2026-10-22",roster_shifts=roster)==([rows[0]],[])
+
+
 def test_shared_s3_s1_finishes_before_0700_credits_s3():
     rows = [
         wo("28025280", "Tech S3", "2026-10-20T06:05:00", "2026-10-20T06:35:00"),
