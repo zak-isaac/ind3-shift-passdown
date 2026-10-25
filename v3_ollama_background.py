@@ -147,37 +147,6 @@ def _verify(source: list[str], result: str) -> tuple[bool, str]:
     )
     if any(re.search(pattern, result, re.I) for pattern in _instruction_leaks):
         return False, "AI instruction or duplicate-analysis text leaked into technician remarks"
-    # Besides missing source details, reject *new* substantial words. Allow
-    # grammatical connectors, spelling corrections and minor tense shifts,
-    # but never add unrecorded operations, components, faults or outcomes.
-    def _normalized_words(value: str) -> set[str]:
-        value = proofread(value).casefold()
-        words = re.findall(r"[a-z]{3,}", value)
-        def stem(word: str) -> str:
-            if len(word) > 5 and word.endswith("ing"):
-                word = word[:-3]
-            elif len(word) > 4 and word.endswith("ed"):
-                word = word[:-2]
-            elif len(word) > 4 and word.endswith("es"):
-                word = word[:-2]
-            elif len(word) > 4 and word.endswith("s"):
-                word = word[:-1]
-            return word
-        return {stem(w) for w in words}
-    source_terms = _normalized_words(src)
-    result_terms = _normalized_words(result)
-    _grammar = {
-        "the","and","are","was","were","its","has","had","have","with",
-        "for","from","that","this","then","into","onto","each","both",
-        "after","before","also","when","while","using","used","which",
-        "where","over","under","upon","been","being","their","there",
-    }
-    extra_terms = result_terms - source_terms - _normalized_words(" ".join(_grammar))
-    # "remains active" is an allowable rewording of source "active".
-    if "activ" in source_terms:
-        extra_terms.discard("remain")
-    if extra_terms:
-        return False, "AI introduced unsupported words: " + ", ".join(sorted(extra_terms)[:12])
     missing = _technical_tokens(src) - _technical_tokens(result)
     if missing:
         return False, "Missing technical tokens: " + ", ".join(sorted(missing))
@@ -215,6 +184,37 @@ def _verify(source: list[str], result: str) -> tuple[bool, str]:
         note_facts = facts(note)
         if note_facts and len(note_facts & out_facts) < max(1, (len(note_facts)*3+3)//4):
             return False, "Distinct technician source remark may be missing"
+    # Besides missing source details, reject *new* substantial words. Allow
+    # grammatical connectors, spelling corrections and minor tense shifts,
+    # but never add unrecorded operations, components, faults or outcomes.
+    def _normalized_words(value: str) -> set[str]:
+        value = proofread(value).casefold()
+        words = re.findall(r"[a-z]{3,}", value)
+        def stem(word: str) -> str:
+            if len(word) > 5 and word.endswith("ing"):
+                word = word[:-3]
+            elif len(word) > 4 and word.endswith("ed"):
+                word = word[:-2]
+            elif len(word) > 4 and word.endswith("es"):
+                word = word[:-2]
+            elif len(word) > 4 and word.endswith("s"):
+                word = word[:-1]
+            return word
+        return {stem(w) for w in words}
+    source_terms = _normalized_words(src)
+    result_terms = _normalized_words(result)
+    _grammar = {
+        "the","and","are","was","were","its","has","had","have","with",
+        "for","from","that","this","then","into","onto","each","both",
+        "after","before","also","when","while","using","used","which",
+        "where","over","under","upon","been","being","their","there",
+    }
+    extra_terms = result_terms - source_terms - _normalized_words(" ".join(_grammar))
+    # "remains active" is an allowable rewording of source "active".
+    if "active" in source_terms:
+        extra_terms.discard("remain")
+    if extra_terms:
+        return False, "AI introduced unsupported words: " + ", ".join(sorted(extra_terms)[:12])
     return True, "Automatic source validation passed"
 
 
