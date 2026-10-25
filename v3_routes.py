@@ -11,7 +11,7 @@ import secrets
 import time
 from datetime import date, datetime, timedelta, timezone
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 
 import db
 import v3_breakdown
@@ -920,6 +920,23 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             notice += " Skipped " + " and ".join(skipped_parts) + " (not counted as happenings)."
         from urllib.parse import quote
         return RedirectResponse(f"/v3?shift_id={shift_id}&notice={quote(notice)}",status_code=303)
+
+    @router.post("/spelling/preview")
+    async def preview_spelling(request:Request,shift_id:int=Form(...),text:str=Form("")):
+        """Preview deterministic corrections. Never save Cetaris source or MST edits."""
+        secure(request,shift_id)
+        if len(text)>12000:
+            raise HTTPException(413,"Text is too long for spelling review.")
+        from spelling_fix import correct_spelling
+        from text_normalize import fix_punctuation_spacing, fix_sentence_capitalization
+        import re
+        suggestion=fix_sentence_capitalization(fix_punctuation_spacing(correct_spelling(text)))
+        # Only capitalize a sentence-opening lowercase word; leave acronyms
+        # and identifiers alone, and never alter technicians' recorded facts.
+        suggestion=re.sub(r"^(\\s*)([a-z])",
+                          lambda m:m.group(1)+m.group(2).upper(),suggestion)
+        return JSONResponse({"original":text,"suggested":suggestion,
+                             "changed":suggestion!=text})
 
     @router.get("/happening/{entry_id}",response_class=HTMLResponse)
     async def view_happening(request:Request,entry_id:int,shift_id:int):
