@@ -102,6 +102,7 @@ def select_records(rows: list[dict], selected: set[str], start: datetime, end: d
     closure_reviews = closure_reviews or {}
     summary = Counter()
     eligible = []
+    reminder_wos = set()
     for r in rows:
         if r["tech_name"] not in selected:
             continue
@@ -118,11 +119,15 @@ def select_records(rows: list[dict], selected: set[str], start: datetime, end: d
             # into passdown as a closure reminder, never as a completed PM.
             summary["completed_unclosed"] += 1
             if closure_reviews.get(r["wo_number"]) == "add":
+                first_reminder = r["wo_number"] not in reminder_wos
                 reminder = "Reminder: Please close this WO in Cetaris before the shift ends."
                 note = r["remarks"].strip()
+                if first_reminder:
+                    reminder_wos.add(r["wo_number"])
+                    note = (note + "; " if note else "") + reminder
+                    summary["closure_reminders"] += 1
                 eligible.append({**r, "kind": "happening", "closure_reminder": True,
-                                 "remarks": (note + "; " if note else "") + reminder})
-                summary["closure_reminders"] += 1
+                                 "remarks": note})
             continue
         if status != "closed":
             summary["not_closed"] += 1
