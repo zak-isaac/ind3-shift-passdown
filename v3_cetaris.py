@@ -100,6 +100,11 @@ def select_records(rows: list[dict], selected: set[str], start: datetime, end: d
                    closure_reviews: dict[str, str] | None = None):
     """Count Closed WOs only. Include Completed WOs as closure reminders if MST opts in."""
     closure_reviews = closure_reviews or {}
+    # Cetaris sometimes repeats a WO across labor rows. A confirmed Closed
+    # status for that WO takes precedence over a stale Completed labor row.
+    closed_wos = {r["wo_number"] for r in rows
+                  if r.get("tech_name") in selected and
+                  str(r.get("status","")).strip().casefold() == "closed"}
     summary = Counter()
     eligible = []
     reminder_wos = set()
@@ -109,6 +114,8 @@ def select_records(rows: list[dict], selected: set[str], start: datetime, end: d
         summary["selected_rows"] += 1
         # Labor Start Date is not a WO eligibility boundary.
         status = r["status"].strip().casefold()
+        if status == "completed" and r["wo_number"] in closed_wos:
+            status = "closed"
         category = r["rfr"].strip().casefold()
         if category == "breakdown" and status == "in process":
             summary["breakdown_in_process"] += 1
