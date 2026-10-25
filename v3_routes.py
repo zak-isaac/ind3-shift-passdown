@@ -1008,9 +1008,20 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             return min(active)[2] if active else None
 
         completed_wos={r["wo_number"] for r in records}
+        # Include scheduled shifts even if their MST has not started a
+        # workspace yet. Otherwise import order would change the winner.
         with db._conn() as c:
             other_shifts=[dict(x) for x in c.execute(
                 "SELECT id,shift_type,date FROM shifts WHERE id<>?",(shift_id,)).fetchall()]
+        known={(x["shift_type"],x["date"]) for x in other_shifts}
+        day=date.fromisoformat(shift["date"])
+        scheduled_types={"S1":{0,1,2,3},"S2":{0,1,2,3},
+                         "S3":{0,1,2,3},"S4":{4,5,6},"S5":{4,5,6}}
+        for d in (day-timedelta(days=1),day,day+timedelta(days=1)):
+            for code,weekdays in scheduled_types.items():
+                if d.weekday() in weekdays and (code,d.isoformat()) not in known:
+                    other_shifts.append({"id":-(100+len(other_shifts)),
+                                         "shift_type":code,"date":d.isoformat()})
         shift_info={"id":shift_id,"shift_type":shift["shift_type"],"date":shift["date"]}
         owner_by_wo={}
         for r in records:
