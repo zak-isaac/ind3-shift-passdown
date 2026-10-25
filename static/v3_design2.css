@@ -107,3 +107,9 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
 .d2-resume-form small { display:block; margin-top:4px; font-size:12px; color:#5c6e88; }
 .d2-choose-divider { margin-top: 25px; padding-top: 18px; border-top: 1px solid #e0e8f2; font-size: 14px; font-weight: 700; }
 .d2-choose-signout { margin-top: 20px; display: block; font-size: 12px; text-align: center; color: #0053e2; }
+
+/* V3 opt-in spelling review, no automatic rewrites. */
+.v3-spelling-trigger{display:inline-flex;margin:6px 0 8px;padding:6px 10px;font-size:11px}
+.v3-spelling-suggestion{margin:7px 0 14px;padding:12px;background:#f7faff;border:1px solid #cbdcf4;border-radius:8px;font-size:12px;color:#213b5f;line-height:1.5}
+.v3-spelling-suggestion p{margin:8px 0 12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.v3-spelling-suggestion button{margin:0 8px 5px 0}
