@@ -3227,6 +3227,7 @@ def _build_eml(subject: str, to_addrs: str, html_body: str) -> bytes:
     # Wrap base64 at 76 chars per RFC 2045
     wrapped = "\r\n".join(encoded[i:i+76] for i in range(0, len(encoded), 76))
     lines = [
+        "X-Unsent: 1",
         "MIME-Version: 1.0",
         f"To: {to_addrs}",
         f"Subject: {subject}",
