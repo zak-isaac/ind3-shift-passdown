@@ -73,6 +73,10 @@ def parse_excel(data: bytes) -> list[dict]:
                 "rfr": _text(get(row,"Primary RFR")),
                 "reported_issue": _text(get(row,"Service/Repair Description")),
                 "tech_name": tech,
+                # A WO's administrative closer can be a different person.
+                # Complete By is a provenance signal, not a blanket claim.
+                "completed_by": _text(get(row, "Completed By")),
+                "last_technician": _text(get(row, "Last Technician")),
                 "remarks": _text(get(row,"Technician Remarks")),
                 "start_at": started.isoformat(timespec="seconds") if started else "",
                 "opened_at": _parse_dt(get(row, "WO Date / Time")).isoformat(timespec="seconds") if _parse_dt(get(row, "WO Date / Time")) else "",
