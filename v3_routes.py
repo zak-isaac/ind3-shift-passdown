@@ -509,6 +509,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         if not source or not sel: return []
         shift=db.get_shift(shift_id)
         start,end=shift_window(shift["shift_type"],date.fromisoformat(shift["date"]))
+        end=end-timedelta(hours=1)  # Access grace is not completed-WO reporting time.
         selected=set(json.loads(sel["technicians_json"]))
         items={}
         for r in json.loads(source["rows_json"]):
@@ -969,6 +970,8 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             return render(request,shift,warning="Select at least one technician before extracting.",staged={
                 "token":token,"filename":batch["filename"],"counts":technician_counts(rows),"total_rows":len(rows)})
         window=shift_window(shift["shift_type"],date.fromisoformat(shift["date"]))
+        if window:
+            window=(window[0],window[1]-timedelta(hours=1))  # Exclude handover grace from WO credit.
         if not window:
             return render(request,shift,warning="Shift timing is not configured. Import cannot continue.")
 
