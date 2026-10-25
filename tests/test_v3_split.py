@@ -122,3 +122,10 @@ def test_s5_record_after_midnight_does_not_count_for_prior_s4():
            "last_complete_at":"2026-10-25T03:15:00"}]
     assert assign(rows,{"Tech A"},"S4","2026-10-24")==([],[])
     assert assign(rows,{"Tech A"},"S5","2026-10-24")==(rows,[])
+
+
+def test_s5_sunday_evening_continues_into_monday_morning():
+    rows=[row(wo="SUNDAY-TO-MONDAY",start="2026-10-26T03:10:00",
+              service="2026-10-26T03:40:00")]
+    assert assign(rows,{"Tech A"},"S5","2026-10-25")==(rows,[])
+    assert assign(rows,{"Tech A"},"S5","2026-10-24")==([],[])
