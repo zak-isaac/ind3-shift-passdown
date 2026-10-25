@@ -20,3 +20,17 @@ def test_ordinary_login_without_developer_mode():
     assert '/dev/login' not in main
     assert 'dev_mode_sandbox' not in main
     assert 'IND3_OLLAMA_MODEL' in (ROOT/"v3_ollama_background.py").read_text()
+
+
+def test_workshop_sidebar_restored_without_test_clock():
+    sidebar = (ROOT/"templates/v3/_sidebar.html").read_text()
+    css = (ROOT/"static/v3_design2.css").read_text()
+    assert 'id="v3-sidebar"' in sidebar
+    assert 'hx-select-oob="#v3-sidebar"' in sidebar
+    assert 'class="d2-sidebar-profile"' in sidebar
+    assert 'href="/v3/logout"' in sidebar
+    assert "sidebar_clock_state" not in sidebar
+    assert "TEST MODE" not in sidebar
+    assert ".navy-sidebar .d2-sidebar-profile" in css
+    assert ".navy-sidebar .d2-signout" in css
+    Environment().parse(sidebar)
