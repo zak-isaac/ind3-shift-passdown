@@ -165,3 +165,13 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
 .design2-shell .navy-sidebar .d2-signout:hover {
   background:#2a4d80;border-color:#4a6da0;
 }
+
+/* Actual Indianapolis date/time above Workspace navigation, not in the topbar. */
+.design2-shell .d2-sidebar-clock {
+  display:flex;flex-direction:column;gap:5px;margin:12px 13px 18px;padding:15px 12px;
+  background:#17365d;border:1px solid #315d91;border-radius:10px;color:#fff;
+}
+.design2-shell .d2-sidebar-clock time {
+  font-size:23px;font-weight:750;line-height:1.2;font-variant-numeric:tabular-nums;
+}
+.design2-shell .d2-sidebar-clock span { font-size:12px;line-height:1.4;color:#dce9fc; }
