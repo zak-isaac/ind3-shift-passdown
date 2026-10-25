@@ -328,6 +328,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             pm_rows = c.execute("SELECT * FROM pm_wos WHERE shift_id=? ORDER BY wo_number", (shift_id,)).fetchall()
             selection = c.execute("SELECT * FROM v3_shift_selection WHERE shift_id=?", (shift_id,)).fetchone()
             audit_row = c.execute("SELECT audit_json FROM v3_import_audit WHERE shift_id=?", (shift_id,)).fetchone()
+            source_row = c.execute("SELECT rows_json FROM v3_shift_source WHERE shift_id=?", (shift_id,)).fetchone()
             reminders = {r[0] for r in c.execute(
                 "SELECT wo_number FROM v3_pending_closure WHERE shift_id=? AND decision='add'",
                 (shift_id,)).fetchall()}
@@ -359,6 +360,34 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                 g["needs_closure"] = True
             if not g["cause_text"] and r["cause_text"]:
                 g["cause_text"] = r["cause_text"]
+        # Work-time source: technician-supported evidence, never the later
+        # WO Closed Date/Time or the import time. An overnight WO remains
+        # assigned to its original S3/S5 shift date.
+        source_by_wo={}
+        if source_row:
+            try:
+                for source_item in json.loads(source_row["rows_json"]):
+                    wo = str(source_item.get("wo_number") or "")
+                    if wo:
+                        source_by_wo.setdefault(wo,[]).append(source_item)
+            except (TypeError, ValueError, AttributeError):
+                pass
+        shift_date = date.fromisoformat(db.get_shift(shift_id)["date"])
+        for group in groups.values():
+            group["work_time"] = ""
+            group["work_time_label"] = ""
+            group["work_time_source"] = ""
+            group["next_day_work"] = False
+            source_items=source_by_wo.get(str(group["wo_number"] or ""),[])
+            if source_items:
+                event=v3_split._actual_completion(source_items)
+                if event:
+                    completed_at, _tech, evidence = event
+                    group["work_time"] = completed_at.isoformat(timespec="minutes")
+                    group["work_time_label"] = completed_at.strftime("%b %d, %-I:%M %p") if os.name != "nt" else completed_at.strftime("%b %d, %#I:%M %p")
+                    group["work_time_source"] = evidence
+                    group["next_day_work"] = completed_at.date() > shift_date
+
         # Match the very same source-of-truth paragraphs used by preview,
         # reports and EML, rather than listing each raw labor line separately.
         originals = {h.wo_number: h.paragraph for h in build_shift_happenings(entries, meta) if h.wo_number}
@@ -375,6 +404,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             group["display_remarks"] = (rewritten.get(wo) if group["ai_eligible"] else None) or group["original_remarks"]
             group["ai_status"] = ai_states.get(wo, {}).get("status", "")
             group["ai_approved"] = bool(ai_states.get(wo, {}).get("approved"))
+            group["ai_reason"] = ai_states.get(wo, {}).get("reason","")
         return {
             "happenings": list(groups.values()),
             "pm_wos": [dict(p) for p in pm_rows],
@@ -384,6 +414,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             "imported_filename": selection["filename"] if selection else "",
             "import_audit": json.loads(audit_row["audit_json"]) if audit_row else None,
             "imported_at": selection["imported_at"] if selection else "",
+            "ai_enabled": ollama_drafts.enabled(),
             "pending_breakdowns": v3_breakdown.pending(db),
         }
 
