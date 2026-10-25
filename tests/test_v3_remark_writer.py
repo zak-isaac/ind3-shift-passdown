@@ -46,3 +46,35 @@ def test_same_tech_separate_labor_lines_supported():
                     "blue light 5ft braking 3ft plugging 5ft"])
     assert d.mode == "rule:wheels-and-measurements"
     assert "3 ft" in d.text
+
+
+def test_alias_equivalence_across_two_techs():
+    d = rewrite_wo(["Motor Brush clean up", "Cleaned the motor brush."])
+    assert d.text == "Cleaned the motor brush."
+    assert not d.requires_review
+
+
+def test_paraphrased_paper_adjustment():
+    d = rewrite_wo(["paper adjustment", "adjusted the paper"])
+    assert d.text == "Adjusted the paper."
+    assert not d.requires_review
+
+
+def test_same_action_but_distinct_extra_repair_kept():
+    d = rewrite_wo(["Paper adjusted", "adjusted the paper", "Replaced roller on BAG0002"])
+    assert "Adjusted the paper." in d.text
+    assert "Replaced roller on BAG0002" in d.text
+    assert d.requires_review
+
+
+def test_direction_and_measurement_not_semantically_collapsed():
+    d = rewrite_wo(["Cleaned left motor brush", "Cleaned right motor brush",
+                    "Braking 6ft", "Plugging 10ft"])
+    assert d.requires_review
+    assert all(term in d.text for term in ["left", "right", "6ft", "10ft"])
+
+
+def test_status_not_inferred_from_equivalent_action():
+    d = rewrite_wo(["Motor Brush clean up", "Cleaned the motor brush"])
+    assert "RTS" not in d.text
+    assert "replaced" not in d.text.lower()

@@ -37,17 +37,49 @@ def _preserved(notes: list[str], reason: str) -> Draft:
                  "preserved", True, reason)
 
 
+
+# Exact source-backed equivalence classes. Never infer equivalence using
+# arbitrary fuzzy similarity: part numbers, directions and service statuses
+# must not be merged into unrelated statements.
+_EQUIVALENT_ACTIONS = (
+    (re.compile(r"(?:paper\s+adjusted|paper\s+adjustment|adjusted\s+the\s+paper)\.?", re.I),
+     "Adjusted the paper."),
+    (re.compile(r"(?:motor\s+brush\s+clean\s*up|cleaned\s+(?:the\s+)?motor\s+brush(?:es)?)\.?", re.I),
+     "Cleaned the motor brush."),
+    (re.compile(r"(?:cleared\s+(?:the\s+)?paper\s+jam|paper\s+jam\s+cleared)\.?", re.I),
+     "Cleared the paper jam."),
+)
+
+
+def _equivalent_action(note: str) -> tuple[int, str] | None:
+    normalized = re.sub(r"\s+", " ", note).strip()
+    for i, (pattern, canonical) in enumerate(_EQUIVALENT_ACTIONS):
+        if pattern.fullmatch(normalized):
+            return i, canonical
+    return None
+
+
+def _semantic_dedup(notes: list[str]) -> list[str]:
+    """Merge only verified stand-alone aliases; keep other notes unmodified."""
+    result = []
+    observed = set()
+    for note in notes:
+        alias = _equivalent_action(note)
+        if alias is None:
+            result.append(note)
+        elif alias[0] not in observed:
+            result.append(alias[1])
+            observed.add(alias[0])
+    return result
+
+
 def rewrite_wo(remarks: list[str]) -> Draft:
     """Rewrite only known patterns, regardless of technician count."""
-    notes = _unique(remarks)
+    notes = _semantic_dedup(_unique(remarks))
     if not notes:
         return _preserved(notes, "No technician evidence")
     if len(notes) == 1:
         return Draft(notes[0], "single", False)
-
-    paper_forms = {"paper adjusted", "paper adjustment"}
-    if all(n.casefold().rstrip(". ") in paper_forms for n in notes):
-        return Draft("Adjusted the paper.", "rule:paper-adjustment", False)
 
     wheels = [n for n in notes if re.fullmatch(
         r"changed both\s+(?:right and left|left and right) load wheels\.?", n,
