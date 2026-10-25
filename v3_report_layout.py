@@ -40,7 +40,7 @@ def _remark_key(text: str) -> str:
     Never use fuzzy/string-similarity dedup: "left" vs "right", different
     measurements, different component IDs and RTS vs OOS must all survive.
     """
-    return re.sub(r"\\.+$", "", re.sub(r"\\s+", " ", text).strip()).casefold()
+    return re.sub(r"\.+$", "", re.sub(r"\s+", " ", text).strip()).casefold()
 
 
 def build_shift_happenings(entries: list[dict], meta_by_id: dict[int, dict]
