@@ -735,6 +735,8 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         require_v3_manager(request)
         if not assoc_num.strip() or len(assoc_num)>30 or not full_name.strip() or len(full_name)>180 or shift not in ("","S1","S2","S3","S4","S5"):
             raise HTTPException(400,"Invalid associate information")
+        if db.get_associate(assoc_num.strip()):
+            raise HTTPException(409,"Associate number already exists; edit the existing roster record")
         db.add_associate(assoc_num.strip(),full_name.strip(),shift,default_id.strip()[:120],is_mst=(is_mst=="1"))
         refresh_login_roster()
         return roster_response(request)
@@ -775,6 +777,8 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         if person.get("is_manager"): raise HTTPException(403,"Manager profiles are protected")
         if not new_assoc_num.strip() or len(new_assoc_num)>30 or not full_name.strip() or len(full_name)>180 or shift not in ("","S1","S2","S3","S4","S5"):
             raise HTTPException(400,"Invalid associate information")
+        if new_assoc_num.strip()!=assoc_num.strip() and db.get_associate(new_assoc_num.strip()):
+            raise HTTPException(409,"Associate number already belongs to another roster record")
         db.update_associate(assoc_num,new_assoc_num.strip(),full_name.strip(),shift,is_mst=(is_mst=="1"))
         refresh_login_roster()
         return roster_response(request)
