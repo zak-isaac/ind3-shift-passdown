@@ -50,6 +50,9 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             response.delete_cookie(cookie,path="/")
 
     def _v3_live_shifts():
+        # Dev sandbox shifts are selectable regardless of the wall clock.
+        if __import__("dev_mode").is_active():
+            return db.get_active_shifts()
         now = now_func() if now_func else datetime.now()
         visible = []
         for shift in db.get_active_shifts():
@@ -68,6 +71,8 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         return visible
 
     def _v3_shift_day(code):
+        if __import__("dev_mode").is_active():
+            return __import__("dev_mode").get_today()
         now = now_func() if now_func else datetime.now()
         for day in (now.date(), now.date() - timedelta(days=1)):
             if allowed_shift_days and day.weekday() not in allowed_shift_days.get(code, ()):
