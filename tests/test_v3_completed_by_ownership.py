@@ -96,3 +96,27 @@ def test_missing_ownership_does_not_block_other_verified_wos():
     accepted,audit=assign([bad,good],{"Tech A","Tech B"},"S5","2026-10-23")
     assert accepted==[good]
     assert len(audit)==1 and audit[0]["wo_number"]=="BAD"
+
+
+def test_selecting_only_previous_shift_worker_does_not_credit_other_finisher():
+    rows=[
+        labor("HANDOFF","Tech S4","2026-10-23T17:15:00",
+              service="2026-10-23T18:28:00",completed_by="Tech S5"),
+        labor("HANDOFF","Tech S5","2026-10-23T18:05:00",
+              service="2026-10-23T18:28:00",completed_by="Tech S5"),
+    ]
+    accepted, ignored=assign(rows,{"Tech S4"},"S5","2026-10-23")
+    assert accepted==[]
+    assert len(ignored)==1 and "not selected" in ignored[0]["reason"]
+    assert assign(rows,{"Tech S4","Tech S5"},"S5","2026-10-23")== (rows,[])
+
+
+def test_last_technician_supports_finisher_when_completed_by_is_administrator():
+    rows=[
+        {**labor("TEAM","Tech A","2026-10-23T18:10:00",
+               service="2026-10-23T19:00:00",completed_by="Supervisor B"),"last_technician":"Tech B"},
+        {**labor("TEAM","Tech B","2026-10-23T18:25:00",
+               service="2026-10-23T19:00:00",completed_by="Supervisor B"),"last_technician":"Tech B"},
+    ]
+    accepted,ignored=assign(rows,{"Tech B"},"S5","2026-10-23")
+    assert accepted==[rows[1]] and ignored==[]
