@@ -223,22 +223,10 @@ def _is_pm(r: dict) -> bool:
 
 def select_records(rows: list[dict], selected: set[str], start: datetime, end: datetime,
                     trust_attribution: bool = False):
-    """Include every Closed non-PM work order; route only PMs to the PM summary.
+    """Accept selected technicians' Closed WOs by the official WO closure time.
 
-    Where Start Date and WO Closed Date/Time disagree about which shift a WO
-    belongs to (or Start Date is missing/unparseable), the record is routed
-    to `ambiguous` for MST review instead of being guessed either way.
-
-    `trust_attribution=True` (2026-10-24, S1-S5 ownership engine): `rows` has
-    already been through v3_split.assign(), which decides shift ownership
-    from technician work-time evidence -- a strictly better signal than this
-    function's own simple start/close-vs-window check. Re-applying that
-    check here would re-reject WOs v3_split just correctly attributed (e.g.
-    the S5 06:00-06:30 grace window, or a roster/continuity-resolved
-    overlap) purely because its start_at sits slightly outside this
-    function's naive window math. When true, every row that reaches here is
-    trusted as already belonging to this shift; only the status/PM/Happening
-    classification below still applies.
+    The supplied window is the selected shift's scheduled operating period.
+    No start-time, roster-home-shift or update-time ownership inference.
     """
     summary = Counter()
     eligible = []
@@ -248,31 +236,15 @@ def select_records(rows: list[dict], selected: set[str], start: datetime, end: d
         if r["tech_name"] not in selected:
             continue
         summary["selected_rows"] += 1
-        started = _parse_dt(r["start_at"])
-        # "Update Date / Time" is the more reliable real-close signal per
-        # 2026-10-23 facility feedback -- "WO Closed Date/Time" can be stale.
-        # Prefer it when present; fall back to WO Closed Date/Time for older
-        # exports that predate this column.
-        closed_at = _parse_dt(r.get("updated_at") or r["closed_at"])
-        in_window = trust_attribution or (started is not None and start <= started <= end)
-        closed_in_window = closed_at is not None and start <= closed_at <= end
-        if not trust_attribution and started is None:
-            summary["ambiguous_shift"] += 1
-            ambiguous.append({**r, "reason": "Start Date is missing or unreadable -- cannot confirm shift."})
-            continue
-        if not in_window:
-            if closed_in_window:
-                # Conflicting signals: started outside the window but closed
-                # inside it. Don't guess which shift gets credit.
-                summary["ambiguous_shift"] += 1
-                ambiguous.append({**r, "reason": "Start Date and Update/Closed Date disagree on shift -- needs MST review."})
-                continue
-            summary["outside_shift"] += 1
-            excluded.append({**r, "reason": "Outside this shift's reporting window."})
-            continue
-        if r["status"].strip().casefold() != "closed":
+        if str(r.get("status", "")).strip().casefold() != "closed":
             summary["not_closed"] += 1
-            excluded.append({**r, "reason": f"WO Status is '{r['status']}', not Closed."})
+            continue
+        closed_at = _parse_dt(r.get("closed_at"))
+        if closed_at is None:
+            summary["missing_close_timestamp"] += 1
+            continue
+        if not start <= closed_at < end:
+            summary["outside_shift"] += 1
             continue
         if _is_pm(r):
             summary["pm_rows"] += 1
