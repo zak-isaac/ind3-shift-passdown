@@ -434,6 +434,9 @@ app.mount("/walkthrough", StaticFiles(directory="docs/walkthrough", html=True), 
 # Raw technical docs (ARCHITECTURE.md, DEPLOYMENT.md) linked from the walkthrough footer.
 app.mount("/docs", StaticFiles(directory="docs"), name="docs")
 templates = Jinja2Templates(directory="templates")
+# Sidebar clock: only sandbox requests receive the simulated timestamp.
+templates.env.globals["sidebar_clock_state"] = lambda: {"simulated": dev_mode.is_active(), "iso": dev_mode.get_now().isoformat() if dev_mode.is_active() else ""}
+
 
 # ── Site-wide config exposed to all templates ─────────────────────────────────
 DC_NUMBER = "US.08972"
