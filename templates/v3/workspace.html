@@ -157,8 +157,8 @@
     <td><span class="d2-category {{ 'd2-breakdown' if g.rfr_type|lower == 'breakdown' else 'd2-interruption' if g.rfr_type|lower == 'process interruption' else 'd2-proactive' if g.rfr_type|lower == 'proactive repair' else 'd2-request' if g.rfr_type|lower == 'work request' else 'd2-other' }}">{{ g.rfr_type or 'Other' }}</span></td>
     <td><div class="d2-truncate" title="{{ g.cause_text or g.reported_issue }}">{{ g.cause_text or g.reported_issue or 'No issue recorded' }}</div></td>
     <td><div class="d2-truncate d2-tech-summary" {% if g.wo_number %}data-ai-remark-wo="{{ g.wo_number|e }}" data-ai-eligible="{{ '1' if g.ai_eligible else '0' }}" data-ai-original="{{ g.original_remarks|e }}"{% endif %}>{{ g.display_remarks }}</div><small class="d2-tech-names">{{ g.rows|map(attribute='tech_name')|join(', ') }}</small></td>
-    <td class="d2-wo">{{ g.wo_number or 'Manual' }}{% if g.wo_number %}<small class="v3-ai-result" data-ai-wo="{{ g.wo_number|e }}" style="display:block;font-size:11px" aria-live="polite">{{ 'AI Passed' if g.ai_eligible and g.ai_status == 'passed' else 'AI Processing' if g.ai_eligible and g.ai_status in ('queued', 'writing') else 'Original Restored' if g.ai_eligible and g.ai_status == 'original' else 'MST Edited' if not g.ai_eligible and g.ai_status == 'passed' else '' }}</small>{% endif %}</td>
-    <td class="d2-row-actions"><button type="button" class="d2-icon-button" title="View work order" aria-label="View or edit {{ g.unit }}" onclick="v3OpenHappening({{ g.main_id }}, {{ shift.id }})">View</button><form method="post" action="/v3/happening/{{ g.main_id }}/exclude"><input type="hidden" name="shift_id" value="{{ shift.id }}"><input type="hidden" name="excluded" value="{{ 0 if g.excluded else 1 }}"><button type="submit" class="d2-icon-button" title="{{ 'Restore' if g.excluded else 'Exclude' }}" aria-label="{{ 'Restore' if g.excluded else 'Exclude' }} {{ g.unit }}">{{ 'Restore' if g.excluded else 'Exclude' }}</button></form></td>
+    <td class="d2-wo">{{ g.wo_number or 'Manual' }}{% if g.wo_number %}<small class="v3-ai-result" data-ai-wo="{{ g.wo_number|e }}" style="display:block;font-size:11px" aria-live="polite">{{ 'MST Approved' if g.ai_eligible and g.ai_approved else 'AI Draft Ready · Review' if g.ai_eligible and g.ai_status == 'passed' else 'AI Processing' if g.ai_eligible and g.ai_status in ('queued', 'writing') else 'Original Retained' if g.ai_eligible and g.ai_status == 'original' else 'MST Edited' if not g.ai_eligible and g.ai_status == 'passed' else '' }}</small>{% endif %}</td>
+    <td class="d2-row-actions">{% if g.wo_number and g.ai_eligible %}<button type="button" class="d2-icon-button" data-ai-review-button="{{ g.wo_number|e }}" {% if g.ai_status != 'passed' or g.ai_approved %}hidden{% endif %} onclick="v3OpenAiReview(this.dataset.aiReviewButton)">Review AI</button>{% endif %}<button type="button" class="d2-icon-button" title="View work order" aria-label="View or edit {{ g.unit }}" onclick="v3OpenHappening({{ g.main_id }}, {{ shift.id }})">View</button><form method="post" action="/v3/happening/{{ g.main_id }}/exclude"><input type="hidden" name="shift_id" value="{{ shift.id }}"><input type="hidden" name="excluded" value="{{ 0 if g.excluded else 1 }}"><button type="submit" class="d2-icon-button" title="{{ 'Restore' if g.excluded else 'Exclude' }}" aria-label="{{ 'Restore' if g.excluded else 'Exclude' }} {{ g.unit }}">{{ 'Restore' if g.excluded else 'Exclude' }}</button></form></td>
    </tr>
    {% else %}<tr class="d2-empty"><td colspan="6">No Shift Happenings yet. Import a Cetaris XLSX file or add a manual entry.</td></tr>{% endfor %}
    </tbody></table></div><div class="d2-table-footer"><span><b id="d2-visible-count">{{ happenings|length }}</b> work orders shown · {{ happenings|selectattr('needs_review')|list|length }} pending review</span><span>Click an asset or View to open its details</span></div>
@@ -180,26 +180,66 @@
  </main></div></div>
 <div id="v3-modal-root" class="modal-shell" hidden></div>
 <dialog id="manual-dialog" class="manual-dialog"><form method="post" action="/v3/manual" class="modal-form"><input type="hidden" name="shift_id" value="{{ shift.id }}"><div class="modal-title"><div><div class="eyebrow">MANUAL SHIFT ENTRY</div><h2>Add Shift Happening</h2></div><button type="button" onclick="document.getElementById('manual-dialog').close()" aria-label="Close">Close</button></div><label>Asset ID<input required name="unit" placeholder="e.g. VOIDFILL0201"></label><label>Reported Issue<input required name="issue" placeholder="What was reported?"></label><label>WO # (optional)<input name="wo_number"></label><label>Technician Remarks<textarea name="remarks" rows="4" placeholder="Work performed"></textarea></label><div class="modal-actions"><button type="button" class="button button-outline" onclick="document.getElementById('manual-dialog').close()">Cancel</button><button type="submit" class="button button-blue">Save manual entry</button></div></form></dialog>
+
+<dialog id="v3-ai-review-dialog" class="d2-dialog d2-ai-review-dialog" aria-labelledby="v3-ai-review-title">
+  <div class="d2-dialog-head"><h2 id="v3-ai-review-title">Review AI draft before report</h2><button type="button" class="d2-close" onclick="document.getElementById('v3-ai-review-dialog').close()">Close</button></div>
+  <form method="post" action="/v3/ai/drafts/review" class="d2-dialog-body">
+    <input type="hidden" name="shift_id" value="{{ shift.id }}">
+    <input type="hidden" name="wo_number" id="v3-ai-review-wo">
+    <input type="hidden" name="source_hash" id="v3-ai-review-hash">
+    <p id="v3-ai-review-details">Compare against every technician's original note. A validation pass is not an approval.</p>
+    <div class="d2-ai-review-columns">
+      <section><strong>Original technician remarks</strong><p id="v3-ai-original"></p></section>
+      <section><strong>AI suggested paragraph (unapproved)</strong><p id="v3-ai-draft"></p></section>
+    </div>
+    <div class="d2-dialog-actions">
+      <button class="button button-outline" name="decision" value="original" type="submit">Keep Original</button>
+      <button class="button button-blue" name="decision" value="accept" type="submit">Accept Rewrite</button>
+    </div>
+  </form>
+</dialog>
 <script>
 (function(){
  const sid={{ shift.id|tojson }};
  const labels=document.querySelectorAll('[data-ai-wo]');
+ const aiByWo=new Map();
+ function showReview(wo){
+   const draft=aiByWo.get(String(wo));
+   if(!draft || draft.status!=='passed' || draft.approved || !draft.source_hash)return;
+   const dialog=document.getElementById('v3-ai-review-dialog');
+   document.getElementById('v3-ai-review-wo').value=String(wo);
+   document.getElementById('v3-ai-review-hash').value=draft.source_hash;
+   document.getElementById('v3-ai-review-details').textContent=
+      'WO #'+wo+' · Compare each original remark to the proposed AI paragraph. Only an explicit MST acceptance changes the report.';
+   let raw=[];
+   try{raw=JSON.parse(draft.source_json||'[]')}catch(e){}
+   document.getElementById('v3-ai-original').textContent=raw.join('; ')||'No technician remarks recorded.';
+   document.getElementById('v3-ai-draft').textContent=draft.draft||'No suggested paragraph.';
+   dialog.showModal();
+ }
+ window.v3OpenAiReview=showReview;
  if(!labels.length)return;
  async function refresh(){
   try{
    const response=await fetch('/v3/ai/drafts?shift_id='+encodeURIComponent(sid),{credentials:'same-origin'});
    if(!response.ok)return;
-   const byWo=new Map(((await response.json()).drafts||[]).map(r=>[String(r.wo_number),r]));
+   const results=(await response.json()).drafts||[];
+   aiByWo.clear();for(const r of results)aiByWo.set(String(r.wo_number),r);
    for(const label of labels){
-    const r=byWo.get(label.dataset.aiWo);
-    const summary=document.querySelector('[data-ai-remark-wo="'+CSS.escape(label.dataset.aiWo)+'"]');
+    const wo=label.dataset.aiWo;
+    const r=aiByWo.get(wo);
+    const summary=document.querySelector('[data-ai-remark-wo="'+CSS.escape(wo)+'"]');
+    const reviewButton=document.querySelector('[data-ai-review-button="'+CSS.escape(wo)+'"]');
     const eligible=summary?.dataset.aiEligible==='1';
-    if(!r){label.textContent='';continue;}
-    label.textContent=!eligible && r.status==='passed'?'MST Edited':r.status==='passed'?'AI Passed':r.status==='original'?'Original Restored':'AI Processing';
+    if(!r){label.textContent='';if(reviewButton)reviewButton.hidden=true;continue;}
+    const accepted=Boolean(r.approved) && r.status==='passed';
+    label.textContent=!eligible?'MST Edited':accepted?'MST Approved':r.status==='passed'?'AI Draft Ready · Review':r.status==='original'?'Original Retained':'AI Processing';
     label.title=r.reason||'';
+    if(reviewButton)reviewButton.hidden=!eligible || r.status!=='passed' || accepted;
     if(summary && eligible){
-      if(r.status==='passed' && r.draft)summary.textContent=r.draft;
-      else if(r.status==='original')summary.textContent=summary.dataset.aiOriginal||'No technician remarks recorded.';
+      // Critically, never display a suggested paragraph as accepted before MST approval.
+      if(accepted && r.draft)summary.textContent=r.draft;
+      else summary.textContent=summary.dataset.aiOriginal||'No technician remarks recorded.';
     }
    }
   }catch(e){}
