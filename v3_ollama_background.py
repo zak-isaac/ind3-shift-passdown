@@ -89,8 +89,13 @@ def queue_shift(shift_id: int) -> int:
     with _connect(path) as c:
         entries = [dict(e) for e in c.execute(
             "SELECT * FROM entries WHERE shift_id=? AND excluded=0", (shift_id,))]
-        metadata = {m["entry_id"]: dict(m) for m in c.execute(
-            "SELECT * FROM v3_entry_meta WHERE shift_id=?", (shift_id,))}
+        try:
+            metadata = {m["entry_id"]: dict(m) for m in c.execute(
+                "SELECT * FROM v3_entry_meta WHERE shift_id=?", (shift_id,))}
+        except sqlite3.OperationalError as exc:
+            if "no such table" not in str(exc).casefold():
+                raise
+            metadata = {}
     count = 0
     grouped = _group_sources(entries, metadata)
     with _connect(path) as c:
@@ -139,6 +144,16 @@ def _verify(source: list[str], result: str) -> tuple[bool, str]:
                     r"\b(?:ordered|received|delivered)\b"):
         if re.search(pattern, result, re.I) and not re.search(pattern, src, re.I):
             return False, "Potential unsupported outcome"
+    source_numbers = set(re.findall(r"(?<![a-z0-9])\d+(?:\.\d+)?(?![a-z0-9])", src, re.I))
+    output_numbers = set(re.findall(r"(?<![a-z0-9])\d+(?:\.\d+)?(?![a-z0-9])", result, re.I))
+    if source_numbers - output_numbers:
+        return False, "Missing source measurements or numeric values"
+    # Unsupported completion/clean bill-of-health filler must not be invented.
+    if re.search(r"\b(?:no (?:further )?(?:issues|faults|problems)(?: (?:observed|remain))?|"
+                r"running smoothly|fully functional|all systems operational)\b",result,re.I) and not re.search(
+                r"\b(?:no (?:further )?(?:issues|faults|problems)|"
+                r"running smoothly|fully functional|all systems operational)\b",src,re.I):
+        return False, "Unsupported all-clear claim"
     # Conservative note-by-note coverage: reject dropped collaborator details.
     # Good paraphrases may be rejected; original remarks are always available.
     stopwords = {"the","a","an","in","on","at","and","or","to","of","for","by",
@@ -154,10 +169,6 @@ def _verify(source: list[str], result: str) -> tuple[bool, str]:
         note_facts = facts(note)
         if note_facts and len(note_facts & out_facts) < max(1, (len(note_facts)*3+3)//4):
             return False, "Distinct technician source remark may be missing"
-    source_numbers = set(re.findall(r"(?<![a-z0-9])\d+(?:\.\d+)?(?![a-z0-9])", src, re.I))
-    output_numbers = set(re.findall(r"(?<![a-z0-9])\d+(?:\.\d+)?(?![a-z0-9])", result, re.I))
-    if source_numbers - output_numbers:
-        return False, "Missing source measurements or numeric values"
     return True, "Automatic source validation passed"
 
 
