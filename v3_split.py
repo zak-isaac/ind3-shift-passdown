@@ -157,9 +157,17 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
         elif ambiguous:
             reason = "Overlapping technician start without confirmed shift evidence"
         else:
-            labels = [_resolve(parse_close(r.get("in_service_at")), r.get("tech_name", ""),
-                               history, roster_shifts, confirmed_s5=r.get("tech_name", "") in confirmed)
-                      for r in items if parse_close(r.get("in_service_at"))]
+            # Cetaris can have a recorded WO Last Complete timestamp without
+            # an In Service timestamp or a fresh labor Start Date. This is
+            # completion evidence, not delayed administrative WO closure.
+            labels = [
+                _resolve(finished, r.get("tech_name", ""), history, roster_shifts,
+                         confirmed_s5=r.get("tech_name", "") in confirmed)
+                for r in items
+                for finished in [parse_close(r.get("in_service_at")) or
+                                 parse_close(r.get("last_complete_at"))]
+                if finished
+            ]
             labels = [v for v in labels if v]
             if len(set(labels)) == 1:
                 owner = labels[0]
@@ -204,6 +212,12 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
             elif any(pair in candidates for pair in s4_pairs):
                 # S4 has priority until 18:00 in the shared evening window.
                 owner = next(pair for pair in s4_pairs if pair in candidates)
+        # Never silently assign an older work-start shift when recorded
+        # completion is in a different shift. Such cross-date WOs require
+        # an explicit MST owner decision, rather than disappearing on S5.
+        if owner and final_work_time and owner not in _windows(final_work_time):
+            owner = None
+            reason = "Work began on another shift; recorded completion needs shift-owner review"
         # A recorded equipment return during the technician's scheduled
         # shift (including S3/S4 overlap) does not transfer ownership.
         if owner:
@@ -223,7 +237,7 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
                 owner = tuple(override)
             elif isinstance(override, str):
                 candidates = [(s, d) for r in items for field in
-                              ("start_at", "in_service_at", "opened_at")
+                              ("start_at", "in_service_at", "last_complete_at", "opened_at")
                               for dt in [parse_close(r.get(field))] if dt
                               for s, d in _windows(dt) if s == override]
                 if candidates:
@@ -233,7 +247,7 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
             # Do not ask S4 MST to review an S3 WO whose technician was not
             # selected for S4. For genuinely ambiguous selected labor, review.
             evidence = [parse_close(r.get(k)) for r in items for k in
-                        ("start_at", "in_service_at", "opened_at")]
+                        ("start_at", "in_service_at", "last_complete_at", "opened_at")]
             relevant = any((shift_code, day) in _windows(dt) for dt in evidence if dt)
             if not any(evidence):
                 # A selected completed WO with no timing evidence must never
