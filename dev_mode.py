@@ -16,6 +16,7 @@ own number without needing the manager code).
 """
 from __future__ import annotations
 import hashlib
+import os
 from contextvars import ContextVar
 from datetime import date, datetime
 from pathlib import Path
@@ -51,7 +52,8 @@ def is_dev_credential(entered: str, roster: dict) -> bool:
 
 def dev_now() -> datetime:
     """Frozen date + real time-of-day, so shift windows still feel live."""
-    return datetime.combine(DEV_DATE, datetime.now().time())
+    override = os.environ.get("IND3_DEV_TEST_AT", "2026-10-24T05:50")
+    return datetime.fromisoformat(override)
 
 
 # ── Per-request "now" override ──────────────────────────────────────────────
