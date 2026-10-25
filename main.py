@@ -605,7 +605,7 @@ async def dev_login_post(request: Request, code: str = Form(...)):
         from urllib.parse import quote
         err = quote("Not recognized. Use the test code or your associate number.")
         return RedirectResponse(f"/dev/login?error={err}", status_code=303)
-    resp = RedirectResponse("/", status_code=303)
+    resp = RedirectResponse("/v3/login", status_code=303)
     resp.set_cookie(dev_mode.DEV_COOKIE, dev_mode.DEV_TOKEN,
                      httponly=True, samesite="lax", path="/")
     return resp

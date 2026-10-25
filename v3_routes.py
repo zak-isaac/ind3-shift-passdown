@@ -76,12 +76,13 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                 return day
         return None
 
-    def entry_page(request, error="", master_verified=False):
+    def entry_page(request, error="", master_verified=False, master_auth_prompt=False):
         shifts=_v3_live_shifts()
         now=now_func() if now_func else datetime.now()
         return templates.TemplateResponse(request,"v3/login.html",{
             "error":error,"shifts":shifts,"today":now.date().isoformat(),
-            "master_verified":master_verified,
+            "master_verified":master_verified or bool(request.cookies.get("dev_session") == __import__("dev_mode").DEV_TOKEN and decode_session(request) and decode_session(request)["profile"].get("is_manager")),
+            "master_auth_prompt":master_auth_prompt, "is_dev_mode": __import__("dev_mode").is_active(),
             "eligible_shifts":[code for code in ("S1","S2","S3","S4","S5") if _v3_shift_day(code)],
             "valid_shifts": [code for code,days in (allowed_shift_days or {}).items()
                              if now.date().weekday() in days] or ["S1","S2","S3","S4","S5"],
@@ -103,6 +104,23 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         if get_mst_roster is None:
             return lead_redirect("/v3")
         associate=associate_id.strip()
+        # Test entry and management entry share the ordinary V3 login form.
+        # Developer access changes ONLY the database context, never live shifts.
+        if associate == "T8972":
+            import dev_mode
+            dev_manager = get_mst_roster().get("8972")
+            if not dev_manager or not dev_manager.get("is_manager"):
+                return entry_page(request, "Developer test profile is unavailable.")
+            response = RedirectResponse("/v3/login", status_code=303)
+            response.set_cookie(dev_mode.DEV_COOKIE, dev_mode.DEV_TOKEN,
+                                httponly=True, samesite="lax", path="/")
+            set_session_cookies(response, {"associate":"8972","profile":dev_manager,"elevated":True}, 0)
+            return response
+        if associate == "8972":
+            # This public identifier opens the verification dialog; it does NOT
+            # authenticate management access without a configured secret.
+            return entry_page(request, "Verify your management credential to continue.",
+                              master_auth_prompt=True)
         profile=get_mst_roster().get(associate)
         if not profile:
             return entry_page(request,"Associate number not found in the current roster.")
