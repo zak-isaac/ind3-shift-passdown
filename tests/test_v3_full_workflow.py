@@ -113,18 +113,33 @@ def test_full_login_import_ai_preview_and_eml(tmp_path,monkeypatch):
             if state.get("28030001",{}).get("status")=="passed":break
             time.sleep(.03)
         assert state.get("28030001",{}).get("status")=="passed",state
+        assert not state["28030001"]["approved"]
+        assert ai.approved_for_report(sid)=={}
+        before_preview=browser.get("/v3/preview",params={"shift_id":sid})
+        assert before_preview.status_code==200
+        assert "Checked column tension; Recalibrated side guide. RTS" in before_preview.text
         page=browser.get("/v3",params={"shift_id":sid})
         assert page.status_code==200
         assert "28030003" in page.text and "Outside this shift" in page.text
         rewritten="Checked column tension and recalibrated the side guide. RTS."
-        assert rewritten in page.text
+        assert rewritten not in page.text
         assert 'data-ai-remark-wo="28030001"' in page.text
-        assert "AI Passed" in page.text
+        assert "AI Draft Ready · Review" in page.text
+        assert "Accept Rewrite" in page.text
         assert "Completed · Close WO" in page.text
         entry=next(e for e in db.get_entries(sid) if e["wo_number"]=="28030001")
         detail=browser.get(f"/v3/happening/{entry['id']}",params={"shift_id":sid})
         assert detail.status_code==200 and "Checked column tension" in detail.text
-        assert any(x["status"]=="passed" for x in browser.get("/v3/ai/drafts",params={"shift_id":sid}).json()["drafts"])
+        drafts=browser.get("/v3/ai/drafts",params={"shift_id":sid}).json()["drafts"]
+        assert any(x["status"]=="passed" for x in drafts)
+        target=next(x for x in drafts if x["wo_number"]=="28030001")
+        approved=browser.post("/v3/ai/drafts/review",data={
+            "shift_id":str(sid),"wo_number":"28030001","source_hash":target["source_hash"],
+            "decision":"accept"}, follow_redirects=False)
+        assert approved.status_code==303,approved.text[:300]
+        assert ai.approved_for_report(sid)=={"28030001":rewritten}
+        approved_page=browser.get("/v3",params={"shift_id":sid})
+        assert rewritten in approved_page.text and "MST Approved" in approved_page.text
         preview=browser.get("/v3/preview",params={"shift_id":sid})
         assert preview.status_code==200 and rewritten in preview.text
         saved_response=browser.post("/v3/generate",data={"shift_id":str(sid)},follow_redirects=False)
