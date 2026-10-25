@@ -3213,7 +3213,8 @@ async def lead_generate(
                 raise
             meta_rows = []
     meta_by_id = {m["entry_id"]: dict(m) for m in meta_rows}
-    happenings = build_shift_happenings(db_entries, meta_by_id)
+    from v3_ollama_background import approved_for_report
+    happenings = build_shift_happenings(db_entries, meta_by_id, approved_remarks=approved_for_report(shift_id))
     for title, note in zip(extra_title, extra_note):
         if title.strip() and note.strip():
             happenings.append(RewrittenHappening(

@@ -19,6 +19,7 @@ import v3_split
 from v3_cetaris import parse_excel, select_records, technician_counts, MAX_SIZE
 from v3_proofread import proofread
 from v3_report_layout import build_shift_happenings
+import v3_ollama_background as ollama_drafts
 
 
 def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shift,
@@ -1033,6 +1034,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                       "ON CONFLICT(shift_id) DO UPDATE SET technicians_json=excluded.technicians_json,filename=excluded.filename,imported_at=excluded.imported_at,split_techs_json=excluded.split_techs_json",
                       (shift_id,json.dumps(sorted(selected)),batch["filename"],datetime.now().strftime("%Y-%m-%d %H:%M"),json.dumps(sorted(split_selected))))
             c.execute("DELETE FROM v3_import_batches WHERE token=?",(token,))
+        ollama_drafts.queue_shift(shift_id)
         notice=f"Imported {added} new technician/WO entries; {unchanged} unchanged; {pending} flagged for review. {stats.get('unique_pm_wos',0)} distinct Completed or Closed PM WOs in this import."
         skipped_parts=[]
         if stats.get("not_closed"):
@@ -1143,6 +1145,18 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         db.save_shift_notes(shift_id,proofread(notes[:20000]))
         return RedirectResponse(f"/v3?shift_id={shift_id}&notice=Notes+saved",status_code=303)
 
+    @router.get("/ai/drafts")
+    async def ai_draft_status(request: Request, shift_id:int):
+        secure(request, shift_id)
+        return {"drafts": ollama_drafts.statuses(shift_id)}
+
+    @router.post("/ai/drafts/{wo}/approve")
+    async def ai_draft_approve(request: Request, wo:str, shift_id:int=Form(...)):
+        secure(request, shift_id)
+        if not ollama_drafts.approve(shift_id, wo):
+            raise HTTPException(409, "Draft missing, flagged, or already approved")
+        return {"approved": True, "wo_number": wo}
+
     @router.get("/preview",response_class=HTMLResponse)
     async def preview(request:Request,shift_id:int):
         shift=secure(request,shift_id)
@@ -1155,6 +1169,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         report_happenings = build_shift_happenings(
             db.get_entries(shift_id),
             {m["entry_id"]: dict(m) for m in meta_rows},
+            approved_remarks=ollama_drafts.approved_for_report(shift_id),
         )
         return templates.TemplateResponse(request,"v3/preview.html",{
             "shift":shift,**data,"report_happenings":report_happenings,

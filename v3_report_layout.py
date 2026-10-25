@@ -44,9 +44,10 @@ def _remark_key(text: str) -> str:
 
 
 def build_shift_happenings(entries: list[dict], meta_by_id: dict[int, dict]
-                           | None = None) -> list[RewrittenHappening]:
+                           | None = None, approved_remarks: dict[str, str] | None = None) -> list[RewrittenHappening]:
     """Build one report happening per unique WO (or individual manual entry)."""
     meta_by_id = meta_by_id or {}
+    approved_remarks = approved_remarks or {}
     groups: OrderedDict[str, dict] = OrderedDict()
     for entry in entries:
         if entry.get("excluded"):
@@ -83,7 +84,7 @@ def build_shift_happenings(entries: list[dict], meta_by_id: dict[int, dict]
         RewrittenHappening(
             title=g["asset"],
             cause=g["cause"],
-            paragraph="; ".join(g["remarks"]) if g["remarks"] else "No technician remarks recorded.",
+            paragraph=approved_remarks.get(g["wo_number"]) or ("; ".join(g["remarks"]) if g["remarks"] else "No technician remarks recorded."),
             wo_number=g["wo_number"],
         )
         for g in groups.values()
