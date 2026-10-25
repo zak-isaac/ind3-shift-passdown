@@ -152,8 +152,8 @@
     <td class="d2-id"><button type="button" onclick="v3OpenHappening({{ g.main_id }}, {{ shift.id }})">{{ g.unit or 'Unassigned' }}</button>{% if g.excluded %}<span class="d2-flag d2-flag-off">Excluded</span>{% endif %}{% if g.needs_review %}<span class="d2-flag">Review update</span>{% endif %}{% if g.needs_closure %}<span class="d2-flag">Completed · Close WO</span>{% endif %}</td>
     <td><span class="d2-category {{ 'd2-breakdown' if g.rfr_type|lower == 'breakdown' else 'd2-interruption' if g.rfr_type|lower == 'process interruption' else 'd2-proactive' if g.rfr_type|lower == 'proactive repair' else 'd2-request' if g.rfr_type|lower == 'work request' else 'd2-other' }}">{{ g.rfr_type or 'Other' }}</span></td>
     <td><div class="d2-truncate" title="{{ g.cause_text or g.reported_issue }}">{{ g.cause_text or g.reported_issue or 'No issue recorded' }}</div></td>
-    <td><div class="d2-truncate d2-tech-summary">{% for r in g.rows %}{{ r.remarks_list|join(' · ') if r.remarks_list else 'No remarks recorded' }}{% if not loop.last %} / {% endif %}{% endfor %}</div><small class="d2-tech-names">{{ g.rows|map(attribute='tech_name')|join(', ') }}</small></td>
-    <td class="d2-wo">{{ g.wo_number or 'Manual' }}{% if g.wo_number %}<small class="v3-ai-result" data-ai-wo="{{ g.wo_number|e }}" style="display:block;font-size:11px" aria-live="polite"></small>{% endif %}</td>
+    <td><div class="d2-truncate d2-tech-summary" {% if g.wo_number %}data-ai-remark-wo="{{ g.wo_number|e }}" data-ai-eligible="{{ '1' if g.ai_eligible else '0' }}" data-ai-original="{{ g.original_remarks|e }}"{% endif %}>{{ g.display_remarks }}</div><small class="d2-tech-names">{{ g.rows|map(attribute='tech_name')|join(', ') }}</small></td>
+    <td class="d2-wo">{{ g.wo_number or 'Manual' }}{% if g.wo_number %}<small class="v3-ai-result" data-ai-wo="{{ g.wo_number|e }}" style="display:block;font-size:11px" aria-live="polite">{{ 'AI Passed' if g.ai_eligible and g.ai_status == 'passed' else 'AI Processing' if g.ai_eligible and g.ai_status in ('queued', 'writing') else 'Original Restored' if g.ai_eligible and g.ai_status == 'original' else 'MST Edited' if not g.ai_eligible and g.ai_status == 'passed' else '' }}</small>{% endif %}</td>
     <td class="d2-row-actions"><button type="button" class="d2-icon-button" title="View work order" aria-label="View or edit {{ g.unit }}" onclick="v3OpenHappening({{ g.main_id }}, {{ shift.id }})">View</button><form method="post" action="/v3/happening/{{ g.main_id }}/exclude"><input type="hidden" name="shift_id" value="{{ shift.id }}"><input type="hidden" name="excluded" value="{{ 0 if g.excluded else 1 }}"><button type="submit" class="d2-icon-button" title="{{ 'Restore' if g.excluded else 'Exclude' }}" aria-label="{{ 'Restore' if g.excluded else 'Exclude' }} {{ g.unit }}">{{ 'Restore' if g.excluded else 'Exclude' }}</button></form></td>
    </tr>
    {% else %}<tr class="d2-empty"><td colspan="6">No Shift Happenings yet. Import a Cetaris XLSX file or add a manual entry.</td></tr>{% endfor %}
@@ -188,8 +188,15 @@
    const byWo=new Map(((await response.json()).drafts||[]).map(r=>[String(r.wo_number),r]));
    for(const label of labels){
     const r=byWo.get(label.dataset.aiWo);
-    label.textContent=!r?'':r.status==='passed'?'AI Passed':r.status==='original'?'Original Restored':'AI Processing';
-    label.title=r?.reason||'';
+    const summary=document.querySelector('[data-ai-remark-wo="'+CSS.escape(label.dataset.aiWo)+'"]');
+    const eligible=summary?.dataset.aiEligible==='1';
+    if(!r){label.textContent='';continue;}
+    label.textContent=!eligible && r.status==='passed'?'MST Edited':r.status==='passed'?'AI Passed':r.status==='original'?'Original Restored':'AI Processing';
+    label.title=r.reason||'';
+    if(summary && eligible){
+      if(r.status==='passed' && r.draft)summary.textContent=r.draft;
+      else if(r.status==='original')summary.textContent=summary.dataset.aiOriginal||'No technician remarks recorded.';
+    }
    }
   }catch(e){}
  }

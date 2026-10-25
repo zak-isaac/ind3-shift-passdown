@@ -358,6 +358,21 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                 g["needs_closure"] = True
             if not g["cause_text"] and r["cause_text"]:
                 g["cause_text"] = r["cause_text"]
+        # Match the very same source-of-truth paragraphs used by preview,
+        # reports and EML, rather than listing each raw labor line separately.
+        originals = {h.wo_number: h.paragraph for h in build_shift_happenings(entries, meta) if h.wo_number}
+        rewritten = {h.wo_number: h.paragraph for h in build_shift_happenings(
+            entries, meta, approved_remarks=ollama_drafts.approved_for_report(shift_id)
+        ) if h.wo_number}
+        ai_states = {str(item["wo_number"]): item["status"] for item in ollama_drafts.statuses(shift_id)}
+        for group in groups.values():
+            wo = str(group["wo_number"] or "")
+            group["ai_eligible"] = bool(wo and not group["excluded"] and
+                                        not any(line["mst_edited"] for line in group["rows"]))
+            fallback = "; ".join(value for line in group["rows"] for value in line["remarks_list"])
+            group["original_remarks"] = originals.get(wo) or fallback or "No technician remarks recorded."
+            group["display_remarks"] = (rewritten.get(wo) if group["ai_eligible"] else None) or group["original_remarks"]
+            group["ai_status"] = ai_states.get(wo, "")
         return {
             "happenings": list(groups.values()),
             "pm_wos": [dict(p) for p in pm_rows],
