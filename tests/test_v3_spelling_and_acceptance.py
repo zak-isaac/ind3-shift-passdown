@@ -130,7 +130,7 @@ def test_automatic_spelling_does_not_need_mst_approval(workspace_client):
     assert "Checked column tension; PLC RTS" in r.text
     assert "Check spelling" not in r.text
     saved = next(e for e in db.get_entries(sid) if e["unit"] == "VOIDFILL0501")
-    assert "Checked column tension; PLC RTS" in saved["raw_remarks"]
+    assert "Checked column tension; PLC RTS" in saved["action"]
     client.cookies.clear()
     assert client.post("/v3/manual", data={
         "shift_id":str(sid), "unit":"M1","issue":"colum"}).status_code == 401
