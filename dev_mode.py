@@ -6,9 +6,8 @@ without touching real shift data. Two things make this safe:
 1. A completely separate sandbox SQLite file (dbs/_devtest.db) swapped in
    via db.use_sandbox_db() for the lifetime of any request carrying the
    dev-session cookie. Production data is never read or written.
-2. A frozen calendar date (Aug 7, 2026 — a Friday, so both weekday groups
-   of shifts are reachable for testing) combined with the REAL wall-clock
-   time-of-day, so shift time-windows still behave like a live system.
+2. The actual local clock by default, with a per-browser simulated test
+   date/time cookie when the tester explicitly freezes the clock.
 
 Entry: /dev/login, accepts either the literal test code below OR any real
 associate number from the roster (so a tech/MST can self-test with their
@@ -32,8 +31,7 @@ DEV_DB_PATH = Path(__file__).parent / "dbs" / "_devtest.db"
 DEV_COOKIE = "dev_session"
 DEV_TOKEN  = hashlib.sha256(b"devmode:" + DEV_CODE.encode()).hexdigest()
 
-# ── Frozen test date ─────────────────────────────────────────────────────────
-DEV_DATE = date(2026, 8, 7)
+# ── Clock defaults to real local date/time until a simulated clock is chosen ─
 
 
 def is_dev_credential(entered: str, roster: dict) -> bool:
@@ -50,13 +48,13 @@ def is_dev_credential(entered: str, roster: dict) -> bool:
 
 
 def dev_now(clock: str = "") -> datetime:
-    """Use a sandbox-only simulated clock without changing production time."""
+    """Use the chosen sandbox clock, otherwise live server-local date/time."""
     if clock:
         try:
             return datetime.strptime(clock, "%Y-%m-%dT%H:%M")
         except (TypeError, ValueError):
             pass
-    return datetime.combine(DEV_DATE, datetime.now().time())
+    return datetime.now()
 
 
 # ── Per-request "now" override ──────────────────────────────────────────────

@@ -102,6 +102,9 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             "error":error,"shifts":shifts,"today":now.date().isoformat(),
             "master_verified":master_verified or bool(request.cookies.get("dev_session") == __import__("dev_mode").DEV_TOKEN and decode_session(request) and decode_session(request)["profile"].get("is_manager")),
             "master_auth_prompt":master_auth_prompt, "is_dev_mode": __import__("dev_mode").is_active(),
+            "test_clock_label": (__import__("dev_mode").get_now().strftime("%a, %b %d, %Y at %I:%M %p")
+                                  if __import__("dev_mode").is_active() else ""),
+            "test_clock_frozen": bool(request.cookies.get("dev_clock")),
             "eligible_shifts":[code for code in ("S1","S2","S3","S4","S5") if _v3_shift_day(code)],
             "valid_shifts": [code for code,days in (allowed_shift_days or {}).items()
                              if now.date().weekday() in days] or ["S1","S2","S3","S4","S5"],
@@ -122,6 +125,8 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         # created or resumed only when requested in this control center.
         return templates.TemplateResponse(request, "v3/dev_workspace.html", {
             "simulated_now": now.strftime("%Y-%m-%dT%H:%M"),
+            "simulated_now_label": now.strftime("%a, %b %d, %Y at %I:%M %p"),
+            "clock_is_frozen": bool(request.cookies.get("dev_clock")),
             "active_shifts": active, "test_mode": True,
         })
 

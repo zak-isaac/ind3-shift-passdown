@@ -1,1 +1,74 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>IND3 Developer Workspace</title><link rel="stylesheet" href="/static/v3.css"><link rel="stylesheet" href="/static/v3_design2.css"></head><body style="background:#f2f6fb;padding:24px"><main style="max-width:950px;margin:auto"><header style="display:flex;justify-content:space-between;align-items:center;gap:16px"><div><h1>IND3 Test Workspace</h1><p>Isolated sandbox database. No production shift data is changed.</p></div><a class="button button-outline" href="/dev/exit">Exit Test Mode</a></header><section class="card" style="padding:24px;margin:18px 0"><h2>Simulated date &amp; time</h2><form action="/v3/dev/clock" method="post"><label>Test date and time <input type="datetime-local" name="simulated_at" value="{{ simulated_now }}" required></label><button class="button button-blue" type="submit">Apply Test Clock</button></form><p>Current sandbox clock: {{ simulated_now }}</p></section><section class="card" style="padding:24px"><h2>Open any test shift</h2><p>No MST login required. Select a shift and enter its sandbox V3 workspace.</p><form action="/v3/dev/shift" method="post"><label for="shift">Shift</label><select id="shift" name="shift_type">{% for code in ("S1","S2","S3","S4","S5") %}<option value="{{ code }}">{{ code }}</option>{% endfor %}</select><button class="button button-blue" type="submit">Open Test Workspace</button></form>{% if active_shifts %}<h3>Existing sandbox shifts</h3>{% for s in active_shifts %}<p>{{ s.shift_type }} — {{ s.date }} <a href="/v3?shift_id={{ s.id }}">Resume test shift</a></p>{% endfor %}{% endif %}</section></main></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>IND3 Developer Workspace</title>
+  <link rel="stylesheet" href="/static/v3.css">
+  <link rel="stylesheet" href="/static/v3_design2.css">
+  <script src="/static/v3_live_clock.js" defer></script>
+  <style>
+    body{background:#f2f6fb;margin:0;padding:24px;color:#102b4b}
+    .dev-main{max-width:980px;margin:auto}
+    .dev-head{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+    .dev-head h1{margin-bottom:4px}
+    .dev-head p{margin-top:0}
+    .dev-card{padding:22px;margin:18px 0}
+    .dev-clocks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px}
+    .dev-time{border:1px solid #d5e1f2;background:#f8fbff;border-radius:10px;padding:16px}
+    .dev-time small{display:block;font-size:12px;font-weight:800;letter-spacing:.04em;color:#445c7b}
+    .dev-time strong{display:block;font-size:20px;line-height:1.4;margin:8px 0;color:#003d77}
+    .dev-time p{font-size:13px;color:#576b81;margin:4px 0 0}
+    .dev-clock-form{display:flex;align-items:end;flex-wrap:wrap;gap:12px;margin-top:18px}
+    .dev-clock-form label{display:flex;flex-direction:column;gap:6px;font-weight:700}
+    .dev-clock-form input{padding:9px 12px;border:1px solid #abc0d9;border-radius:7px}
+    .dev-clock-form button{min-height:39px}
+    .dev-muted{font-size:13px;color:#50647f}
+    @media(max-width:640px){body{padding:13px}.dev-clocks{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<main class="dev-main">
+  <header class="dev-head">
+    <div><h1>IND3 Test Workspace</h1><p>Isolated sandbox database. Production shift data is not changed.</p></div>
+    <a class="button button-outline" href="/dev/exit">Exit Test Mode</a>
+  </header>
+  <section class="card dev-card" aria-label="Real and test clocks">
+    <h2>Live date &amp; test clock</h2>
+    <div class="dev-clocks">
+      <div class="dev-time">
+        <small>LIVE DATE &amp; TIME · INDIANAPOLIS</small>
+        <strong><time data-v3-live-clock>Loading live clock…</time></strong>
+        <p>Real time, updating every second.</p>
+      </div>
+      <div class="dev-time">
+        <small>SANDBOX DATE &amp; TIME · {{ 'FROZEN' if clock_is_frozen else 'LIVE' }}</small>
+        <strong><time {% if not clock_is_frozen %}data-v3-live-clock{% endif %}>{{ simulated_now_label }}</time></strong>
+        <p>{{ 'All test shift decisions use this frozen date and time until you change it.' if clock_is_frozen else 'The test clock currently follows real time. Set a date below to simulate another shift.' }}</p>
+      </div>
+    </div>
+    <form class="dev-clock-form" action="/v3/dev/clock" method="post">
+      <label for="simulated-at">Set simulated date &amp; time
+        <input id="simulated-at" type="datetime-local" name="simulated_at" value="{{ simulated_now }}" required>
+      </label>
+      <button class="button button-blue" type="submit">Apply Test Clock</button>
+    </form>
+    <p class="dev-muted">Only sandbox requests use the simulated time. A date change does not automatically import historical Cetaris work orders.</p>
+  </section>
+  <section class="card dev-card">
+    <h2>Open any test shift</h2>
+    <p>No MST login required. Select a shift and enter its sandbox V3 workspace.</p>
+    <form action="/v3/dev/shift" method="post">
+      <label for="shift">Shift</label>
+      <select id="shift" name="shift_type">{% for code in ("S1","S2","S3","S4","S5") %}<option value="{{ code }}">{{ code }}</option>{% endfor %}</select>
+      <button class="button button-blue" type="submit">Open Test Workspace</button>
+    </form>
+    {% if active_shifts %}
+    <h3>Existing sandbox shifts</h3>
+    {% for s in active_shifts %}
+      <p>{{ s.shift_type }} — {{ s.date }} <a href="/v3?shift_id={{ s.id }}">Resume test shift</a></p>
+    {% endfor %}
+    {% endif %}
+  </section>
+</main>
+</body>
+</html>
