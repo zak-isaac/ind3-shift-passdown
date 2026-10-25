@@ -166,3 +166,22 @@ def test_automatic_validation_falls_back_on_prompt_echo_in_existing_passed_draft
     status=ai.statuses(sid)[0]
     assert status["status"]=="original" and status["draft"]==""
     assert "instruction" in status["reason"].casefold()
+
+
+def test_failed_local_ai_can_be_retried_without_reimport(tmp_path,monkeypatch):
+    import json
+    import db
+    db.set_db_path(tmp_path/"ai_retry.db")
+    db.init_db()
+    sid=db.start_shift("2026-10-25","S5","MST Test")
+    db.upsert_cmms_entry(sid,"RETRY-1","MDR.C0004","Belt slipped",
+                         json.dumps(["Reseated the roller belt. RTS."]),
+                         "Test Technician")
+    monkeypatch.setenv("IND3_OLLAMA_REWRITE","1")
+    monkeypatch.setattr(ai,"start_worker",lambda path:None)
+    assert ai.queue_shift(sid)==1
+    with ai._connect(ai._db_path()) as c:
+        c.execute("UPDATE v3_ollama_drafts SET status='original', reason='Ollama offline' WHERE shift_id=?",(sid,))
+    assert ai.queue_shift(sid)==0
+    assert ai.queue_shift(sid,retry_original=True)==1
+    assert ai.statuses(sid)[0]["status"]=="queued"
