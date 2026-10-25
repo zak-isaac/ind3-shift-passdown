@@ -7,7 +7,7 @@
 {% include 'v3/_topbar.html' %}
 <main class="d2-dashboard" id="main-content">
 
-<div class="d2-page-intro"><div><p class="eyebrow">SYSTEM</p><h1>Administration</h1><p>Facility roster and notification settings &mdash; shared with the V2 dashboard, one source of truth.</p></div></div>
+<div class="d2-page-intro"><div><p class="eyebrow">SYSTEM</p><h1>Administration</h1><p>Facility roster, email settings and notifications for the V3 Shift Passdown.</p></div></div>
 {% if notice %}<div class="v3-admin-notice">{{ notice }}</div>{% endif %}
 
 <div class="d2-kpis v3-admin-kpis">
@@ -31,7 +31,7 @@
       <label>Full name<input name="full_name" type="text" required placeholder="e.g. John Smith"></label>
       <label>Shift<select name="shift"><option value="">&mdash; Any &mdash;</option><option value="S1">S1</option><option value="S2">S2</option><option value="S3">S3</option><option value="S4">S4</option><option value="S5">S5</option></select></label>
       <label>Default ID<input name="default_id" type="text" placeholder="optional"></label>
-      <div class="v3-form-grid-footer"><label class="v3-roster-edit-check"><input type="checkbox" name="is_mst" value="1"> MST &mdash; can log into the lead dashboard</label><button type="submit" class="button button-blue">Add associate</button></div>
+      <div class="v3-form-grid-footer"><label class="v3-roster-edit-check"><input type="checkbox" name="is_mst" value="1"> MST role</label><button type="submit" class="button button-blue">Add associate</button></div>
     </form>
   </div>
 </section>
