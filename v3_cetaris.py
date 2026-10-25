@@ -155,7 +155,7 @@ def select_records(rows: list[dict], selected: set[str], start: datetime, end: d
             grouped[key] = {**r, "remarks_list": []}
         if r["remarks"] and r["remarks"] not in grouped[key]["remarks_list"]:
             grouped[key]["remarks_list"].append(r["remarks"])
-        if not grouped[key]["cause"] and r["cause"]:
+        if not grouped[key].get("cause") and r.get("cause"):
             grouped[key]["cause"] = r["cause"]
         if not grouped[key]["reported_issue"] and r["reported_issue"]:
             grouped[key]["reported_issue"] = r["reported_issue"]
