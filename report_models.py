@@ -16,7 +16,8 @@ class OosUnit(BaseModel):
 
 class RewrittenHappening(BaseModel):
     title: str        # asset ID
-    paragraph: str    # single-tech summary (used when sub_points is empty)
+    paragraph: str    # safely corrected and merged technician remarks
+    cause: str = ""   # Cetaris Service/Repair Description or MST-approved edit
     wo_number: str = ""  # WO number for the report line, empty for manual entries
     tech_name: str = ""  # who logged it (single-tech)
     # Multi-tech WOs: each tech's remark as its own sub-point
