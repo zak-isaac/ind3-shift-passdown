@@ -85,7 +85,7 @@ def test_full_login_import_ai_preview_and_eml(tmp_path,monkeypatch):
     monkeypatch.setattr(ai,"_generate",mock_local_ai)
     with TestClient(make_app(roster)) as browser:
         login=browser.get("/v3/login")
-        assert login.status_code==200 and "Your associate number" in login.text
+        assert login.status_code==200 and 'name="associate_id"' in login.text
         started=browser.post("/v3/login",data={"associate_id":"1001","mode":"start"},follow_redirects=False)
         assert started.status_code==303,started.text[:350]
         sid=int(started.headers["location"].split("shift_id=")[-1])
