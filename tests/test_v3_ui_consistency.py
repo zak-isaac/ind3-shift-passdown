@@ -26,7 +26,13 @@ def test_workshop_sidebar_restored_without_test_clock():
     sidebar = (ROOT/"templates/v3/_sidebar.html").read_text()
     css = (ROOT/"static/v3_design2.css").read_text()
     assert 'id="v3-sidebar"' in sidebar
-    assert 'hx-select-oob="#v3-sidebar"' in sidebar
+    # Full V3 page navigation preserves active sidebar states and lets the
+    # recovered Analytics Chart.js and Administration scripts initialize.
+    # Main-only HTMX swaps discarded the scripts on the recovered pages.
+    assert 'href="/v3/history?shift_id={{ sid }}"' in sidebar
+    assert 'href="/v3/analytics?shift_id={{ sid }}"' in sidebar
+    assert 'href="/v3/admin"' in sidebar
+    assert 'hx-select="#main-content"' not in sidebar
     assert 'class="d2-sidebar-profile"' in sidebar
     assert 'href="/v3/logout"' in sidebar
     assert 'data-v3-live-time' in sidebar
