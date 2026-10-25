@@ -66,17 +66,51 @@ def test_numeric_calibrations_cannot_be_truncated():
         "Recalibrated the fill head.")
     assert not ok and "technical" in reason.lower() or (not ok and "numeric" in reason.lower())
 
-def test_automated_pass_is_not_report_approval(tmp_path):
+def test_auto_validated_ai_used_without_mst_approval(tmp_path):
+    import json
     import db
-    db.set_db_path(tmp_path/"draft_only.db")
+    db.set_db_path(tmp_path/"validated_ai.db")
     db.init_db()
+    sid = db.start_shift("2026-10-25","S4","MST Test")
+    db.upsert_cmms_entry(sid,"AUTO-1","MDR0007","Roller trouble",
+                         json.dumps(["Reseated O-ring belt and verified conveyor operation. RTS."]),
+                         "Test Technician")
     ai.ensure_table(ai._db_path())
     with ai._connect(ai._db_path()) as c:
+        entries = [dict(e) for e in c.execute("SELECT * FROM entries WHERE shift_id=?", (sid,))]
+        groups = ai._group_sources(entries,{})
+        assert len(groups)==1
+        source = groups[0]
+        stamp = ai._source_hash(source["asset"],source["cause"],source["notes"])
         c.execute("""INSERT INTO v3_ollama_drafts
             (shift_id,wo_number,source_hash,asset,cause,source_json,draft,status,approved)
-            VALUES (42,'TEST-WO','snapshot','TEST-ASSET','Issue','["Replaced wire"]',
-                    'Replaced wire.','passed',0)""")
-    assert ai.approved_for_report(42)=={}
+            VALUES (?,?,?,?,?,?,?,'passed',0)""",
+            (sid,"AUTO-1",stamp,source["asset"],source["cause"],json.dumps(source["notes"]),
+             "Reseated O-ring belt and verified conveyor operation. RTS."))
+    assert ai.approved_for_report(sid)=={
+        "AUTO-1":"Reseated O-ring belt and verified conveyor operation. RTS."}
+    assert ai.statuses(sid)[0]["status"]=="passed"
+
+
+def test_old_passed_ai_without_source_evidence_restores_original(tmp_path):
+    import json
+    import db
+    db.set_db_path(tmp_path/"old_ai.db")
+    db.init_db()
+    sid = db.start_shift("2026-10-25","S4","MST Test")
+    db.upsert_cmms_entry(sid,"AUTO-2","BALER0005","Wire",
+                         json.dumps(["Replaced two boxes of wire."]),
+                         "Test Technician")
+    ai.ensure_table(ai._db_path())
     with ai._connect(ai._db_path()) as c:
-        c.execute("UPDATE v3_ollama_drafts SET approved=1 WHERE shift_id=42")
-    assert ai.approved_for_report(42)=={"TEST-WO":"Replaced wire."}
+        entries = [dict(e) for e in c.execute("SELECT * FROM entries WHERE shift_id=?", (sid,))]
+        item = ai._group_sources(entries,{})[0]
+        stamp = ai._source_hash(item["asset"],item["cause"],item["notes"])
+        c.execute("""INSERT INTO v3_ollama_drafts
+            (shift_id,wo_number,source_hash,asset,cause,source_json,draft,status,approved)
+            VALUES (?,?,?,?,?,?,?,'passed',1)""",
+            (sid,"AUTO-2",stamp,item["asset"],item["cause"],json.dumps(item["notes"]),
+             "Consolidated maintenance actions: Replaced two boxes of wire."))
+    assert ai.approved_for_report(sid)=={}
+    assert ai.statuses(sid)[0]["status"]=="original"
+    assert "instruction" in ai.statuses(sid)[0]["reason"].lower()
