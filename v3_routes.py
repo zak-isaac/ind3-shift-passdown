@@ -375,7 +375,11 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         try:
             value = json.loads(e.get("raw_remarks") or "[]")
             if isinstance(value, list):
-                return [str(v).strip() for v in value if str(v).strip()]
+                saved = [str(v).strip() for v in value if str(v).strip()]
+                if saved:
+                    return saved
+                # Manually entered WOs retain their technician remarks in
+                # entries.action rather than the CMMS raw_remarks JSON.
         except (TypeError, ValueError):
             pass
         return [str(e.get("action") or "").strip()] if e.get("action") else []
