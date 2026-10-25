@@ -176,6 +176,7 @@
 <script>
 (function(){
  const sid={{ shift.id|tojson }};
+ const aiEnabled={{ ai_enabled|tojson }};
  const labels=document.querySelectorAll('[data-ai-wo]');
  if(!labels.length)return;
  async function refresh(){
@@ -187,7 +188,11 @@
     const r=byWo.get(label.dataset.aiWo);
     const summary=document.querySelector('[data-ai-remark-wo="'+CSS.escape(label.dataset.aiWo)+'"]');
     const eligible=summary?.dataset.aiEligible==='1';
-    if(!r){label.textContent='';continue;}
+    if(!r){
+      label.textContent=!eligible?'MST Edited':(aiEnabled?'AI Not Run':'AI Disabled');
+      label.title=!eligible?'Manual edit retained':(aiEnabled?'No eligible Ollama rewrite recorded; original technician remarks shown':'Local Ollama rewriting is disabled; original technician remarks shown');
+      continue;
+    }
     const safe=eligible && r.status==='passed' && Number(r.approved)===1 && Boolean(r.draft);
     label.textContent=!eligible?'MST Edited':safe?'AI Passed':r.status==='queued'||r.status==='writing'?'AI Processing':'Original Restored';
     label.title=r.reason||'';
