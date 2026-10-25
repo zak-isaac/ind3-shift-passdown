@@ -80,4 +80,9 @@ def heading(h: RewrittenHappening) -> str:
 
 def remark(h: RewrittenHappening) -> str:
     """One displayable technician-remarks bullet per WO."""
-    return (h.paragraph or "").strip() or "No technician remarks recorded."
+    written = (h.paragraph or "").strip()
+    if written:
+        return written
+    if h.sub_points:  # Legacy saved reports remain readable.
+        return "; ".join(str(item[1]).strip() for item in h.sub_points if str(item[1]).strip())
+    return "No technician remarks recorded."
