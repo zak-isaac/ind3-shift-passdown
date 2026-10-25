@@ -235,6 +235,13 @@ def _actual_completion(items):
         shift_sets = {tuple(_windows(r[0])) for r in returns}
         if len(shift_sets)==1 and len(next(iter(shift_sets)))==1:
             return max(returns,key=lambda p:p[0])
+        # One actual In Service time and documented collaborating labor can
+        # still establish the shift via explicit S3/S4 handover priority.
+        # Do not pretend this establishes which individual pressed Complete.
+        times={r[0] for r in returns}
+        if len(times)==1:
+            moment,worker,_=returns[0]
+            return moment,worker,"Shared In Service + technician labor"
         return None
     return None
 
@@ -278,12 +285,20 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
         owner = None
         if evidence:
             when, completing_tech, source = evidence
-            if completing_tech not in selected:
+            if completing_tech not in selected and not source.startswith("Shared In Service"):
                 reason = "Completing technician is not selected for this shift"
                 owner = None
             else:
                 owner = _choose_completion_owner(
                     when, completing_tech, items, history, roster_shifts, confirmed)
+                # A shared return cannot decide an otherwise unresolved
+                # S1/S2 or S4/S5 overlap merely by list order.
+                if source.startswith("Shared In Service") and len(_windows(when))>1:
+                    allowed_handover = bool(owner and (
+                        (owner[0]=="S3" and when.time()<time(7)) or
+                        (owner[0]=="S4" and time(17,30)<=when.time()<time(18))))
+                    if not allowed_handover:
+                        owner=None
                 reason = ("Completion timestamp falls in overlapping shifts without reliable technician shift evidence"
                           if owner is None else "")
             if owner is None:
