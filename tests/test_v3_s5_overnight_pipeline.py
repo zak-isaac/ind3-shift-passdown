@@ -104,3 +104,31 @@ def test_s5_saturday_shift_credits_sunday_early_work_and_imports_nonduplicates(t
         }
         assert db.get_pm_count(shift_id)==1
         assert db.get_pm_count(other)==1
+        # Technician-supported equipment-return time is kept separately from
+        # administrative closure and survives importing another XLSX later.
+        assert "Oct 25, 1:18 AM" in screen.text
+        assert "Next day" in screen.text
+        with db._conn() as conn:
+            saved=conn.execute(
+                "SELECT completed_at FROM v3_wo_completion_times WHERE shift_id=? AND wo_number=?",
+                (shift_id,"S5-AM")).fetchone()
+        assert saved and saved[0].startswith("2026-10-25T01:18")
+        next_book=Workbook()
+        next_sheet=next_book.active
+        next_sheet.append(HEADERS)
+        next_sheet.append(labor("S5-LATER","2026-10-25T02:05:00",
+                                "2026-10-25T02:20:00","2026-10-25T02:18:00"))
+        next_buf=BytesIO();next_book.save(next_buf)
+        staged=client.post("/v3/import",data={"shift_id":str(shift_id)},
+            files={"file":("next_export.xlsx",next_buf.getvalue(),
+                          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+        assert staged.status_code==200
+        next_token=re.search(r"/v3/import/([0-9a-f]{32})/confirm",staged.text).group(1)
+        imported=client.post(f"/v3/import/{next_token}/confirm",
+            data={"shift_id":str(shift_id),"techs":["Tech S5"]},follow_redirects=False)
+        assert imported.status_code==303
+        after=client.get(f"/v3?shift_id={shift_id}")
+        assert "S5-AM" in after.text
+        assert "Oct 25, 1:18 AM" in after.text
+        assert "S5-LATER" in after.text
+
