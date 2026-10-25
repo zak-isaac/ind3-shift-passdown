@@ -47,6 +47,12 @@ JARGON_WHITELIST = {
     "comm",                           # shop-radio/dash jargon -> was becoming "come"
     "refed", "refeed",                # "re-fed the paper" -> was becoming "refer"
     "ranpak",                         # equipment brand name -> was becoming "rank"
+    # Additional IND3 equipment and control-system vocabulary.
+    "mdr", "vfd", "hmi", "scada", "wcs", "asrs", "osr", "knapp",
+    "kisoft", "autobagger", "autobagger", "voidfill", "voidfills",
+    "loto", "rfr", "wo", "wos", "o-ring", "o-rings", "rmt",
+    "spurs", "baler", "balers", "conveyors", "recirculation",
+    "retreaded", "retreading", "squeegees", "solenoids",
 }
 
 # Only correct plain alphabetic tokens -- never touch asset IDs (mixed
