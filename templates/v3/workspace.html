@@ -26,7 +26,7 @@
    <div class="card d2-kpi d2-shift-kpi"><div><small>Current shift</small><strong>{{ shift.shift_type }} · {{ shift.date }}</strong><span>IND3 · {{ shift.lead_name }}</span></div></div>
    <div class="card d2-kpi"><div><small>Selected technicians</small><strong>{{ selected_techs|length }}</strong><span>From the Cetaris report</span></div></div>
    <div class="card d2-kpi"><div><small>Shift happenings</small><strong>{{ happenings|length }}</strong><span>Reported work orders</span></div></div>
-   <div class="card d2-kpi"><div><small>Completed PMs</small><strong>{{ pm_count }}</strong><span>Unique closed PM WOs</span></div></div>
+   <div class="card d2-kpi"><div><small>Completed PMs</small><strong>{{ pm_count }}</strong><span>Unique Completed or Closed PM WOs</span></div></div>
  </section>
 
  <div class="d2-import-summary card" role="status">
@@ -78,7 +78,7 @@
      {% if staged.closure_review is defined and staged.closure_review %}
      <section class="d2-dialog-note" aria-label="Completed WO closure review">
        <strong>Completed work orders need Cetaris closure</strong>
-       <p>These work orders are marked Completed but not Closed. Choose what goes into this shift's passdown. Items added here are reminders only and are not counted as completed PMs.</p>
+       <p>These non-PM work orders are marked Completed but not Closed. Choose what goes into this shift's passdown. Completed PMs are already counted automatically.</p>
        {% for wo, code in staged.confirmed_split_decisions.items() %}
        <input type="hidden" name="split_wo_{{ wo }}" value="{{ code }}">
        {% endfor %}
@@ -116,7 +116,7 @@
 
  <div class="workspace-grid d2-workspace-grid">
  <section class="card happenings d2-happenings" id="happenings">
-   <div class="section-head d2-happenings-head"><div><h2>Shift happenings <span class="count-label">{{ happenings|length }}</span></h2><p>All Closed non-PM Cetaris work orders, reviewed by the shift owner.</p></div><button class="button button-outline" onclick="v3OpenManual()" type="button">Manual entry</button></div>
+   <div class="section-head d2-happenings-head"><div><h2>Shift happenings <span class="count-label">{{ happenings|length }}</span></h2><p>Closed non-PM work orders and MST-approved Completed reminders.</p></div><button class="button button-outline" onclick="v3OpenManual()" type="button">Manual entry</button></div>
    <div class="d2-table-filters"><input id="d2-search" type="search" placeholder="Search assets, issues, or remarks" aria-label="Search shift happenings"><select id="d2-type" aria-label="Filter by work type"><option value="">All types</option>{% for type in happenings|map(attribute="rfr_type")|unique|sort %}<option value="{{ type|lower|e }}">{{ type or "Unspecified" }}</option>{% endfor %}</select><select id="d2-asset" aria-label="Filter by asset"><option value="">All assets</option>{% for g in happenings %}<option value="{{ g.unit }}">{{ g.unit }}</option>{% endfor %}</select></div>
    <div class="d2-table-scroll"><table class="d2-wo-table"><thead><tr><th>Asset ID</th><th>Type</th><th>Cause / Issue</th><th>Tech Remarks</th><th>WO #</th><th>Actions</th></tr></thead><tbody>
    {% for g in happenings %}
@@ -133,7 +133,7 @@
  </section>
  <aside class="d2-tools">
  <section class="card d2-tools-card"><h2>Shift tools</h2>
- <details class="d2-tool" id="d2-pm"><summary><span class="d2-tool-name">PM Summary</span><span class="d2-tool-count d2-badge-green">{{ pm_count }}</span></summary><div class="d2-tool-inner">Unique closed PM work orders.{% if pm_wos %}<div class="pm-list">{% for p in pm_wos %}<div><b>{{ p.asset_id or 'Unknown asset' }}</b><span>WO# {{ p.wo_number }}</span></div>{% endfor %}</div>{% endif %}</div></details>
+ <details class="d2-tool" id="d2-pm"><summary><span class="d2-tool-name">PM Summary</span><span class="d2-tool-count d2-badge-green">{{ pm_count }}</span></summary><div class="d2-tool-inner">Unique Completed or Closed PM work orders.{% if pm_wos %}<div class="pm-list">{% for p in pm_wos %}<div><b>{{ p.asset_id or 'Unknown asset' }}</b><span>WO# {{ p.wo_number }}</span></div>{% endfor %}</div>{% endif %}</div></details>
  <details class="d2-tool"><summary><span class="d2-tool-name">LOTO Verification</span><span class="d2-tool-count {{ 'd2-badge-green' if loto.loto_verified else 'd2-badge-red' }}">{{ 'Verified' if loto.loto_verified else 'Review' }}</span></summary><form class="d2-tool-inner" method="post" action="/v3/loto"><input type="hidden" name="shift_id" value="{{ shift.id }}"><label><input type="checkbox" name="verified" value="1" {% if loto.loto_verified %}checked{% endif %}> All LOTO keys accounted for</label><label>Missing keys<input name="missing_keys" value="{{ loto.loto_missing_keys }}" placeholder="Key #"></label><button class="button button-blue" type="submit">Save LOTO</button></form></details>
  <details class="d2-tool"><summary><span class="d2-tool-name">Out of Service (OOS)</span><span class="d2-tool-count d2-badge-red">{{ oos_units|length }}</span></summary><div class="d2-tool-inner"><form method="post" action="/v3/oos/add"><input type="hidden" name="shift_id" value="{{ shift.id }}"><label>Asset ID<input name="unit" required maxlength="80" placeholder="VOIDFILL0201"></label><button class="button button-blue" type="submit">Mark OOS</button></form>{% for unit in oos_units %}<form method="post" action="/v3/oos/rts"><input type="hidden" name="shift_id" value="{{ shift.id }}"><input type="hidden" name="unit" value="{{ unit }}"><span>{{ unit }}</span> <button type="submit" class="button button-outline">Return to Service</button></form>{% else %}<p>No OOS assets.</p>{% endfor %}</div></details>
  <details class="d2-tool"><summary><span class="d2-tool-name">Returned to Service</span><span class="d2-tool-count d2-badge-yellow">{{ rts_units|length }}</span></summary><div class="d2-tool-inner">{% for unit in rts_units %}<form method="post" action="/v3/rts/undo"><input type="hidden" name="shift_id" value="{{ shift.id }}"><input type="hidden" name="unit" value="{{ unit }}"><span>{{ unit }}</span> <button class="button button-outline" type="submit">Remove log entry</button></form>{% else %}<p>No RTS events this shift.</p>{% endfor %}</div></details>
