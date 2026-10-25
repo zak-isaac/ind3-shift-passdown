@@ -73,7 +73,7 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
 </main>
 </div></div>
 <script>
-const D = {{ data_json | safe }};
+const D = {{ data | tojson }};
 const WM_BLUE='#0053e2', WM_SPARK='#ffc220', WM_RED='#c83939', WM_GREEN='#0c7739', GRAY='#94a3b8';
 Chart.defaults.font.family = "'Segoe UI', ui-sans-serif, system-ui, sans-serif";
 Chart.defaults.plugins.legend.display = false;

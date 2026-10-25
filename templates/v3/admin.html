@@ -20,8 +20,8 @@
   <div class="v3-admin-card-head"><h2>Associate Roster</h2><span class="v3-admin-card-tag">{{ roster_count }} loaded</span></div>
   <p class="v3-admin-card-sub">Seeded from the Associates spreadsheet. Edits save straight to the facility database.</p>
   <div class="v3-roster-toolbar">
-    <button type="button" class="button button-outline" hx-post="/v3/admin/roster/reload" hx-target="#v3-roster-reload-msg" hx-swap="innerHTML">Re-sync from Drax</button>
-    <span id="v3-roster-reload-msg" class="v3-roster-toolbar-hint">Imports all associates from the Drax file into the DB.</span>
+    <button type="button" class="button button-outline" hx-post="/v3/admin/roster/reload" hx-target="#v3-roster-reload-msg" hx-swap="innerHTML">Refresh roster</button>
+    <span id="v3-roster-reload-msg" class="v3-roster-toolbar-hint">Updates the active login roster from the facility database.</span>
   </div>
   <div id="v3-assoc-table" hx-get="/v3/admin/roster" hx-trigger="load" hx-swap="innerHTML"><p class="v3-roster-empty">Loading roster&hellip;</p></div>
   <div class="v3-roster-add">
@@ -39,7 +39,7 @@
 <section class="card v3-admin-card v3-accent-amber">
   <div class="v3-admin-card-head"><h2>Teams Notifications</h2><span class="v3-admin-card-tag {{ 'v3-tag-on' if teams_webhook_url else '' }}">{{ 'Active' if teams_webhook_url else 'Off' }}</span></div>
   <p class="v3-admin-card-sub">A card posts to this Teams channel whenever a tech logs a Down or Degraded unit.</p>
-  <form method="POST" action="/admin/teams-webhook" class="v3-webhook-form">
+  <form method="POST" action="/v3/admin/teams-webhook" class="v3-webhook-form">
     <input name="webhook_url" type="url" placeholder="https://walmart.webhook.office.com/..." value="{{ teams_webhook_url }}">
     <div class="v3-webhook-actions">
       <button type="submit" class="button button-blue">Save webhook</button>
