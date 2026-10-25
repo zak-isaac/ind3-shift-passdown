@@ -135,6 +135,10 @@ def _verify(source: list[str], result: str) -> tuple[bool, str]:
         return False, "Unverified RTS"
     if re.search(r"\b(?:technician|tech)\s*[A-Z0-9]\b", result, re.I):
         return False, "Technician labels in draft"
+    for pattern in (r"\b(?:resolved|fully operational|fixed)\b",
+                    r"\b(?:ordered|received|delivered)\b"):
+        if re.search(pattern, result, re.I) and not re.search(pattern, src, re.I):
+            return False, "Potential unsupported outcome"
     # Conservative note-by-note coverage: reject dropped collaborator details.
     # Good paraphrases may be rejected; original remarks are always available.
     stopwords = {"the","a","an","in","on","at","and","or","to","of","for","by",
@@ -154,10 +158,6 @@ def _verify(source: list[str], result: str) -> tuple[bool, str]:
     output_numbers = set(re.findall(r"(?<![a-z0-9])\d+(?:\.\d+)?(?![a-z0-9])", result, re.I))
     if source_numbers - output_numbers:
         return False, "Missing source measurements or numeric values"
-    for pattern in (r"\b(?:resolved|fully operational|fixed)\b",
-                    r"\b(?:ordered|received|delivered)\b"):
-        if re.search(pattern, result, re.I) and not re.search(pattern, src, re.I):
-            return False, "Potential unsupported outcome"
     return True, "AI draft ready for MST review; not approved"
 
 
