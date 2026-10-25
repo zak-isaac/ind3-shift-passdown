@@ -22,6 +22,19 @@ from v3_report_layout import build_shift_happenings
 import v3_ollama_background as ollama_drafts
 
 
+# Sandbox-only roster mapping. Never modifies Drax or production rosters.
+_TEST_TECH_SHIFTS = {
+    "alexander carr": "S4",
+    "bradley spires": "S4",
+    "kpedekpo koukpo": "S4",
+    "robert jones": "S4",
+    "isaac ssaku": "S2",
+    "douglas melvin": "S2",
+    "mang bawi": "S2",
+    "waheed popoola": "S2",
+    "rob tice": "N/A",
+}
+
 def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shift,
                      shift_window, lead_redirect, get_mst_roster=None, verify_mst_pin=None,
                      start_eligibility=None, allowed_shift_days=None, now_func=None,
@@ -548,19 +561,25 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         return return_workspace(shift_id,"Carry-over dismissed")
 
     def roster_technician_counts(counts, shift):
-        """Annotate detected technicians from the existing Drax roster."""
+        """Annotate every uploaded technician; sandbox mapping is isolated."""
         import re
         def key(name):
-            parts=re.findall(r"[a-z]+",str(name).casefold())
-            return tuple(sorted((parts[0],parts[-1]))) if len(parts)>=2 else tuple(parts)
-        assigned=set()
+            return " ".join(sorted(re.findall(r"[a-z]+", str(name).casefold())))
+        if __import__("dev_mode").is_active():
+            sandbox = {key(name): code for name, code in _TEST_TECH_SHIFTS.items()}
+            return [{**c, "shift_label": sandbox.get(key(c["name"]), "N/A"),
+                     "assigned": sandbox.get(key(c["name"])) == shift["shift_type"]}
+                    for c in counts]
+        assigned = set()
         if get_mst_roster:
             for person in get_mst_roster().values():
-                if str(person.get("shift","")).strip().upper()!=shift["shift_type"]:
+                if str(person.get("shift", "")).strip().upper() != shift["shift_type"]:
                     continue
-                name=person.get("full_name") or person.get("display_name") or ""
-                if name: assigned.add(key(name))
-        return [{**c,"assigned":key(c["name"]) in assigned} for c in counts]
+                name = person.get("full_name") or person.get("display_name") or ""
+                if name:
+                    assigned.add(key(name))
+        return [{**c, "shift_label": "", "assigned": key(c["name"]) in assigned}
+                for c in counts]
 
     def render(request, shift, **extra):
         info = model(shift["id"])
