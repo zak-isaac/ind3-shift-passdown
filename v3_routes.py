@@ -857,7 +857,8 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             stats["unique_happening_wos"] = len({r["wo_number"] for r in records
                                                  if r["kind"] == "happening"})
         audit_result = build_audit(rows, selected, attributed, records,
-                                   conflicting_wos=conflicting_wos)
+                                   conflicting_wos=conflicting_wos,
+                                   shift_type=shift["shift_type"],shift_day=shift["date"])
         v3_breakdown.sync(db,rows,selected,shift_id,
                           allowed_new_wos={r["wo_number"] for r in attributed})
         added,unchanged,pending=0,0,0
@@ -1049,6 +1050,11 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         if conflicting_wos:
             notice += (f" {len(conflicting_wos)} WO(s) already credited to another shift "
                        "were excluded without blocking the remaining work. Review those WOs in the import audit.")
+        if shift["shift_type"] == "S5":
+            notice += (f" After midnight: {audit_result['after_midnight_source_wos']} source WOs, "
+                       f"{audit_result['after_midnight_included_wos']} included.")
+            if audit_result["after_midnight_source_wos"] == 0:
+                notice += " If you worked after midnight, check the Cetaris export includes both calendar dates."
         skipped_parts=[]
         if stats.get("not_closed"):
             skipped_parts.append(f"{stats['not_closed']} not yet closed")
