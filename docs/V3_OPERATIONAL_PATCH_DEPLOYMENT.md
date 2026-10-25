@@ -14,7 +14,7 @@ The standard `python run_server.py` startup now exposes **V3 only**:
 This is a **route retirement**, not destructive removal of the historical source or stored shifts. Do not delete the V2 database or the shared report-generation code.
 
 ## Changes in this branch
-- Cetaris: no Start Date eligibility filtering for normal shifts; WO Closed Date/Time parsed; Completed Breakdown becomes a happening; In Process Breakdown enters WO-specific OOS tracking; PM counted only when Preventive Maintenance + Closed.
+- Cetaris: no Start Date eligibility filtering for normal shifts; WO Closed Date/Time parsed; Completed Breakdown becomes a happening; In Process Breakdown enters WO-specific OOS tracking; PM counted only when Preventive Maintenance + Completed or Closed, with a unique WO counted once.
 - Drax: shift-assigned technicians prechecked on the existing selection dialog; other staff optional.
 - S4/S5: MST can mark split-shift technicians and adjudicate overlap/missing WO close timestamps. Check duplicate WO credit across shifts before production release.
 - Re-import: WOs missing from subsequent exports retained, explicit reopened WOs excluded; previous manual edits flagged.

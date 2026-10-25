@@ -107,3 +107,33 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
 .d2-resume-form small { display:block; margin-top:4px; font-size:12px; color:#5c6e88; }
 .d2-choose-divider { margin-top: 25px; padding-top: 18px; border-top: 1px solid #e0e8f2; font-size: 14px; font-weight: 700; }
 .d2-choose-signout { margin-top: 20px; display: block; font-size: 12px; text-align: center; color: #0053e2; }
+
+/* V3 opt-in spelling review, no automatic rewrites. */
+.v3-spelling-trigger{display:inline-flex;margin:6px 0 8px;padding:6px 10px;font-size:11px}
+.v3-spelling-suggestion{margin:7px 0 14px;padding:12px;background:#f7faff;border:1px solid #cbdcf4;border-radius:8px;font-size:12px;color:#213b5f;line-height:1.5}
+.v3-spelling-suggestion p{margin:8px 0 12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.v3-spelling-suggestion button{margin:0 8px 5px 0}
+
+/* Two explicit Completed-WO choices in the technician confirmation modal. */
+.v3-closure-choice{padding:10px 12px;margin:10px 0;border:1px solid #d9e4f3;border-radius:8px;background:#fff}
+.v3-closure-choice legend{padding:0 5px;font-size:11px;font-weight:750;color:#173b6f}
+.v3-closure-choice label{display:block;margin:8px 0;font-size:11px;cursor:pointer}
+.v3-closure-choice input{margin-right:6px;accent-color:#0053e2}
+
+/* Distinguish actual live Indianapolis time from a simulated sandbox clock. */
+.d2-real-clock{display:flex;flex-direction:column;gap:2px;min-width:188px}
+.d2-real-clock small{font-size:10px;color:#516985;font-weight:800;letter-spacing:.04em}
+.d2-real-clock time{font-size:12px;font-weight:750;color:#003e78;white-space:nowrap}
+.v3-test-clock-banner{display:flex;align-items:center;flex-wrap:wrap;gap:9px;font-size:12px}
+.v3-test-clock-banner time{font-weight:750}
+@media(max-width:790px){.d2-real-clock{min-width:0}.d2-real-clock time{white-space:normal}}
+
+/* Additional WO audit inside the existing production V3 command center. */
+.d2-import-audit{margin:14px 0;padding:18px 22px}
+.d2-audit-kpis{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 16px}
+.d2-audit-kpis span{font-size:12px;background:#f5f8fd;padding:7px 10px;border-radius:8px;border:1px solid #dbe5f0;color:#2b4664}
+.d2-audit-kpis strong{font-weight:800;color:#003d77;font-size:16px;margin-right:4px}
+.d2-audit-details{border-top:1px solid #dfe8f4;padding-top:12px}
+.d2-audit-details summary{font-weight:750;font-size:13px;color:#0053a5;cursor:pointer}
+.d2-audit-scroll{margin-top:10px;max-height:380px;overflow:auto}
+.d2-audit-scroll .d2-wo-table{min-width:850px}

@@ -22,15 +22,16 @@ def read(request, roster):
         if not (0 <= time.time()-int(issued) < 12*3600): return None
         person=roster.get(assoc)
         if not person: return None
-        # The synthetic 8972 account may ONLY be entered by verified master flow.
-        if person.get("is_manager"):
-            if assoc!="8972" or not elevated or not os.environ.get("IND3_V3_MASTER_CODE"):
+        # Only the designated V3 override identifiers may hold elevated
+        # sessions. Cookie signatures prevent client-side privilege changes.
+        if elevated:
+            if assoc not in ("8972", "2759"):
                 return None
-        if elevated and not person.get("is_manager"):
-            allowed=os.environ.get("IND3_V3_PERSONAL_MASTER_ASSOC","").strip()
-            if not allowed or assoc!=allowed or not os.environ.get("IND3_V3_PERSONAL_MASTER_SECRET"):
+            if assoc == "8972" and not person.get("is_manager"):
                 return None
             person={**person,"is_manager":True}
+        elif person.get("is_manager"):
+            return None
         return {"associate":assoc,"shift_id":int(sid),"profile":person,"elevated":elevated}
     except (ValueError,TypeError,KeyError,UnicodeDecodeError):
         return None

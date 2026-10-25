@@ -18,7 +18,6 @@ import httpx
 from starlette.middleware.base import BaseHTTPMiddleware
 import associates as assoc_mod
 import db
-import dev_mode
 import emailer
 import signatures as _sigs
 import outlook_sender
@@ -226,7 +225,7 @@ def _find_end_shift_grace_shift(entered: str):
     entered = entered.strip()
     if not entered:
         return None
-    now = dev_mode.get_now()
+    now = datetime.now()
     for s in db.get_active_shifts():
         if s.get("opened_by_role") != "tech":
             continue
@@ -323,13 +322,6 @@ async def lifespan(_: FastAPI):
         dc_number=active_slug,
     )
 
-    # 2b. Boot the dev/test-mode sandbox DB (separate file, own schema) so
-    # /dev/* routes have somewhere safe to write immediately on first use.
-    with db.use_sandbox_db(dev_mode.DEV_DB_PATH):
-        db.init_db()
-        db.purge_orphaned_shifts()
-        db.init_settings(lead_pin_hash=_LEAD_PIN_DEFAULT, dc_number="DEVTEST")
-
     # 3. Seed associates from Excel if DB table is empty
     db.seed_associates(_ROSTER)
 
@@ -392,9 +384,9 @@ async def lifespan(_: FastAPI):
 
     asyncio.create_task(_shift_reaper())
 
-    # 8. Verify local AI rewriter (Ollama + model) — run in background so server starts immediately
-    import threading
-    threading.Thread(target=ai_rewriter.check_ollama, daemon=True).start()
+    # 8. Legacy AI writer is dormant in V3. Do not probe or warm its obsolete
+    # phi4-mini dependency; V3 uses qwen2.5:3b via v3_ollama_background.
+    # The V3 worker connects to local Ollama only after a confirmed import.
 
     yield
 
@@ -409,20 +401,6 @@ def _sync_facility_globals(fac: dict) -> None:
 
 
 app = FastAPI(title="Shift Passdown Generator", lifespan=lifespan)
-
-
-@app.middleware("http")
-async def _dev_mode_sandbox(request: Request, call_next):
-    """If this request carries a valid dev-mode session cookie, route the
-    ENTIRE request through the sandbox DB + frozen test date. Every other
-    request (the vast majority -- real production traffic) passes through
-    completely untouched. This is the single choke point that guarantees
-    dev/test traffic can never read or write the live shift.
-    """
-    if request.cookies.get(dev_mode.DEV_COOKIE) == dev_mode.DEV_TOKEN:
-        with db.use_sandbox_db(dev_mode.DEV_DB_PATH), dev_mode.freeze_time(dev_mode.dev_now()):
-            return await call_next(request)
-    return await call_next(request)
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -583,42 +561,6 @@ def _local_ip() -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────────────
-# DEV / TEST MODE  (T8972 or any real associate number)
-#
-# Completely sandboxed: own SQLite file, frozen date. The middleware
-# installed on `app` (see near FastAPI() construction) does the actual
-# swap for every request carrying the dev-session cookie -- these routes
-# just handle getting the cookie set/cleared and landing on the exact
-# same home page production uses.
-# ─────────────────────────────────────────────────────────────────────────────────────
-
-@app.get("/dev/login", response_class=HTMLResponse)
-async def dev_login_get(request: Request, error: str = ""):
-    return templates.TemplateResponse(
-        request, "dev_login.html", {"error": error}
-    )
-
-
-@app.post("/dev/login")
-async def dev_login_post(request: Request, code: str = Form(...)):
-    if not dev_mode.is_dev_credential(code, _ROSTER):
-        from urllib.parse import quote
-        err = quote("Not recognized. Use the test code or your associate number.")
-        return RedirectResponse(f"/dev/login?error={err}", status_code=303)
-    resp = RedirectResponse("/", status_code=303)
-    resp.set_cookie(dev_mode.DEV_COOKIE, dev_mode.DEV_TOKEN,
-                     httponly=True, samesite="lax", path="/")
-    return resp
-
-
-@app.get("/dev/exit")
-async def dev_exit():
-    resp = RedirectResponse("/", status_code=303)
-    resp.delete_cookie(dev_mode.DEV_COOKIE, path="/")
-    return resp
-
-
-# ─────────────────────────────────────────────────────────────────────────────────────
 # HOME
 # ─────────────────────────────────────────────────────────────
 
@@ -626,7 +568,7 @@ async def dev_exit():
 async def home(request: Request, error: str = ""):
     shifts = db.get_active_shifts()          # 0-2 active shifts
     shift  = shifts[0] if shifts else None   # backwards-compat for single-shift logic
-    now   = dev_mode.get_now()
+    now   = datetime.now()
     today = now.date().isoformat()
     elapsed_hours: float = 0.0
     if shift:
@@ -641,7 +583,7 @@ async def home(request: Request, error: str = ""):
     return templates.TemplateResponse(
         request, "home.html",
         {"shift": shift, "shifts": shifts, "today": today,
-         "elapsed_hours": elapsed_hours, "is_dev_mode": dev_mode.is_active(),
+         "elapsed_hours": elapsed_hours, 
          "day_name": day_name, "valid_shifts_today": valid_now, "error": error}
     )
 
@@ -728,7 +670,7 @@ async def shift_start(
         return RedirectResponse("/?error=Invalid+date+format", status_code=303)
 
     # No future dates -- today or earlier only (today = frozen dev date in test mode)
-    if parsed_date > dev_mode.get_today():
+    if parsed_date > date.today():
         return RedirectResponse(
             "/?error=Future+dates+are+not+allowed.+Pick+today+or+an+earlier+date.",
             status_code=303,
@@ -737,7 +679,7 @@ async def shift_start(
     # Dev/test mode intentionally bypasses the weekday<->shift_type pairing
     # (frozen date is always a Friday) so every shift type can be exercised
     # on the single frozen test date. Production traffic keeps the real rule.
-    allowed_days = None if dev_mode.is_active() else _WEEKDAY_SHIFTS.get(shift_type)
+    allowed_days = _WEEKDAY_SHIFTS.get(shift_type)
     if allowed_days is not None and parsed_date.weekday() not in allowed_days:
         day_label = parsed_date.strftime("%A")
         rule = ("S1, S2 and S3 run Monday - Thursday only"
@@ -777,7 +719,7 @@ async def shift_start(
         return RedirectResponse(f"/?error={err}", status_code=303)
 
     # -- Assigned-shift + time-window eligibility --
-    now = dev_mode.get_now()
+    now = datetime.now()
     allowed, is_ot, elig_err = _check_shift_start_eligibility(assoc, shift_type, now)
     if not allowed:
         from urllib.parse import quote
@@ -1379,7 +1321,7 @@ async def lead_login_post(
             try:
                 p = json.loads(pending_raw)
                 assoc = _ROSTER.get(entered)
-                _, is_ot, _ = _check_shift_start_eligibility(assoc, p["shift_type"], dev_mode.get_now())
+                _, is_ot, _ = _check_shift_start_eligibility(assoc, p["shift_type"], datetime.now())
                 bound_shift_id = db.start_shift(
                     p["date"], p["shift_type"], p["lead_name"],
                     opened_by_role="mst", is_ot=is_ot, opened_by_assoc=entered,
@@ -3195,130 +3137,31 @@ async def lead_generate(
     # Remove any RTS'd units that are still in OOS (edge case: form-only entries)
     db.remove_rts_from_oos(rts_from_form)
 
-    # ── Pull FRESH entries and consolidate duplicate WOs ──────────────────
-    # Same WO from multiple techs → one merged block with all remarks + tech list.
-    # Raw rows are never deleted; consolidation is view-only.
-    from wo_consolidator import consolidate_entries, consolidated_to_happenings, ConsolidatedWO, has_real_remarks
-    db_entries  = db.get_entries(shift_id)
-    co_result   = consolidate_entries(db_entries)   # handles excluded filter internally
-    co_happenings = consolidated_to_happenings(
-        co_result, wo_prefix_re=_WO_PREFIX_RE,
-        cause_lookup=db.get_wo_causes(shift_id),
-    )
-
-    # Optional: upgrade merged summaries via Element LLM if key is configured
-    from summarizer import summarize_remarks as _summarize, _ELEMENT_API_KEY as _EL_KEY
-
-    # Build passdown notes using the rule-based cleaner (deterministic, instant,
-    # zero hallucinations). AI rewriting was removed -- phi4-mini was too small
-    # Build AI inputs and track per-tech remarks for multi-tech WOs
-    ai_inputs: list[str] = []          # flat list: one entry per remark needing AI
-    # (happening_idx, tech_name, is_sub) so we can reconstruct sub_points
-    input_meta: list[tuple[int, str]] = []
-    ai_positions: list[int] = []        # position in input_meta -> position in ai_inputs
-    no_ai_positions: dict[int, str] = {}  # position in input_meta -> final text (AI bypassed)
-
-    for h_idx, h in enumerate(co_happenings):
-        title    = h["title"]
-        fallback = h.get("paragraph") or h.get("raw_remark") or title
-        cwo_match: ConsolidatedWO | None = None
-        for cwo in co_result.consolidated:
-            if cwo.wo_number == h["wo_number"]:
-                cwo_match = cwo
-                break
-
-        # Always synthesize every remark for this WO into ONE continuous
-        # narrative, whether it's one technician or several. Multi-tech WOs
-        # used to get one isolated AI call per tech (separate sub-bullets),
-        # which produced redundant, repeated-fact sentences when two techs
-        # described the same work ("Replaced brush on motor 4... / Installed
-        # a new brush for the motor..."). Rule 13b in ai_rewriter.py now
-        # explicitly forbids inventing connective tissue/outcomes during
-        # synthesis, so the hallucination risk that justified the old split
-        # is covered -- merging is safe and reads far better.
-        # cwo_match.all_remarks is already a deduped union across all techs.
-        raw = []
-        if cwo_match:
-            raw = [r for r in cwo_match.all_remarks if r and r.strip()]
-
-        pos = len(input_meta)
-        input_meta.append((h_idx, h.get("tech_name", "")))
-
-        if not cwo_match or not has_real_remarks(cwo_match):
-            # No real technician remarks exist for this WO -- `fallback` is
-            # OUR OWN synthetic placeholder (wo_consolidator._build_wo's
-            # "WO #X worked on by Y. No remarks recorded."), not something a
-            # technician actually wrote. Feeding synthetic filler to the AI
-            # gives it nothing real to rewrite, so it fabricates a narrative
-            # to fill the gap -- proven live 2026-09-17: "No remarks
-            # recorded" for TRKGATE0002/WO#27815641 became an invented "gate
-            # was serviced... no further observations... following our
-            # engineer Isaac S.'s intervention", complete with the tech's
-            # real name folded into fabricated prose. The 10-word placeholder
-            # is long enough to sail past _MIN_WORDS_FOR_AI, so word-count
-            # alone doesn't catch this -- it must be skipped explicitly.
-            no_ai_positions[pos] = fallback
-        else:
-            ai_positions.append(pos)
-            ai_inputs.append(ai_rewriter.build_input(title, raw))
-
-    ai_results  = await asyncio.to_thread(ai_rewriter.rewrite_batch, ai_inputs)
-    rewritten_flat: list[str] = [""] * len(input_meta)
-    for pos, result in zip(ai_positions, ai_results):
-        rewritten_flat[pos] = result
-    for pos, text in no_ai_positions.items():
-        rewritten_flat[pos] = text
-
-    # Reconstruct per-happening with sub_points for multi-tech
-    from collections import defaultdict, OrderedDict
-    groups: dict[int, list[tuple[str, str]]] = defaultdict(list)
-    for (h_idx, t_name), para in zip(input_meta, rewritten_flat):
-        groups[h_idx].append((t_name, para))
-
-    raw_happenings: list[RewrittenHappening] = []
-    for h_idx, h in enumerate(co_happenings):
-        pts = groups[h_idx]
-        if not pts or not any(p.strip() for _, p in pts):
-            continue
-        clean = [(t, p) for t, p in pts if p.strip() and p.strip() not in ("-", "--")]
-        if not clean:
-            continue
-        if len(clean) == 1:
-            raw_happenings.append(RewrittenHappening(
-                title=h["title"], paragraph=clean[0][1],
-                wo_number=h["wo_number"], tech_name=clean[0][0], sub_points=[],
-            ))
-        else:
-            raw_happenings.append(RewrittenHappening(
-                title=h["title"], paragraph="",
-                wo_number=h["wo_number"], tech_name="", sub_points=clean,
-            ))
-
-    from collections import OrderedDict
-    asset_groups: OrderedDict = OrderedDict()
-    for rh in raw_happenings:
-        asset_groups.setdefault(rh.title, []).append(rh)
-
-    happenings: list[RewrittenHappening] = []
-    for asset_id, group in asset_groups.items():
-        if len(group) == 1:
-            happenings.append(group[0])
-        else:
-            sub_pts: list[tuple[str, str]] = []
-            for rh in group:
-                if rh.sub_points:
-                    for _, remark in rh.sub_points:
-                        sub_pts.append((rh.wo_number, remark))
-                else:
-                    sub_pts.append((rh.wo_number, rh.paragraph))
+    # V3 uses exactly the same deterministic source and text rules as the
+    # Command Center and report preview. Never send these remarks through the
+    # legacy AI rewrite/summarizer paths, which may invent work or drift from
+    # the MST's approved text.
+    from v3_report_layout import build_shift_happenings
+    from v3_proofread import proofread
+    db_entries = db.get_entries(shift_id)
+    with db._conn() as c:
+        # Older pre-V3 shifts may have no sidecar metadata yet.
+        try:
+            meta_rows = c.execute(
+                "SELECT * FROM v3_entry_meta WHERE shift_id=?", (shift_id,)
+            ).fetchall()
+        except Exception as exc:
+            if "no such table" not in str(exc).lower():
+                raise
+            meta_rows = []
+    meta_by_id = {m["entry_id"]: dict(m) for m in meta_rows}
+    from v3_ollama_background import approved_for_report
+    happenings = build_shift_happenings(db_entries, meta_by_id, approved_remarks=approved_for_report(shift_id))
+    for title, note in zip(extra_title, extra_note):
+        if title.strip() and note.strip():
             happenings.append(RewrittenHappening(
-                title=asset_id, paragraph="", wo_number="", tech_name="", sub_points=sub_pts,
+                title=title.strip(), paragraph=proofread(note.strip())
             ))
-
-
-    for t, n in zip(extra_title, extra_note):
-        if t.strip() and n.strip():
-            happenings.append(RewrittenHappening(title=t.strip(), paragraph=n.strip()))
 
     # OOS always comes from the persistent DB — not the form
     oos_units = db.get_oos_units()
@@ -3492,7 +3335,7 @@ _v3_router = create_v3_router(
     verify_mst_pin=lambda pin: bool(pin) and hashlib.sha256(pin.encode()).hexdigest() == _get_pin_hash(),
     start_eligibility=_check_shift_start_eligibility,
     allowed_shift_days=_WEEKDAY_SHIFTS,
-    now_func=dev_mode.get_now,
+    now_func=datetime.now,
     get_v2_cookie_value=_get_pin_hash,
     legacy_lead_page=lead_page,
     generate_report=lead_generate,

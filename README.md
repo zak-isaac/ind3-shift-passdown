@@ -13,7 +13,7 @@
 
 ## All-shift Cetaris rollout checklist (S1–S5)
 
-V3's import route uses the same shift/date ownership engine for S1, S2, S3, S4 and S5.
+V3's import route uses the same shift/date ownership engine for S1, S2, S3, S4 and S5. Completed and Closed Preventive Maintenance work orders both count toward the PM total. Spelling correction runs automatically using a technical vocabulary dictionary; imported Cetaris source remarks are preserved.
 Thursday-night S3 continues into Friday morning. Overlap ownership uses confirmed
 roster assignments and technician labor, not administrative WO closure.
 An imported completed WO that is already credited to another shift is blocked

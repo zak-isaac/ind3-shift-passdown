@@ -16,7 +16,11 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 import db
 import v3_breakdown
 import v3_split
+from v3_import_audit import build_audit, preview_status
 from v3_cetaris import parse_excel, select_records, technician_counts, MAX_SIZE
+from v3_proofread import proofread
+from v3_report_layout import build_shift_happenings
+import v3_ollama_background as ollama_drafts
 
 
 def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shift,
@@ -39,7 +43,8 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
 
     def set_session_cookies(response, who, sid):
         response.set_cookie(v3_cookie, signed_session(who["associate"],sid,elevated=bool(who.get("elevated")) or bool(who["profile"].get("is_manager"))), max_age=12*3600,
-                            httponly=True, samesite="strict", path="/", secure=False)
+                            httponly=True, samesite="strict", path="/",
+                            secure=os.environ.get("IND3_V3_SECURE_COOKIES", "") == "1")
         # V3 is the only authenticated UI; clear any stale V2 cookies.
         for cookie in ("lead_auth","lead_shift_id","mgr_session",
                        "tech_assoc","tech_shift","tech_name"):
@@ -73,12 +78,13 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                 return day
         return None
 
-    def entry_page(request, error="", master_verified=False):
+    def entry_page(request, error="", master_verified=False, master_auth_prompt=False):
         shifts=_v3_live_shifts()
         now=now_func() if now_func else datetime.now()
         return templates.TemplateResponse(request,"v3/login.html",{
             "error":error,"shifts":shifts,"today":now.date().isoformat(),
             "master_verified":master_verified,
+            "master_auth_prompt":master_auth_prompt,
             "eligible_shifts":[code for code in ("S1","S2","S3","S4","S5") if _v3_shift_day(code)],
             "valid_shifts": [code for code,days in (allowed_shift_days or {}).items()
                              if now.date().weekday() in days] or ["S1","S2","S3","S4","S5"],
@@ -100,6 +106,20 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         if get_mst_roster is None:
             return lead_redirect("/v3")
         associate=associate_id.strip()
+        # Ordinary associate and authorized management entry only.
+        # Two explicitly designated override identifiers open shift selection
+        # directly. This is an operational override, not a second login form.
+        if associate in ("8972", "2759"):
+            roster = get_mst_roster()
+            profile = roster.get(associate)
+            if associate == "8972":
+                if not profile or not profile.get("is_manager"):
+                    return entry_page(request, "Override profile is unavailable.")
+            elif not profile:
+                return entry_page(request, "Personal override profile is unavailable.")
+            response = entry_page(request, master_verified=True)
+            set_session_cookies(response, {"associate": associate, "profile": {**profile, "is_manager": True}, "elevated": True}, 0)
+            return response
         profile=get_mst_roster().get(associate)
         if not profile:
             return entry_page(request,"Associate number not found in the current roster.")
@@ -160,32 +180,6 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             return entry_page(request,"The active-shift limit was reached. Try again.")
         response=RedirectResponse(f"/v3?shift_id={sid}",status_code=303)
         set_session_cookies(response,who,sid)
-        return response
-
-    @router.post("/master/verify", response_class=HTMLResponse)
-    async def verify_master(request:Request, master_code:str=Form(""), associate_id:str=Form("")):
-        # Both credentials must be explicitly configured on the workshop server.
-        # Neither associate number alone nor a hardcoded code grants access.
-        roster = get_mst_roster() if get_mst_roster else {}
-        associate = associate_id.strip()
-        shared = os.environ.get("IND3_V3_MASTER_CODE","")
-        personal_assoc = os.environ.get("IND3_V3_PERSONAL_MASTER_ASSOC","").strip()
-        personal_secret = os.environ.get("IND3_V3_PERSONAL_MASTER_SECRET","")
-        if associate:
-            valid = bool(personal_assoc and personal_secret and associate==personal_assoc
-                         and hmac.compare_digest(master_code.strip(),personal_secret))
-            profile = roster.get(associate) if valid else None
-            if not profile or profile.get("is_manager"):
-                return entry_page(request,"Management verification failed.")
-            profile = {**profile,"is_manager":True}
-        else:
-            valid = bool(shared and hmac.compare_digest(master_code.strip(),shared))
-            profile = roster.get("8972") if valid else None
-            if not profile or not profile.get("is_manager"):
-                return entry_page(request,"Management verification failed.")
-            associate = "8972"
-        response = entry_page(request, master_verified=True)
-        set_session_cookies(response, {"associate":associate,"profile":profile,"elevated":True}, 0)
         return response
 
     @router.post("/master/select")
@@ -257,11 +251,28 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                   imported_v3 INTEGER NOT NULL DEFAULT 0,
                   source_snapshot TEXT NOT NULL DEFAULT ''
                 );
+                CREATE TABLE IF NOT EXISTS v3_pending_closure (
+                  shift_id INTEGER NOT NULL, wo_number TEXT NOT NULL,
+                  decision TEXT NOT NULL, decided_at TEXT NOT NULL,
+                  PRIMARY KEY (shift_id, wo_number)
+                );
+                CREATE TABLE IF NOT EXISTS v3_wo_attribution_audit (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  shift_id INTEGER NOT NULL, wo_number TEXT NOT NULL,
+                  source_signature TEXT NOT NULL,
+                  evidence_json TEXT NOT NULL, recorded_at TEXT NOT NULL,
+                  UNIQUE (shift_id, wo_number, source_signature)
+                );
                 CREATE TABLE IF NOT EXISTS v3_shift_selection (
                   shift_id INTEGER PRIMARY KEY,
                   technicians_json TEXT NOT NULL DEFAULT '[]',
                   filename TEXT NOT NULL DEFAULT '',
                   imported_at TEXT NOT NULL DEFAULT ''
+                );
+                CREATE TABLE IF NOT EXISTS v3_import_audit (
+                  shift_id INTEGER PRIMARY KEY,
+                  filename TEXT NOT NULL DEFAULT '',
+                  audit_json TEXT NOT NULL DEFAULT '{}'
                 );
                 CREATE TABLE IF NOT EXISTS v3_shift_source (
                   shift_id INTEGER PRIMARY KEY, filename TEXT NOT NULL, rows_json TEXT NOT NULL
@@ -315,6 +326,10 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             meta_rows = c.execute("SELECT * FROM v3_entry_meta WHERE shift_id=?", (shift_id,)).fetchall()
             pm_rows = c.execute("SELECT * FROM pm_wos WHERE shift_id=? ORDER BY wo_number", (shift_id,)).fetchall()
             selection = c.execute("SELECT * FROM v3_shift_selection WHERE shift_id=?", (shift_id,)).fetchone()
+            audit_row = c.execute("SELECT audit_json FROM v3_import_audit WHERE shift_id=?", (shift_id,)).fetchone()
+            reminders = {r[0] for r in c.execute(
+                "SELECT wo_number FROM v3_pending_closure WHERE shift_id=? AND decision='add'",
+                (shift_id,)).fetchall()}
         meta = {m["entry_id"]: dict(m) for m in meta_rows}
         groups = {}
         for e in entries:
@@ -322,22 +337,25 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             key = e.get("wo_number") or f"manual:{e['id']}"
             m = meta.get(e["id"], {})
             r = dict(e)
-            r["reported_issue"] = m.get("reported_issue") or e.get("issue", "")
-            r["cause_text"] = m.get("cause_text") or ""
+            r["reported_issue"] = proofread(m.get("reported_issue") or e.get("issue", ""))
+            r["cause_text"] = proofread(m.get("cause_text") or "")
             r["needs_review"] = bool(m.get("needs_review"))
             r["mst_edited"] = bool(m.get("mst_edited"))
             r["rfr_type"] = m.get("rfr_type") or ("Work Request" if e.get("tech_name") in ("MST (Manual)","Shift Owner (Manual)") else "Other")
-            r["remarks_list"] = _remarks(e)
+            r["remarks_list"] = [proofread(v) for v in _remarks(e)]
+            r["needs_closure"] = bool(e.get("wo_number") in reminders)
             g = groups.setdefault(key, {
                 "key": key, "wo_number": e.get("wo_number") or "", "main_id":e["id"],
                 "unit":e.get("unit") or "", "reported_issue":r["reported_issue"],
-                "cause_text":r["cause_text"], "rfr_type":r["rfr_type"], "rows":[], "excluded":True,"needs_review":False,
+                "cause_text":r["cause_text"], "rfr_type":r["rfr_type"], "rows":[], "excluded":True,"needs_review":False,"needs_closure":r["needs_closure"],
             })
             g["rows"].append(r)
             if not e.get("excluded"):
                 g["excluded"] = False
             if r["needs_review"]:
                 g["needs_review"] = True
+            if r["needs_closure"]:
+                g["needs_closure"] = True
             if not g["cause_text"] and r["cause_text"]:
                 g["cause_text"] = r["cause_text"]
         return {
@@ -347,6 +365,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             "selected_techs": json.loads(selection["technicians_json"]) if selection else [],
             "selected_split_techs": json.loads(selection["split_techs_json"]) if selection else [],
             "imported_filename": selection["filename"] if selection else "",
+            "import_audit": json.loads(audit_row["audit_json"]) if audit_row else None,
             "imported_at": selection["imported_at"] if selection else "",
             "pending_breakdowns": v3_breakdown.pending(db),
         }
@@ -355,7 +374,11 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         try:
             value = json.loads(e.get("raw_remarks") or "[]")
             if isinstance(value, list):
-                return [str(v).strip() for v in value if str(v).strip()]
+                saved = [str(v).strip() for v in value if str(v).strip()]
+                if saved:
+                    return saved
+                # Manually entered WOs retain their technician remarks in
+                # entries.action rather than the CMMS raw_remarks JSON.
         except (TypeError, ValueError):
             pass
         return [str(e.get("action") or "").strip()] if e.get("action") else []
@@ -465,25 +488,31 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         return return_workspace(shift_id,"Carry-over dismissed")
 
     def roster_technician_counts(counts, shift):
-        """Annotate detected technicians from the existing Drax roster."""
+        """Annotate every uploaded technician; sandbox mapping is isolated."""
         import re
         def key(name):
-            parts=re.findall(r"[a-z]+",str(name).casefold())
-            return tuple(sorted((parts[0],parts[-1]))) if len(parts)>=2 else tuple(parts)
-        assigned=set()
+            return " ".join(sorted(re.findall(r"[a-z]+", str(name).casefold())))
+        assigned = set()
         if get_mst_roster:
             for person in get_mst_roster().values():
-                if str(person.get("shift","")).strip().upper()!=shift["shift_type"]:
+                if str(person.get("shift", "")).strip().upper() != shift["shift_type"]:
                     continue
-                name=person.get("full_name") or person.get("display_name") or ""
-                if name: assigned.add(key(name))
-        return [{**c,"assigned":key(c["name"]) in assigned} for c in counts]
+                name = person.get("full_name") or person.get("display_name") or ""
+                if name:
+                    assigned.add(key(name))
+        return [{**c, "shift_label": "", "assigned": key(c["name"]) in assigned}
+                for c in counts]
 
     def render(request, shift, **extra):
         info = model(shift["id"])
         if extra.get("staged"):
             extra["staged"]={**extra["staged"],
                              "counts":roster_technician_counts(extra["staged"]["counts"],shift)}
+            with db._conn() as c:
+                batch_preview = c.execute("SELECT rows_json FROM v3_import_batches WHERE token=?",
+                                          (extra["staged"]["token"],)).fetchone()
+            if batch_preview:
+                extra["staged"]["preview"] = preview_status(json.loads(batch_preview["rows_json"]))
         context = {
             "shift":shift,
             **info,
@@ -718,7 +747,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         # Every shift (including Thursday S3 carried into Friday morning)
         # uses the same WO ownership engine. Roster home shifts resolve
         # overlapping handovers; explicit selected OT still remains selectable.
-        split_selected=set(split_techs) & selected if shift["shift_type"]=="S5" else set()
+        split_selected=set(selected) if shift["shift_type"]=="S5" else set()
         roster_shifts={}
         if get_mst_roster is not None:
             import re
@@ -747,7 +776,44 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                         "split_review":unresolved,
                         "checked_techs":sorted(selected),
                         "checked_split_techs":sorted(split_selected)})
-        records,stats=select_records(attributed,selected,*window)
+        # A Cetaris Completed WO is not officially Closed. Offer exactly
+        # two MST choices before counting anything from this import.
+        closure_candidates = {}
+        already_closed = {str(raw.get("wo_number","")).strip() for raw in attributed
+                          if str(raw.get("status","")).strip().casefold() == "closed"}
+        for raw in attributed:
+            if str(raw.get("status", "")).strip().casefold() != "completed":
+                continue
+            if str(raw.get("rfr", "")).strip().casefold() in ("preventive maintenance", "preventative maintenance"):
+                continue  # Completed PMs are automatically counted, no popup.
+            wo = str(raw.get("wo_number", "")).strip()
+            if wo and wo not in already_closed:
+                item = closure_candidates.setdefault(wo, {
+                    "wo_number": wo, "asset_id": raw.get("asset_id") or "",
+                    "technicians": set(), "rfr": raw.get("rfr") or ""})
+                item["technicians"].add(raw.get("tech_name", ""))
+        closure_decisions = {
+            key[len("completed_wo_"):]: value
+            for key, value in submitted.multi_items()
+            if key.startswith("completed_wo_") and value in ("add", "ignore")
+        }
+        missing_closure = [
+            {**item, "technicians": ", ".join(sorted(item["technicians"]))}
+            for wo, item in closure_candidates.items() if wo not in closure_decisions
+        ]
+        if missing_closure:
+            return render(request, shift,
+                warning="Review completed work orders that are not yet Closed in Cetaris.",
+                staged={"token": token, "filename": batch["filename"],
+                        "counts": technician_counts(rows), "total_rows": len(rows),
+                        "checked_techs": sorted(selected),
+                        "checked_split_techs": sorted(split_selected),
+                        "confirmed_split_decisions": decisions,
+                        "closure_review": missing_closure,
+                        "checked_closure_decisions": closure_decisions})
+        records,stats=select_records(attributed,selected,*window,
+                                     closure_reviews=closure_decisions)
+        audit_result = build_audit(rows,selected,attributed,records)
         # Cross-shift completion credit must be unique across the database,
         # including older PM records. Never silently overwrite another shift.
         completed_wos={r["wo_number"] for r in records if r["kind"] in ("pm","happening")}
@@ -902,7 +968,54 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                     c.execute("INSERT INTO v3_entry_meta(entry_id,shift_id,reported_issue,cause_text,original_remarks,imported_v3,source_snapshot,rfr_type) VALUES (?,?,?,?,?,1,?,?)",
                               (eid,shift_id,r["reported_issue"],r["reported_issue"],json.dumps(r["remarks_list"]),json.dumps(incoming),r["rfr"]))
                 added+=1
+        # Retain a minimal WO-level audit trail of why a shift received
+        # work credit. Do not duplicate raw remarks or personally identifying
+        # fields beyond already-selected technician names.
+        audit_by_wo = {}
+        for raw in attributed:
+            wo = str(raw.get("wo_number", "")).strip()
+            if not wo:
+                continue
+            audit_by_wo.setdefault(wo, []).append(raw)
         with db._conn() as c:
+            for wo, labor in audit_by_wo.items():
+                evidence = {
+                    "shift_type": shift["shift_type"], "shift_date": shift["date"],
+                    "asset_id": labor[0].get("asset_id", ""),
+                    "technicians": sorted({r.get("tech_name", "") for r in labor}),
+                    "recorded_statuses": sorted({r.get("status", "") for r in labor}),
+                    "work_starts": sorted({r.get("start_at", "") for r in labor if r.get("start_at")}),
+                    "in_service": sorted({r.get("in_service_at", "") for r in labor if r.get("in_service_at")}),
+                    "last_completed": sorted({r.get("last_complete_at", "") for r in labor if r.get("last_complete_at")}),
+                    "wo_closed": sorted({r.get("closed_at", "") for r in labor if r.get("closed_at")}),
+                    "roster_shifts": {r.get("tech_name", ""): roster_shifts.get(r.get("tech_name", ""), "")
+                                      for r in labor},
+                    "mst_shift_override": decisions.get(wo, ""),
+                    "mst_closure_choice": closure_decisions.get(wo, ""),
+                }
+                payload = json.dumps(evidence, sort_keys=True)
+                digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+                c.execute("""INSERT OR IGNORE INTO
+                    v3_wo_attribution_audit(shift_id,wo_number,source_signature,evidence_json,recorded_at)
+                    VALUES (?,?,?,?,?)""",
+                    (shift_id, wo, digest, payload, datetime.now(timezone.utc).isoformat()))
+        # Save explicit MST choices and clear reminders upon confirmed closure.
+        with db._conn() as c:
+            for wo, decision in closure_decisions.items():
+                if wo in closure_candidates:
+                    c.execute("""INSERT INTO v3_pending_closure(shift_id,wo_number,decision,decided_at)
+                        VALUES (?,?,?,?) ON CONFLICT(shift_id,wo_number)
+                        DO UPDATE SET decision=excluded.decision,decided_at=excluded.decided_at""",
+                        (shift_id,wo,decision,datetime.now(timezone.utc).isoformat()))
+            closed_wos = {raw["wo_number"] for raw in attributed
+                          if str(raw.get("status","")).strip().casefold() == "closed"}
+            for wo in closed_wos:
+                c.execute("DELETE FROM v3_pending_closure WHERE shift_id=? AND wo_number=?",
+                          (shift_id,wo))
+        with db._conn() as c:
+            c.execute("INSERT INTO v3_import_audit(shift_id,filename,audit_json) VALUES (?,?,?) "
+                      "ON CONFLICT(shift_id) DO UPDATE SET filename=excluded.filename,audit_json=excluded.audit_json",
+                      (shift_id,batch["filename"],json.dumps(audit_result)))
             c.execute("INSERT INTO v3_shift_source(shift_id,filename,rows_json) VALUES (?,?,?) "
                       "ON CONFLICT(shift_id) DO UPDATE SET filename=excluded.filename,rows_json=excluded.rows_json",
                       (shift_id,batch["filename"],batch["rows_json"]))
@@ -910,7 +1023,9 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                       "ON CONFLICT(shift_id) DO UPDATE SET technicians_json=excluded.technicians_json,filename=excluded.filename,imported_at=excluded.imported_at,split_techs_json=excluded.split_techs_json",
                       (shift_id,json.dumps(sorted(selected)),batch["filename"],datetime.now().strftime("%Y-%m-%d %H:%M"),json.dumps(sorted(split_selected))))
             c.execute("DELETE FROM v3_import_batches WHERE token=?",(token,))
-        notice=f"Imported {added} new technician/WO entries; {unchanged} unchanged; {pending} flagged for review. {stats.get('unique_pm_wos',0)} distinct closed PM WOs in this import."
+        ollama_drafts.queue_shift(shift_id)
+        notice=f"Imported {added} new technician/WO entries; {unchanged} unchanged; {pending} flagged for review. {stats.get('unique_pm_wos',0)} distinct Completed or Closed PM WOs in this import."
+        notice += f" Audit: {audit_result['work_orders']} source WOs, {audit_result['included_work_orders']} included, {audit_result['ignored_count']} not counted. Review the audit below."
         skipped_parts=[]
         if stats.get("not_closed"):
             skipped_parts.append(f"{stats['not_closed']} not yet closed")
@@ -927,14 +1042,20 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         rows=group_for_entry(shift_id,entry_id)
         with db._conn() as c:
             meta={r["entry_id"]:dict(r) for r in c.execute("SELECT * FROM v3_entry_meta WHERE shift_id=?",(shift_id,))}
+        with db._conn() as c:
+            needs_closure = bool(c.execute(
+                "SELECT 1 FROM v3_pending_closure WHERE shift_id=? AND wo_number=? AND decision='add'",
+                (shift_id,rows[0].get("wo_number") or "")).fetchone())
         items=[]
         for r in rows:
             m=meta.get(r["id"],{})
-            items.append({**r, "remarks": "\n".join(_remarks(r)),
-                          "cause_text":m.get("cause_text") or "",
-                          "reported_issue":m.get("reported_issue") or (r.get("issue") or "").split(" — ",1)[-1],
+            items.append({**r, "remarks": "\n".join(proofread(v) for v in _remarks(r)),
+                          "cause_text":proofread(m.get("cause_text") or ""),
+                          "reported_issue":proofread(m.get("reported_issue") or (r.get("issue") or "").split(" — ",1)[-1]),
                           "needs_review":m.get("needs_review",0), "pending":json.loads(m["pending_json"]) if m.get("pending_json") else None})
-        return templates.TemplateResponse(request,"v3/happening_modal.html",{"shift":shift,"items":items,"happening":items[0]})
+        return templates.TemplateResponse(request,"v3/happening_modal.html",{
+            "shift":shift,"items":items,"happening":items[0],
+            "needs_closure":needs_closure})
 
     @router.post("/happening/{entry_id}/edit")
     async def edit_happening(request:Request,entry_id:int,shift_id:int=Form(...),reported_issue:str=Form(""),cause_text:str=Form("")):
@@ -943,9 +1064,9 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         form=await request.form()
         with db._conn() as c:
             for r in group:
-                remarks=str(form.get(f"remarks_{r['id']}",""))[:12000].strip()
-                issue=reported_issue[:4000].strip()
-                cause=cause_text[:4000].strip()
+                remarks=proofread(str(form.get(f"remarks_{r['id']}",""))[:12000].strip())
+                issue=proofread(reported_issue[:4000].strip())
+                cause=proofread(cause_text[:4000].strip())
                 raw=json.dumps([part.strip() for part in remarks.splitlines() if part.strip()])
                 prefix=f"WO #{r['wo_number']} — " if r.get("wo_number") else ""
                 c.execute("UPDATE entries SET issue=?, raw_remarks=? WHERE id=?",(prefix+issue,raw,r["id"]))
@@ -991,7 +1112,9 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         secure(request,shift_id)
         if not unit.strip() or not issue.strip():
             raise HTTPException(400,"Asset ID and reported issue are required")
-        eid=db.add_entry(shift_id,"Shift Owner (Manual)",unit.strip()[:100],issue.strip()[:4000],remarks.strip()[:12000],"", "monitor")
+        issue=proofread(issue.strip()[:4000])
+        remarks=proofread(remarks.strip()[:12000])
+        eid=db.add_entry(shift_id,"Shift Owner (Manual)",unit.strip()[:100],issue,remarks,"", "monitor")
         with db._conn() as c:
             if wo_number.strip():
                 c.execute("UPDATE entries SET wo_number=? WHERE id=?",(wo_number.strip()[:50],eid))
@@ -1009,13 +1132,33 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
     @router.post("/notes")
     async def notes(request:Request,shift_id:int=Form(...),notes:str=Form("")):
         secure(request,shift_id)
-        db.save_shift_notes(shift_id,notes[:20000])
+        db.save_shift_notes(shift_id,proofread(notes[:20000]))
         return RedirectResponse(f"/v3?shift_id={shift_id}&notice=Notes+saved",status_code=303)
+
+    @router.get("/ai/drafts")
+    async def ai_draft_status(request: Request, shift_id:int):
+        secure(request, shift_id)
+        return {"drafts": ollama_drafts.statuses(shift_id)}
 
     @router.get("/preview",response_class=HTMLResponse)
     async def preview(request:Request,shift_id:int):
         shift=secure(request,shift_id)
         data=model(shift_id)
-        return templates.TemplateResponse(request,"v3/preview.html",{"shift":shift,**data,"loto":db.get_loto(shift_id),"shift_notes":db.get_shift_notes(shift_id),"oos_units":db.get_oos_units(),"rts_units":db.get_rts_events(shift_id),"vendors":v3_vendors(shift_id),"carry_overs":db.get_carry_over_entries(shift_id)})
+        # Use exactly the same WO grouping/remarks as the generated report.
+        with db._conn() as c:
+            meta_rows = c.execute(
+                "SELECT * FROM v3_entry_meta WHERE shift_id=?", (shift_id,)
+            ).fetchall()
+        report_happenings = build_shift_happenings(
+            db.get_entries(shift_id),
+            {m["entry_id"]: dict(m) for m in meta_rows},
+            approved_remarks=ollama_drafts.approved_for_report(shift_id),
+        )
+        return templates.TemplateResponse(request,"v3/preview.html",{
+            "shift":shift,**data,"report_happenings":report_happenings,
+            "loto":db.get_loto(shift_id),"shift_notes":db.get_shift_notes(shift_id),
+            "oos_units":db.get_oos_units(),"rts_units":db.get_rts_events(shift_id),
+            "vendors":v3_vendors(shift_id),
+            "carry_overs":db.get_carry_over_entries(shift_id)})
 
     return router

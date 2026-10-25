@@ -96,22 +96,54 @@ def technician_counts(rows: list[dict]) -> list[dict]:
     return [{"name":name, "count":len(wos)} for name,wos in sorted(by_tech.items())]
 
 
-def select_records(rows: list[dict], selected: set[str], start: datetime, end: datetime):
-    """Include every Closed non-PM work order; route only PMs to the PM summary."""
+def select_records(rows: list[dict], selected: set[str], start: datetime, end: datetime,
+                   closure_reviews: dict[str, str] | None = None):
+    """Count Completed or Closed PM WOs; other Completed WOs require MST choice."""
+    closure_reviews = closure_reviews or {}
+    # Cetaris sometimes repeats a WO across labor rows. A confirmed Closed
+    # status for that WO takes precedence over a stale Completed labor row.
+    closed_wos = {r["wo_number"] for r in rows
+                  if r.get("tech_name") in selected and
+                  str(r.get("status","")).strip().casefold() == "closed"}
     summary = Counter()
     eligible = []
+    reminder_wos = set()
     for r in rows:
         if r["tech_name"] not in selected:
             continue
         summary["selected_rows"] += 1
         # Labor Start Date is not a WO eligibility boundary.
         status = r["status"].strip().casefold()
+        if status == "completed" and r["wo_number"] in closed_wos:
+            status = "closed"
         category = r["rfr"].strip().casefold()
         if category == "breakdown" and status == "in process":
             summary["breakdown_in_process"] += 1
             eligible.append({**r, "kind": "oos"})
             continue
-        if status not in ("closed", "completed"):
+        if status == "completed" and category in {"preventive maintenance", "preventative maintenance"}:
+            # Completing maintenance fulfills a PM. Cetaris administrative
+            # closure may occur later and must not delay the completed count.
+            summary["pm_rows"] += 1
+            summary["pm_completed_not_closed"] += 1
+            eligible.append({**r, "kind": "pm"})
+            continue
+        if status == "completed":
+            # Non-PM Completed rows can be included as closure reminders
+            # into passdown as a closure reminder, never as a completed PM.
+            summary["completed_unclosed"] += 1
+            if closure_reviews.get(r["wo_number"]) == "add":
+                first_reminder = r["wo_number"] not in reminder_wos
+                reminder = "Reminder: Please close this WO in Cetaris before the shift ends."
+                note = r["remarks"].strip()
+                if first_reminder:
+                    reminder_wos.add(r["wo_number"])
+                    note = (note + "; " if note else "") + reminder
+                    summary["closure_reminders"] += 1
+                eligible.append({**r, "kind": "happening", "closure_reminder": True,
+                                 "remarks": note})
+            continue
+        if status != "closed":
             summary["not_closed"] += 1
             continue
         if category in {"preventive maintenance", "preventative maintenance"}:
@@ -130,7 +162,7 @@ def select_records(rows: list[dict], selected: set[str], start: datetime, end: d
             grouped[key] = {**r, "remarks_list": []}
         if r["remarks"] and r["remarks"] not in grouped[key]["remarks_list"]:
             grouped[key]["remarks_list"].append(r["remarks"])
-        if not grouped[key]["cause"] and r["cause"]:
+        if not grouped[key].get("cause") and r.get("cause"):
             grouped[key]["cause"] = r["cause"]
         if not grouped[key]["reported_issue"] and r["reported_issue"]:
             grouped[key]["reported_issue"] = r["reported_issue"]

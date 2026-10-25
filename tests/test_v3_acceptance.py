@@ -25,4 +25,6 @@ def test_acceptance_real_parser_covers_s3_s4_s5_without_double_credit(tmp_path):
     assert results["duplicate_completed_ownership"]=={}
     assert results["examples"]["28025279"]==["S3 2026-10-22"]
     assert results["examples"]["28026013"]==["S4 2026-10-23"]
-    assert results["examples"]["28026131"]==["S5 2026-10-23"]
+    # Completed without Closed status is a review item, not automatic WO credit.
+    assert results["examples"]["28026131"]==[]
+    assert results["pending_closure_review"]["28026131"]==["S5 2026-10-23"]
