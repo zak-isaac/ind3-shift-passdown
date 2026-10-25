@@ -257,6 +257,18 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                   imported_v3 INTEGER NOT NULL DEFAULT 0,
                   source_snapshot TEXT NOT NULL DEFAULT ''
                 );
+                CREATE TABLE IF NOT EXISTS v3_pending_closure (
+                  shift_id INTEGER NOT NULL, wo_number TEXT NOT NULL,
+                  decision TEXT NOT NULL, decided_at TEXT NOT NULL,
+                  PRIMARY KEY (shift_id, wo_number)
+                );
+                CREATE TABLE IF NOT EXISTS v3_wo_attribution_audit (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  shift_id INTEGER NOT NULL, wo_number TEXT NOT NULL,
+                  source_signature TEXT NOT NULL,
+                  evidence_json TEXT NOT NULL, recorded_at TEXT NOT NULL,
+                  UNIQUE (shift_id, wo_number, source_signature)
+                );
                 CREATE TABLE IF NOT EXISTS v3_shift_selection (
                   shift_id INTEGER PRIMARY KEY,
                   technicians_json TEXT NOT NULL DEFAULT '[]',
@@ -315,6 +327,9 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             meta_rows = c.execute("SELECT * FROM v3_entry_meta WHERE shift_id=?", (shift_id,)).fetchall()
             pm_rows = c.execute("SELECT * FROM pm_wos WHERE shift_id=? ORDER BY wo_number", (shift_id,)).fetchall()
             selection = c.execute("SELECT * FROM v3_shift_selection WHERE shift_id=?", (shift_id,)).fetchone()
+            reminders = {r[0] for r in c.execute(
+                "SELECT wo_number FROM v3_pending_closure WHERE shift_id=? AND decision='add'",
+                (shift_id,)).fetchall()}
         meta = {m["entry_id"]: dict(m) for m in meta_rows}
         groups = {}
         for e in entries:
@@ -328,16 +343,19 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             r["mst_edited"] = bool(m.get("mst_edited"))
             r["rfr_type"] = m.get("rfr_type") or ("Work Request" if e.get("tech_name") in ("MST (Manual)","Shift Owner (Manual)") else "Other")
             r["remarks_list"] = _remarks(e)
+            r["needs_closure"] = bool(e.get("wo_number") in reminders)
             g = groups.setdefault(key, {
                 "key": key, "wo_number": e.get("wo_number") or "", "main_id":e["id"],
                 "unit":e.get("unit") or "", "reported_issue":r["reported_issue"],
-                "cause_text":r["cause_text"], "rfr_type":r["rfr_type"], "rows":[], "excluded":True,"needs_review":False,
+                "cause_text":r["cause_text"], "rfr_type":r["rfr_type"], "rows":[], "excluded":True,"needs_review":False,"needs_closure":r["needs_closure"],
             })
             g["rows"].append(r)
             if not e.get("excluded"):
                 g["excluded"] = False
             if r["needs_review"]:
                 g["needs_review"] = True
+            if r["needs_closure"]:
+                g["needs_closure"] = True
             if not g["cause_text"] and r["cause_text"]:
                 g["cause_text"] = r["cause_text"]
         return {
@@ -934,6 +952,19 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                     c.execute("INSERT INTO v3_entry_meta(entry_id,shift_id,reported_issue,cause_text,original_remarks,imported_v3,source_snapshot,rfr_type) VALUES (?,?,?,?,?,1,?,?)",
                               (eid,shift_id,r["reported_issue"],r["reported_issue"],json.dumps(r["remarks_list"]),json.dumps(incoming),r["rfr"]))
                 added+=1
+        # Save explicit MST choices and clear reminders upon confirmed closure.
+        with db._conn() as c:
+            for wo, decision in closure_decisions.items():
+                if wo in closure_candidates:
+                    c.execute("""INSERT INTO v3_pending_closure(shift_id,wo_number,decision,decided_at)
+                        VALUES (?,?,?,?) ON CONFLICT(shift_id,wo_number)
+                        DO UPDATE SET decision=excluded.decision,decided_at=excluded.decided_at""",
+                        (shift_id,wo,decision,datetime.now(timezone.utc).isoformat()))
+            closed_wos = {raw["wo_number"] for raw in attributed
+                          if str(raw.get("status","")).strip().casefold() == "closed"}
+            for wo in closed_wos:
+                c.execute("DELETE FROM v3_pending_closure WHERE shift_id=? AND wo_number=?",
+                          (shift_id,wo))
         with db._conn() as c:
             c.execute("INSERT INTO v3_shift_source(shift_id,filename,rows_json) VALUES (?,?,?) "
                       "ON CONFLICT(shift_id) DO UPDATE SET filename=excluded.filename,rows_json=excluded.rows_json",
@@ -976,6 +1007,10 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         rows=group_for_entry(shift_id,entry_id)
         with db._conn() as c:
             meta={r["entry_id"]:dict(r) for r in c.execute("SELECT * FROM v3_entry_meta WHERE shift_id=?",(shift_id,))}
+        with db._conn() as c:
+            needs_closure = bool(c.execute(
+                "SELECT 1 FROM v3_pending_closure WHERE shift_id=? AND wo_number=? AND decision='add'",
+                (shift_id,rows[0].get("wo_number") or "")).fetchone())
         items=[]
         for r in rows:
             m=meta.get(r["id"],{})
@@ -983,7 +1018,9 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                           "cause_text":m.get("cause_text") or "",
                           "reported_issue":m.get("reported_issue") or (r.get("issue") or "").split(" — ",1)[-1],
                           "needs_review":m.get("needs_review",0), "pending":json.loads(m["pending_json"]) if m.get("pending_json") else None})
-        return templates.TemplateResponse(request,"v3/happening_modal.html",{"shift":shift,"items":items,"happening":items[0]})
+        return templates.TemplateResponse(request,"v3/happening_modal.html",{
+            "shift":shift,"items":items,"happening":items[0],
+            "needs_closure":needs_closure})
 
     @router.post("/happening/{entry_id}/edit")
     async def edit_happening(request:Request,entry_id:int,shift_id:int=Form(...),reported_issue:str=Form(""),cause_text:str=Form("")):
