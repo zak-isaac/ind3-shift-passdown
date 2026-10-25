@@ -499,6 +499,46 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         db.set_carry_over(entry_id,False)
         return return_workspace(shift_id,"Carry-over dismissed")
 
+
+    def completed_candidates(shift_id):
+        with db._conn() as c:
+            c.execute("CREATE TABLE IF NOT EXISTS v3_completed_decisions (shift_id INTEGER, wo_number TEXT, decision TEXT, PRIMARY KEY(shift_id,wo_number))")
+            source=c.execute("SELECT rows_json FROM v3_shift_source WHERE shift_id=?",(shift_id,)).fetchone()
+            sel=c.execute("SELECT technicians_json FROM v3_shift_selection WHERE shift_id=?",(shift_id,)).fetchone()
+            decisions={r["wo_number"]:r["decision"] for r in c.execute("SELECT wo_number,decision FROM v3_completed_decisions WHERE shift_id=?",(shift_id,))}
+        if not source or not sel: return []
+        shift=db.get_shift(shift_id)
+        start,end=shift_window(shift["shift_type"],date.fromisoformat(shift["date"]))
+        selected=set(json.loads(sel["technicians_json"]))
+        items={}
+        for r in json.loads(source["rows_json"]):
+            if r.get("tech_name") not in selected or str(r.get("status","")).casefold().strip()!="completed": continue
+            try: when=datetime.fromisoformat(r.get("last_complete_at") or r.get("updated_at") or "")
+            except (ValueError,TypeError): continue
+            if not start <= when < end: continue
+            wo=r["wo_number"]
+            if decisions.get(wo)=="ignore": continue
+            item=items.setdefault(wo,{"wo_number":wo,"asset_id":r["asset_id"],"techs":set(),"rows":[],"decision":decisions.get(wo)})
+            item["techs"].add(r["tech_name"])
+            item["rows"].append(r)
+        return [{**v,"techs":", ".join(sorted(v["techs"]))} for v in items.values()]
+
+    @router.post("/completed-wo/decision")
+    async def completed_wo_decision(request:Request,shift_id:int=Form(...),wo_number:str=Form(...),decision:str=Form(...)):
+        secure(request,shift_id)
+        if decision not in ("add","ignore"): raise HTTPException(400,"Invalid decision")
+        items={r["wo_number"]:r for r in completed_candidates(shift_id)}
+        if wo_number not in items: raise HTTPException(404,"Completed WO not found")
+        item=items[wo_number]
+        with db._conn() as c:
+            c.execute("INSERT INTO v3_completed_decisions VALUES (?,?,?) ON CONFLICT(shift_id,wo_number) DO UPDATE SET decision=excluded.decision",(shift_id,wo_number,decision))
+        if decision=="add":
+            for r in item["rows"]:
+                if r.get("pm_code"): continue
+                if not db.get_cmms_entry(shift_id,wo_number,r["tech_name"]):
+                    db.upsert_cmms_entry(shift_id,wo_number,r["asset_id"],"Pending Cetaris Closure | "+r["reported_issue"],json.dumps([r["remarks"]] if r["remarks"] else []),r["tech_name"])
+        return return_workspace(shift_id,"Completed work order decision saved")
+
     def render(request, shift, **extra):
         info = model(shift["id"])
         context = {
@@ -509,6 +549,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             "rts_units":db.get_rts_events(shift["id"]),
             "breakdown_pending":v3_breakdown.pending(db),
             "import_review":v3_import_review.pending(db,shift["id"]),
+            "completed_wo_candidates":completed_candidates(shift["id"]),
             "shift_notes":db.get_shift_notes(shift["id"]),
             "carry_overs":db.get_carry_over_entries(shift["id"]),
             "vendors":v3_vendors(shift["id"]),
@@ -1016,11 +1057,13 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         # affected; manual entries and original V2 records remain untouched.
         current_keys={(r["wo_number"],r["tech_name"]) for r in records if r["kind"]=="happening"}
         with db._conn() as c:
+            pending_added={x["wo_number"] for x in c.execute("SELECT wo_number FROM v3_completed_decisions WHERE shift_id=? AND decision=?", (shift_id,"add"))}
+        with db._conn() as c:
             previous_imports=c.execute("""SELECT e.id,e.wo_number,e.tech_name,e.excluded
                 FROM entries e JOIN v3_entry_meta m ON m.entry_id=e.id
                 WHERE e.shift_id=? AND m.imported_v3=1""",(shift_id,)).fetchall()
             for old in previous_imports:
-                if (old["wo_number"],old["tech_name"]) not in current_keys:
+                if (old["wo_number"],old["tech_name"]) not in current_keys and old["wo_number"] not in pending_added:
                     c.execute("UPDATE entries SET excluded=1 WHERE id=?",(old["id"],))
                     c.execute("UPDATE v3_entry_meta SET selection_hidden=1 WHERE entry_id=?",(old["id"],))
         # Provenance permits revoking stale V3-imported PMs without deleting V2 PMs.
