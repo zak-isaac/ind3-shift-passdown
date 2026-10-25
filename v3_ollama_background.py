@@ -18,6 +18,7 @@ from pathlib import Path
 
 import db
 from v3_report_layout import build_shift_happenings
+from v3_proofread import proofread
 
 MODEL = "qwen2.5:3b"
 _LOCK = threading.Lock()
@@ -121,6 +122,11 @@ def _verify(source: list[str], result: str) -> tuple[bool, str]:
     if not result.strip() or len(result) > 3000:
         return False, "Empty or oversized draft"
     src = " ".join(source)
+    if re.search(
+        r"\bconsolidat(?:e|ed|ing)\b.{0,60}\b(?:maintenance|tasks?|actions?|paragraph|troubleshooting|duplicated)\b"
+        r"|\bremark\s+\d+\s*:|\bsource remarks\b|\bhere is (?:the|a) (?:summary|rewrite)\b",
+        result, re.I):
+        return False, "AI instruction/summary label leaked into technician remarks"
     missing = _technical_tokens(src) - _technical_tokens(result)
     if missing:
         return False, "Missing technical tokens: " + ", ".join(sorted(missing))
@@ -129,13 +135,31 @@ def _verify(source: list[str], result: str) -> tuple[bool, str]:
         return False, "Unverified RTS"
     if re.search(r"\b(?:technician|tech)\s*[A-Z0-9]\b", result, re.I):
         return False, "Technician labels in draft"
-    # Lexical checks catch common invented conclusions; semantic facts
-    # require human confirmation even if these checks pass.
+    # Conservative note-by-note coverage: reject dropped collaborator details.
+    # Good paraphrases may be rejected; original remarks are always available.
+    stopwords = {"the","a","an","in","on","at","and","or","to","of","for","by",
+                 "from","with","we","i","it","is","was","were","be","been",
+                 "then","that","this","as","after","before","had","have","has",
+                 "there","are","not","so","but","when","into","per"}
+    def facts(value):
+        value = proofread(value).casefold()
+        return {w for w in re.findall(r"[a-z0-9]+", value)
+                if len(w) > 2 and w not in stopwords}
+    out_facts = facts(result)
+    for note in source:
+        note_facts = facts(note)
+        if note_facts and len(note_facts & out_facts) < max(1, (len(note_facts)*3+3)//4):
+            return False, "Distinct technician source remark may be missing"
+    source_numbers = set(re.findall(r"(?<![a-z0-9])\d+(?:\.\d+)?(?![a-z0-9])", src, re.I))
+    output_numbers = set(re.findall(r"(?<![a-z0-9])\d+(?:\.\d+)?(?![a-z0-9])", result, re.I))
+    if source_numbers - output_numbers:
+        return False, "Missing source measurements or numeric values"
     for pattern in (r"\b(?:resolved|fully operational|fixed)\b",
                     r"\b(?:ordered|received|delivered)\b"):
         if re.search(pattern, result, re.I) and not re.search(pattern, src, re.I):
             return False, "Potential unsupported outcome"
-    return True, "Draft requires source review"
+    return True, "AI draft ready for MST review; not approved"
+
 
 def _generate(item: sqlite3.Row) -> tuple[str, str, str]:
     notes = json.loads(item["source_json"])
@@ -160,7 +184,7 @@ def _generate(item: sqlite3.Row) -> tuple[str, str, str]:
             payload = json.load(response)
         draft = str(payload.get("message", {}).get("content", "")).strip()
         good, reason = _verify(notes, draft)
-        return (draft, "passed", "Automated checks passed") if good else ("", "original", reason)
+        return (draft, "passed", "AI draft ready for MST review; not approved") if good else ("", "original", reason)
     except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
         return "", "original", "Ollama unavailable or request failed: " + type(exc).__name__
 
@@ -200,7 +224,7 @@ def statuses(shift_id: int) -> list[dict]:
     path = _db_path()
     ensure_table(path)
     with _connect(path) as c:
-        return [dict(r) for r in c.execute("""SELECT wo_number,asset,cause,status,reason,approved,draft,source_json
+        return [dict(r) for r in c.execute("""SELECT wo_number,asset,cause,status,reason,approved,draft,source_json,source_hash
             FROM v3_ollama_drafts WHERE shift_id=? ORDER BY wo_number""",(shift_id,))]
 
 def approved_for_report(shift_id: int) -> dict[str,str]:
@@ -208,5 +232,42 @@ def approved_for_report(shift_id: int) -> dict[str,str]:
     ensure_table(path)
     with _connect(path) as c:
         return {r["wo_number"]:r["draft"] for r in c.execute(
-            "SELECT wo_number,draft FROM v3_ollama_drafts WHERE shift_id=? AND status='passed'",
+            "SELECT wo_number,draft FROM v3_ollama_drafts WHERE shift_id=? AND status='passed' AND approved=1",
             (shift_id,))}
+
+
+def review_draft(shift_id: int, wo_number: str, source_hash: str, *, accept: bool) -> bool:
+    """Apply only the exact AI draft inspected by an MST.
+
+    Source remarks remain unchanged in entries; rejected results retain the
+    original. Excluded or manually edited WOs are never AI-approvable.
+    """
+    path = _db_path()
+    ensure_table(path)
+    with _connect(path) as c:
+        entries = [dict(x) for x in c.execute(
+            "SELECT * FROM entries WHERE shift_id=? AND excluded=0", (shift_id,))]
+        metadata = {x["entry_id"]: dict(x) for x in c.execute(
+            "SELECT * FROM v3_entry_meta WHERE shift_id=?", (shift_id,))}
+    current = next((x for x in _group_sources(entries, metadata)
+                    if x["wo"] == wo_number), None)
+    if not current or any(metadata.get(x["id"], {}).get("mst_edited") for x in entries
+                          if str(x.get("wo_number") or "") == wo_number):
+        return False
+    if _source_hash(current["asset"], current["cause"], current["notes"]) != source_hash:
+        return False
+    with _connect(path) as c:
+        if accept:
+            result = c.execute("""UPDATE v3_ollama_drafts SET approved=1,
+                reason='Reviewed and accepted by MST'
+                WHERE shift_id=? AND wo_number=? AND source_hash=?
+                AND status='passed' AND length(trim(draft))>0""",
+                (shift_id, wo_number, source_hash))
+        else:
+            result = c.execute("""UPDATE v3_ollama_drafts SET approved=0,
+                status='original', draft='',
+                reason='MST chose original technician remarks'
+                WHERE shift_id=? AND wo_number=? AND source_hash=?
+                AND status IN ('passed','original')""",
+                (shift_id, wo_number, source_hash))
+        return result.rowcount == 1
