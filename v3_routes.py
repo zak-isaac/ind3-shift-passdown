@@ -1150,13 +1150,6 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         secure(request, shift_id)
         return {"drafts": ollama_drafts.statuses(shift_id)}
 
-    @router.post("/ai/drafts/{wo}/approve")
-    async def ai_draft_approve(request: Request, wo:str, shift_id:int=Form(...)):
-        secure(request, shift_id)
-        if not ollama_drafts.approve(shift_id, wo):
-            raise HTTPException(409, "Draft missing, flagged, or already approved")
-        return {"approved": True, "wo_number": wo}
-
     @router.get("/preview",response_class=HTMLResponse)
     async def preview(request:Request,shift_id:int):
         shift=secure(request,shift_id)

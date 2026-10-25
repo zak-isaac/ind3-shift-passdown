@@ -26,3 +26,23 @@ def test_extra_technical_details_trigger_review():
     okay, reason = ai._verify(["Installed MDR.C0004, braking 6ft."], "Installed MDR.C0004.")
     assert not okay
     assert "6ft" in reason
+
+def test_invalid_model_claim_uses_original(monkeypatch):
+    import json
+    class Response:
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+    monkeypatch.setattr(ai.urllib.request,'urlopen',lambda *args,**kw:Response())
+    monkeypatch.setattr(ai.json,'load',lambda _: {'message':{'content':'Part ordered. RTS.'}})
+    draft,status,_=ai._generate({'source_json':json.dumps(['Part requested.']),'asset':'X','cause':'Part pending'})
+    assert status=='original' and draft==''
+
+def test_valid_model_output_auto_pass(monkeypatch):
+    import json
+    class Response:
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+    monkeypatch.setattr(ai.urllib.request,'urlopen',lambda *args,**kw:Response())
+    monkeypatch.setattr(ai.json,'load',lambda _: {'message':{'content':'Replaced right wheel; braking 5 ft.'}})
+    draft,status,_=ai._generate({'source_json':json.dumps(['Replaced right wheel; braking 5 ft.']),'asset':'X','cause':'Issue'})
+    assert status=='passed' and draft.startswith('Replaced')

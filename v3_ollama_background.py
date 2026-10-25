@@ -160,9 +160,9 @@ def _generate(item: sqlite3.Row) -> tuple[str, str, str]:
             payload = json.load(response)
         draft = str(payload.get("message", {}).get("content", "")).strip()
         good, reason = _verify(notes, draft)
-        return draft, "review" if good else "flagged", reason
+        return (draft, "passed", "Automated checks passed") if good else ("", "original", reason)
     except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
-        return "", "error", "Ollama unavailable or request failed: " + type(exc).__name__
+        return "", "original", "Ollama unavailable or request failed: " + type(exc).__name__
 
 def _worker(path: Path) -> None:
     try:
@@ -203,19 +203,10 @@ def statuses(shift_id: int) -> list[dict]:
         return [dict(r) for r in c.execute("""SELECT wo_number,asset,cause,status,reason,approved,draft,source_json
             FROM v3_ollama_drafts WHERE shift_id=? ORDER BY wo_number""",(shift_id,))]
 
-def approve(shift_id: int, wo: str) -> bool:
-    path = _db_path()
-    ensure_table(path)
-    with _connect(path) as c:
-        r = c.execute("""UPDATE v3_ollama_drafts SET approved=1, status='approved'
-            WHERE shift_id=? AND wo_number=? AND status='review' AND approved=0""",
-            (shift_id,wo))
-        return r.rowcount == 1
-
 def approved_for_report(shift_id: int) -> dict[str,str]:
     path = _db_path()
     ensure_table(path)
     with _connect(path) as c:
         return {r["wo_number"]:r["draft"] for r in c.execute(
-            "SELECT wo_number,draft FROM v3_ollama_drafts WHERE shift_id=? AND approved=1 AND status='approved'",
+            "SELECT wo_number,draft FROM v3_ollama_drafts WHERE shift_id=? AND status='passed'",
             (shift_id,))}
