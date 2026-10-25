@@ -160,6 +160,19 @@ def test_full_login_import_ai_preview_and_eml(tmp_path,monkeypatch):
         assert "M28030001" in html
         assert "NEXT GEN FULFILLMENT" in html
         assert "colum tention" not in html
+        # The MST can still revert the chosen draft. Future previews/reports
+        # use original source, while an already generated EML is a snapshot.
+        rejected=browser.post("/v3/ai/drafts/review",data={
+            "shift_id":str(sid),"wo_number":"28030001","source_hash":"stale-hash",
+            "decision":"accept"},follow_redirects=False)
+        assert rejected.status_code==409
+        restored=browser.post("/v3/ai/drafts/review",data={
+            "shift_id":str(sid),"wo_number":"28030001","source_hash":target["source_hash"],
+            "decision":"original"},follow_redirects=False)
+        assert restored.status_code==303
+        assert ai.approved_for_report(sid)=={}
+        final_preview=browser.get("/v3/preview",params={"shift_id":sid})
+        assert "Checked column tension; Recalibrated side guide. RTS" in final_preview.text
         assert db.get_shift(sid)["is_active"]
 
 
