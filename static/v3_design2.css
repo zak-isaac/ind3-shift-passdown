@@ -253,3 +253,17 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
 .v3-webhook-actions { display: flex; gap: 10px; }
 @media(max-width: 830px) { .v3-admin-kpis { grid-template-columns: 1fr 1fr; } .v3-form-grid { grid-template-columns: 1fr; } }
 
+
+/* WO completion is based on technician work, not administrative WO closure. */
+.design2-shell .d2-wo-table { min-width:1090px; }
+.design2-shell .d2-wo-table th:nth-child(1) { width:14%; }
+.design2-shell .d2-wo-table th:nth-child(2) { width:14%; }
+.design2-shell .d2-wo-table th:nth-child(3) { width:18%; }
+.design2-shell .d2-wo-table th:nth-child(4) { width:26%; }
+.design2-shell .d2-wo-table th:nth-child(5) { width:12%; }
+.design2-shell .d2-wo-table th:nth-child(6) { width:10%; }
+.design2-shell .d2-wo-table th:nth-child(7) { width:6%; }
+.d2-work-time { min-width:110px;font-size:12px;color:#1f466f;font-weight:700; }
+.d2-work-time time { display:block;font-variant-numeric:tabular-nums;white-space:nowrap; }
+.d2-work-time small {color:#62758c;font-weight:400;font-size:11px; }
+.d2-next-day {display:inline-block;border-radius:4px;margin-top:5px;padding:3px 5px;background:#e2efff;color:#1256b9;font-size:10px;font-weight:750;line-height:1.25; }
