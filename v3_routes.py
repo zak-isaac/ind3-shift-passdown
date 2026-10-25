@@ -84,7 +84,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
 
     def entry_page(request, error="", master_verified=False, master_auth_prompt=False):
         shifts=_v3_live_shifts()
-        now=now_func() if now_func else datetime.now()
+        now=__import__("dev_mode").get_now() if __import__("dev_mode").is_active() else (now_func() if now_func else datetime.now())
         return templates.TemplateResponse(request,"v3/login.html",{
             "error":error,"shifts":shifts,"today":now.date().isoformat(),
             "master_verified":master_verified or bool(request.cookies.get("dev_session") == __import__("dev_mode").DEV_TOKEN and decode_session(request) and decode_session(request)["profile"].get("is_manager")),
