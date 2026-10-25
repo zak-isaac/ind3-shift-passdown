@@ -175,12 +175,3 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
   font-size:23px;font-weight:750;line-height:1.2;font-variant-numeric:tabular-nums;
 }
 .design2-shell .d2-sidebar-clock span { font-size:12px;line-height:1.4;color:#dce9fc; }
-
-/* AI suggestions are never report text until MST explicitly approves them. */
-.d2-ai-review-dialog { width:min(960px,96vw); }
-.d2-ai-review-columns { display:grid;grid-template-columns:1fr 1fr;gap:15px; }
-.d2-ai-review-columns section { border:1px solid #dce6f3;background:#f7faff;border-radius:9px;padding:16px;min-width:0; }
-.d2-ai-review-columns strong { font-size:13px;color:#16385a; }
-.d2-ai-review-columns p { font-size:13px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere;color:#203e61; }
-.d2-row-actions button[data-ai-review-button]:not([hidden]) { display:block;margin:0 0 5px;font-weight:800;color:#0053e2; }
-@media(max-width:700px){.d2-ai-review-columns{grid-template-columns:1fr}}
