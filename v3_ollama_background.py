@@ -127,11 +127,57 @@ def _verify(source: list[str], result: str) -> tuple[bool, str]:
     if not result.strip() or len(result) > 3000:
         return False, "Empty or oversized draft"
     src = " ".join(source)
-    if re.search(
-        r"\bconsolidat(?:e|ed|ing)\b.{0,60}\b(?:maintenance|tasks?|actions?|paragraph|troubleshooting|duplicated)\b"
-        r"|\bremark\s+\d+\s*:|\bsource remarks\b|\bhere is (?:the|a) (?:summary|rewrite)\b",
-        result, re.I):
-        return False, "AI instruction/summary label leaked into technician remarks"
+    # A small model can echo its SYSTEM prompt or produce meta-commentary.
+    # This is NEVER a maintenance action, even when other technical words
+    # appear in the same draft. Do not trim the phrase and guess what remains.
+    # Reject the *entire* AI draft and use the technician source instead.
+    _instruction_leaks = (
+        r"\bconsolidat(?:e|ed|ing|ion)\b",
+        r"\bduplicat(?:e|ed|es|ing|ion)\b.{0,45}\b(?:action|remark|note|entr|line|word|statement|task|work)\b",
+        r"\b(?:action|remark|note|entr|line|word|statement|task|work)\b.{0,45}\bduplicat(?:e|ed|es|ing|ion)\b",
+        r"\bis\s+duplicat(?:e|ed)\b",
+        r"\b(?:maintenance|technical|rewritten|consolidated)\s+(?:paragraph|summary|rewrite|note)\b",
+        r"\b(?:source|original|technician)\s+remarks?\b",
+        r"\b(?:remark|note)\s+\d+\s*:",
+        r"\b(?:here (?:is|are)|below is)\s+(?:the|a|your|my)\s+(?:summary|rewrite|revised|consolidated|paragraph)\b",
+        r"\b(?:return|write|generate)\s+(?:one|only|a)\s+(?:concise|professional|consolidated|paragraph)\b",
+        r"\b(?:do not|don't|never|avoid)\s+(?:copy|invent|add|include|turn|repeat|assume)\b",
+        r"\b(?:even if described in different wording|retain all distinct troubleshooting|reported issue .{0,15}context only)\b",
+        r"\b(?:as an? ai|as (?:a|an) (?:technical|maintenance) editor|according to (?:the|your) instructions)\b",
+    )
+    if any(re.search(pattern, result, re.I) for pattern in _instruction_leaks):
+        return False, "AI instruction or duplicate-analysis text leaked into technician remarks"
+    # Besides missing source details, reject *new* substantial words. Allow
+    # grammatical connectors, spelling corrections and minor tense shifts,
+    # but never add unrecorded operations, components, faults or outcomes.
+    def _normalized_words(value: str) -> set[str]:
+        value = proofread(value).casefold()
+        words = re.findall(r"[a-z]{3,}", value)
+        def stem(word: str) -> str:
+            if len(word) > 5 and word.endswith("ing"):
+                word = word[:-3]
+            elif len(word) > 4 and word.endswith("ed"):
+                word = word[:-2]
+            elif len(word) > 4 and word.endswith("es"):
+                word = word[:-2]
+            elif len(word) > 4 and word.endswith("s"):
+                word = word[:-1]
+            return word
+        return {stem(w) for w in words}
+    source_terms = _normalized_words(src)
+    result_terms = _normalized_words(result)
+    _grammar = {
+        "the","and","are","was","were","its","has","had","have","with",
+        "for","from","that","this","then","into","onto","each","both",
+        "after","before","also","when","while","using","used","which",
+        "where","over","under","upon","been","being","their","there",
+    }
+    extra_terms = result_terms - source_terms - _normalized_words(" ".join(_grammar))
+    # "remains active" is an allowable rewording of source "active".
+    if "activ" in source_terms:
+        extra_terms.discard("remain")
+    if extra_terms:
+        return False, "AI introduced unsupported words: " + ", ".join(sorted(extra_terms)[:12])
     missing = _technical_tokens(src) - _technical_tokens(result)
     if missing:
         return False, "Missing technical tokens: " + ", ".join(sorted(missing))
