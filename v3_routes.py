@@ -779,19 +779,12 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                     if match:
                         roster_shifts[match]=home
         submitted=await request.form()
-        decisions={key[len("split_wo_"):]:value for key,value in submitted.multi_items()
-                   if key.startswith("split_wo_") and value in ("S1","S2","S3","S4","S5")}
+        # Ownership is automatic based on actual technician completion and
+        # shift timestamps. WOs without verifiable evidence are logged in
+        # the import audit; they never stop extraction or demand an MST guess.
         attributed,unresolved=v3_split.assign(
-            rows, selected, shift["shift_type"], shift["date"], decisions,
+            rows, selected, shift["shift_type"], shift["date"],
             confirmed_s5_techs=split_selected, roster_shifts=roster_shifts)
-        if unresolved:
-            return render(request,shift,
-                warning="Choose the owning shift for each ambiguous work order.",
-                staged={"token":token,"filename":batch["filename"],
-                        "counts":technician_counts(rows),"total_rows":len(rows),
-                        "split_review":unresolved,
-                        "checked_techs":sorted(selected),
-                        "checked_split_techs":sorted(split_selected)})
         # A Cetaris Completed WO is not officially Closed. Offer exactly
         # two MST choices before counting anything from this import.
         closure_candidates = {}
@@ -824,7 +817,6 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                         "counts": technician_counts(rows), "total_rows": len(rows),
                         "checked_techs": sorted(selected),
                         "checked_split_techs": sorted(split_selected),
-                        "confirmed_split_decisions": decisions,
                         "closure_review": missing_closure,
                         "checked_closure_decisions": closure_decisions})
         records,stats=select_records(attributed,selected,*window,
@@ -859,7 +851,8 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                                                  if r["kind"] == "happening"})
         audit_result = build_audit(rows, selected, attributed, records,
                                    conflicting_wos=conflicting_wos,
-                                   shift_type=shift["shift_type"],shift_day=shift["date"])
+                                   shift_type=shift["shift_type"],shift_day=shift["date"],
+                                   unresolved_wos=unresolved)
         v3_breakdown.sync(db,rows,selected,shift_id,
                           allowed_new_wos={r["wo_number"] for r in attributed})
         added,unchanged,pending=0,0,0
@@ -1012,7 +1005,8 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                     "wo_closed": sorted({r.get("closed_at", "") for r in labor if r.get("closed_at")}),
                     "roster_shifts": {r.get("tech_name", ""): roster_shifts.get(r.get("tech_name", ""), "")
                                       for r in labor},
-                    "mst_shift_override": decisions.get(wo, ""),
+                    "completion_actor": sorted({r.get("completed_by", "") for r in labor if r.get("completed_by")}),
+                    "last_technician": sorted({r.get("last_technician", "") for r in labor if r.get("last_technician")}),
                     "mst_closure_choice": closure_decisions.get(wo, ""),
                 }
                 payload = json.dumps(evidence, sort_keys=True)
@@ -1048,6 +1042,9 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         ollama_drafts.queue_shift(shift_id)
         notice=f"Imported {added} new technician/WO entries; {unchanged} unchanged; {pending} flagged for review. {stats.get('unique_pm_wos',0)} distinct Completed or Closed PM WOs in this import."
         notice += f" Audit: {audit_result['work_orders']} source WOs, {audit_result['included_work_orders']} included, {audit_result['ignored_count']} not counted. Review the audit below."
+        if unresolved:
+            notice += (f" {len(unresolved)} WO(s) lacked verified technician completion ownership and "
+                       "were skipped automatically; details are in the ignored-WO audit.")
         if conflicting_wos:
             notice += (f" {len(conflicting_wos)} WO(s) already credited to another shift "
                        "were excluded without blocking the remaining work. Review those WOs in the import audit.")
