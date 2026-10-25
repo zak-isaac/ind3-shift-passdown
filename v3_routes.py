@@ -42,7 +42,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         return [shift for shift in db.get_active_shifts() if shift_owned_by(shift,who)]
 
     def set_session_cookies(response, who, sid):
-        response.set_cookie(v3_cookie, signed_session(who["associate"],sid,elevated=bool(who.get("elevated")) or bool(who["profile"].get("is_manager"))), max_age=12*3600,
+        response.set_cookie(v3_cookie, signed_session(who["associate"],sid,elevated=bool(who.get("elevated")) or bool(who["profile"].get("is_manager"))), max_age=18*3600,
                             httponly=True, samesite="strict", path="/",
                             secure=os.environ.get("IND3_V3_SECURE_COOKIES", "") == "1")
         # V3 is the only authenticated UI; clear any stale V2 cookies.
@@ -1169,19 +1169,6 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
     async def ai_draft_status(request: Request, shift_id:int):
         secure(request, shift_id)
         return {"drafts": ollama_drafts.statuses(shift_id)}
-
-    @router.post("/ai/drafts/review")
-    async def ai_review(request: Request, shift_id:int=Form(...),
-                        wo_number:str=Form(...),source_hash:str=Form(...),
-                        decision:str=Form(...)):
-        secure(request, shift_id)
-        if decision not in ("accept", "original"):
-            raise HTTPException(400,"Invalid AI draft decision")
-        if not ollama_drafts.review_draft(shift_id, wo_number, source_hash,
-                                           accept=decision=="accept"):
-            raise HTTPException(409,"AI draft is stale or no longer eligible; refresh before reviewing")
-        return return_workspace(shift_id, "AI draft accepted for this WO" if decision=="accept"
-                                 else "Original technician remarks retained")
 
     @router.get("/preview",response_class=HTMLResponse)
     async def preview(request:Request,shift_id:int):
