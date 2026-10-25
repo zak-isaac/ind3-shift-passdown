@@ -26,7 +26,8 @@ import v3_ollama_background as ollama_drafts
 def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shift,
                      shift_window, lead_redirect, get_mst_roster=None, verify_mst_pin=None,
                      start_eligibility=None, allowed_shift_days=None, now_func=None,
-                     get_v2_cookie_value=None, legacy_lead_page=None, generate_report=None):
+                     get_v2_cookie_value=None, legacy_lead_page=None, generate_report=None,
+                     build_eml_response=None, refresh_roster=None):
     router = APIRouter(prefix="/v3", tags=["Shift V3"])
 
     # Same signed V3 session can be validated by the original V2 handlers.
@@ -586,6 +587,21 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             "shifts":db.list_past_shifts_with_counts(limit=100),
         })
 
+    @router.get("/history/{target_shift_id}/eml")
+    async def v3_history_eml(request:Request,target_shift_id:int):
+        """Re-download the already saved passdown as an Outlook EML."""
+        who=decode_session(request)
+        if not who:
+            return RedirectResponse("/v3/login",status_code=303)
+        shift=db.get_shift(target_shift_id)
+        if not shift: raise HTTPException(404,"Shift not found")
+        if not who["profile"].get("is_manager") and str(shift.get("opened_by_assoc") or "")!=who["associate"]:
+            raise HTTPException(403,"Only the shift owner may download this report")
+        report=db.get_last_report_for_shift(target_shift_id)
+        if not report: raise HTTPException(404,"No report generated for this shift")
+        if build_eml_response is None: raise HTTPException(503,"Outlook EML export unavailable")
+        return await build_eml_response(report["id"],subject="",html_body="")
+
     @router.get("/analytics", response_class=HTMLResponse)
     async def v3_analytics(request:Request, shift_id:int=0):
         if get_mst_roster is not None:
@@ -596,6 +612,21 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         return templates.TemplateResponse(request,"v3/analytics.html",{
             "shift_id":shift_id,
             "data":db.get_analytics(),
+        })
+
+    def require_v3_manager(request:Request):
+        who=decode_session(request)
+        if not who or not who["profile"].get("is_manager"):
+            raise HTTPException(403,"Verified management access required")
+        return who
+
+    def refresh_login_roster():
+        if refresh_roster:
+            refresh_roster()
+
+    def roster_response(request:Request):
+        return templates.TemplateResponse(request,"partials/v3_assoc_list.html",{
+            "associates": db.get_associates(),
         })
 
     @router.get("/admin", response_class=HTMLResponse)
@@ -609,6 +640,8 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             "email_from_name":db.get_setting("email_from_name","IND3 Shift Passdown"),
             "ms_client_id":db.get_setting("ms_client_id",""),
             "roster_count":len(get_mst_roster() if get_mst_roster else {}),
+            "teams_webhook_url":db.get_setting("teams_webhook_url",""),
+            "is_manager":True,
             "notice":request.query_params.get("notice",""),
         })
 
@@ -627,6 +660,87 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         db.set_setting("email_from_name",email_from_name.strip()[:160] or "IND3 Shift Passdown")
         db.set_setting("ms_client_id",ms_client_id.strip()[:300])
         return RedirectResponse("/v3/admin?notice=Configuration+saved",status_code=303)
+
+    @router.post("/admin/teams-webhook")
+    async def v3_admin_teams_webhook(request:Request,webhook_url:str=Form("")):
+        require_v3_manager(request)
+        url=webhook_url.strip()
+        if url and (len(url)>2048 or not url.startswith("https://")):
+            raise HTTPException(400,"Teams webhook must be HTTPS")
+        db.set_setting("teams_webhook_url",url)
+        return RedirectResponse("/v3/admin?notice=Teams+settings+saved",status_code=303)
+
+    @router.get("/admin/roster",response_class=HTMLResponse)
+    async def v3_admin_roster(request:Request):
+        require_v3_manager(request)
+        return roster_response(request)
+
+    @router.post("/admin/roster/reload",response_class=HTMLResponse)
+    async def v3_admin_roster_reload(request:Request):
+        require_v3_manager(request)
+        refresh_login_roster()
+        return HTMLResponse('<span class="v3-roster-reload-ok">Active roster refreshed.</span>')
+
+    @router.post("/admin/roster/add",response_class=HTMLResponse)
+    async def v3_admin_roster_add(request:Request,assoc_num:str=Form(...),
+                                  full_name:str=Form(...),shift:str=Form(""),
+                                  default_id:str=Form(""),is_mst:str=Form("0")):
+        require_v3_manager(request)
+        if not assoc_num.strip() or len(assoc_num)>30 or not full_name.strip() or len(full_name)>180 or shift not in ("","S1","S2","S3","S4","S5"):
+            raise HTTPException(400,"Invalid associate information")
+        db.add_associate(assoc_num.strip(),full_name.strip(),shift,default_id.strip()[:120],is_mst=(is_mst=="1"))
+        refresh_login_roster()
+        return roster_response(request)
+
+    @router.post("/admin/roster/{assoc_num}/toggle-mst",response_class=HTMLResponse)
+    async def v3_admin_roster_toggle(request:Request,assoc_num:str):
+        require_v3_manager(request)
+        person=db.get_associate(assoc_num)
+        if not person: raise HTTPException(404,"Associate not found")
+        if person.get("is_manager"): raise HTTPException(403,"Manager profiles are protected")
+        db.set_associate_mst(assoc_num,not bool(person.get("is_mst")))
+        refresh_login_roster()
+        return roster_response(request)
+
+    @router.get("/admin/roster/{assoc_num}/edit-form",response_class=HTMLResponse)
+    async def v3_admin_roster_edit_form(request:Request,assoc_num:str):
+        require_v3_manager(request)
+        person=db.get_associate(assoc_num)
+        if not person: raise HTTPException(404,"Associate not found")
+        if person.get("is_manager"): raise HTTPException(403,"Manager profiles are protected")
+        return templates.TemplateResponse(request,"partials/v3_assoc_row_edit.html",{"a":person})
+
+    @router.get("/admin/roster/{assoc_num}/edit-form/cancel",response_class=HTMLResponse)
+    async def v3_admin_roster_edit_cancel(request:Request,assoc_num:str):
+        require_v3_manager(request)
+        person=db.get_associate(assoc_num)
+        if not person: raise HTTPException(404,"Associate not found")
+        if person.get("is_manager"): raise HTTPException(403,"Manager profiles are protected")
+        return templates.TemplateResponse(request,"partials/v3_assoc_row.html",{"a":person})
+
+    @router.post("/admin/roster/{assoc_num}/edit",response_class=HTMLResponse)
+    async def v3_admin_roster_edit(request:Request,assoc_num:str,
+                                   new_assoc_num:str=Form(...),full_name:str=Form(...),
+                                   shift:str=Form(""),is_mst:str=Form("0")):
+        require_v3_manager(request)
+        person=db.get_associate(assoc_num)
+        if not person: raise HTTPException(404,"Associate not found")
+        if person.get("is_manager"): raise HTTPException(403,"Manager profiles are protected")
+        if not new_assoc_num.strip() or len(new_assoc_num)>30 or not full_name.strip() or len(full_name)>180 or shift not in ("","S1","S2","S3","S4","S5"):
+            raise HTTPException(400,"Invalid associate information")
+        db.update_associate(assoc_num,new_assoc_num.strip(),full_name.strip(),shift,is_mst=(is_mst=="1"))
+        refresh_login_roster()
+        return roster_response(request)
+
+    @router.delete("/admin/roster/{assoc_num}",response_class=HTMLResponse)
+    async def v3_admin_roster_delete(request:Request,assoc_num:str):
+        require_v3_manager(request)
+        person=db.get_associate(assoc_num)
+        if not person: raise HTTPException(404,"Associate not found")
+        if person.get("is_manager"): raise HTTPException(403,"Manager profiles are protected")
+        db.delete_associate(assoc_num)
+        refresh_login_roster()
+        return roster_response(request)
 
     @router.get("/operations", response_class=HTMLResponse)
     async def v3_operations(request:Request, shift_id:int):
