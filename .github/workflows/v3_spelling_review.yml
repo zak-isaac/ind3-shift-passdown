@@ -28,4 +28,4 @@ jobs:
           python -m pip install -r requirements.txt pytest
       - name: Verify spelling, ownership, and route regressions
         run: |
-          python -m pytest -q tests/test_v3_spelling_and_acceptance.py tests/test_v3_split.py tests/test_v3_operational_patch.py tests/test_v3_all_non_pm.py tests/test_v3_routes.py tests/test_v3_migration.py tests/test_v3_only.py
+          python -m pytest -q tests/test_v3_dictionary_safety.py tests/test_v3_spelling_and_acceptance.py tests/test_v3_split.py tests/test_v3_operational_patch.py tests/test_v3_all_non_pm.py tests/test_v3_routes.py tests/test_v3_migration.py tests/test_v3_only.py
