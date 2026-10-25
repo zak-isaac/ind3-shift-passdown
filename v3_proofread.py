@@ -10,7 +10,7 @@ import re
 from spelling_fix import correct_spelling
 from text_normalize import fix_punctuation_spacing, fix_sentence_capitalization
 
-_START_RE = re.compile(r"^(\\s*)([a-z])", re.MULTILINE)
+_START_RE = re.compile(r"^(\s*)([a-z])", re.MULTILINE)
 
 
 def proofread(value: str) -> str:
