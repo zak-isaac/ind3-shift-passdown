@@ -113,3 +113,9 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
 .v3-spelling-suggestion{margin:7px 0 14px;padding:12px;background:#f7faff;border:1px solid #cbdcf4;border-radius:8px;font-size:12px;color:#213b5f;line-height:1.5}
 .v3-spelling-suggestion p{margin:8px 0 12px;white-space:pre-wrap;overflow-wrap:anywhere}
 .v3-spelling-suggestion button{margin:0 8px 5px 0}
+
+/* Two explicit Completed-WO choices in the technician confirmation modal. */
+.v3-closure-choice{padding:10px 12px;margin:10px 0;border:1px solid #d9e4f3;border-radius:8px;background:#fff}
+.v3-closure-choice legend{padding:0 5px;font-size:11px;font-weight:750;color:#173b6f}
+.v3-closure-choice label{display:block;margin:8px 0;font-size:11px;cursor:pointer}
+.v3-closure-choice input{margin-right:6px;accent-color:#0053e2}
