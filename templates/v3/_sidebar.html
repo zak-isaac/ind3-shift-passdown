@@ -1,6 +1,10 @@
 {% set sid = shift.id if shift is defined and shift else (shift_id if shift_id is defined else 0) %}
 <aside class="navy-sidebar" id="v3-sidebar" aria-label="Primary navigation">
   <div class="brand d2-brand"><div><strong>IND3 <span>/ Passdown</span></strong><small>Maintenance Reliability</small></div></div>
+  <section class="d2-sidebar-clock" aria-label="Current Indianapolis date and time">
+    <time data-v3-live-time>--:-- --</time>
+    <span data-v3-live-date>Loading Indianapolis date…</span>
+  </section>
   <nav class="nav-block"><div class="nav-cap">WORKSPACE</div>
     <a class="nav-link{{ ' active' if active_page=='workspace' else '' }}"{{ ' aria-current="page"' if active_page=='workspace' else '' }} href="/v3?shift_id={{ sid }}" hx-get="/v3?shift_id={{ sid }}" hx-select="#main-content" hx-target="#main-content" hx-swap="outerHTML" hx-push-url="true" hx-select-oob="#v3-sidebar"><span>Shift workspace</span></a>
   </nav>
