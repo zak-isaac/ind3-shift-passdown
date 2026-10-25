@@ -39,7 +39,8 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
 
     def set_session_cookies(response, who, sid):
         response.set_cookie(v3_cookie, signed_session(who["associate"],sid,elevated=bool(who.get("elevated")) or bool(who["profile"].get("is_manager"))), max_age=12*3600,
-                            httponly=True, samesite="strict", path="/", secure=False)
+                            httponly=True, samesite="strict", path="/",
+                            secure=os.environ.get("IND3_V3_SECURE_COOKIES", "") == "1")
         # V3 is the only authenticated UI; clear any stale V2 cookies.
         for cookie in ("lead_auth","lead_shift_id","mgr_session",
                        "tech_assoc","tech_shift","tech_name"):
