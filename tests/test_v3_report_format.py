@@ -144,3 +144,83 @@ def test_word_and_pdf_exporters_contain_bullet():
     assert heading(h[0]) in paragraphs
     assert "•  "+remark(h[0]) in paragraphs
     assert export_pdf(data).startswith(b"%PDF-")
+
+
+def test_one_technician_two_distinct_labor_lines_counts_as_one_wo():
+    """Repeated labor by the same tech is still one WO with both repairs and tests."""
+    from v3_cetaris import select_records
+    import json
+    rows = [
+        {"wo_number": "99090001", "tech_name": "Test Technician",
+         "asset_id": "MDR0099", "status": "Closed", "rfr": "Breakdown",
+         "reported_issue": "Load wheels worn", "remarks": "Changed both left and right load wheels",
+         "ln": "1"},
+        {"wo_number": "99090001", "tech_name": "Test Technician",
+         "asset_id": "MDR0099", "status": "Closed", "rfr": "Breakdown",
+         "reported_issue": "Load wheels worn", "remarks": "Blue light 5ft; braking 3ft; plugging 5ft",
+         "ln": "2"},
+    ]
+    grouped, counts = select_records(rows, {"Test Technician"}, None, None)
+    assert counts["unique_happening_wos"] == 1
+    assert len(grouped) == 1
+    assert grouped[0]["remarks_list"] == [r["remarks"] for r in rows]
+    entry = {"id": 901, "unit": "MDR0099", "wo_number": "99090001",
+             "source": "cmms", "issue": "WO #99090001 — Load wheels worn",
+             "raw_remarks": json.dumps(grouped[0]["remarks_list"]), "excluded": 0}
+    h = build_shift_happenings([entry])
+    assert len(h) == 1
+    assert "left and right load wheels" in remark(h[0])
+    assert "braking 3ft" in remark(h[0])
+    assert "plugging 5ft" in remark(h[0])
+
+
+def test_same_technician_repeat_pm_labor_even_same_ln_counts_once():
+    """Even when Cetaris repeats LN 1, one WO is one completed PM."""
+    from v3_cetaris import select_records
+    rows = [
+        {"wo_number": "99090002", "tech_name": "Test Technician",
+         "asset_id": "RACKTEST", "status": "Closed", "rfr": "Preventive Maintenance",
+         "reported_issue": "Rack PM", "remarks": "Inspected center racks",
+         "ln": "1"},
+        {"wo_number": "99090002", "tech_name": "Test Technician",
+         "asset_id": "RACKTEST", "status": "Closed", "rfr": "Preventive Maintenance",
+         "reported_issue": "Rack PM", "remarks": "Documented PM completion",
+         "ln": "1"},
+    ]
+    grouped, counts = select_records(rows, {"Test Technician"}, None, None)
+    assert counts["unique_pm_wos"] == 1
+    assert counts["unique_happening_wos"] == 0
+    assert len(grouped) == 1
+    assert grouped[0]["kind"] == "pm"
+    assert grouped[0]["remarks_list"] == [r["remarks"] for r in rows]
+
+
+def test_two_technicians_with_repeated_labor_by_one_keeps_all_distinct_notes():
+    """Three labor rows, two workers and one WO must become one report bullet."""
+    from v3_cetaris import select_records
+    rows = [
+        {"wo_number": "99090003", "tech_name": "Tech Alpha",
+         "asset_id": "TSPTEST", "status": "Closed", "rfr": "Process Interruption",
+         "reported_issue": "Overheat alarm", "remarks": "Inspected cooling fan", "ln": "1"},
+        {"wo_number": "99090003", "tech_name": "Tech Beta",
+         "asset_id": "TSPTEST", "status": "Closed", "rfr": "Process Interruption",
+         "reported_issue": "Overheat alarm", "remarks": "Updated software", "ln": "1"},
+        {"wo_number": "99090003", "tech_name": "Tech Alpha",
+         "asset_id": "TSPTEST", "status": "Closed", "rfr": "Process Interruption",
+         "reported_issue": "Overheat alarm", "remarks": "Braking 6ft and plugging 10ft", "ln": "2"},
+    ]
+    grouped, counts = select_records(rows, {"Tech Alpha", "Tech Beta"}, None, None)
+    assert len(grouped) == 2  # one per technician within the importer
+    assert counts["unique_happening_wos"] == 1  # one WO overall
+    assert sum(len(g["remarks_list"]) for g in grouped) == 3
+    entries = [
+        {"id": 903 + i, "unit": "TSPTEST", "wo_number": "99090003",
+         "source": "cmms", "issue": "WO #99090003 — Overheat alarm",
+         "raw_remarks": __import__("json").dumps(g["remarks_list"]), "excluded": 0}
+        for i, g in enumerate(grouped)
+    ]
+    h=build_shift_happenings(entries)
+    assert len(h)==1
+    assert all(x in remark(h[0]) for x in ("Inspected cooling fan", "Updated software", "Braking 6ft", "plugging 10ft"))
+
+
