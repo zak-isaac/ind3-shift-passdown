@@ -948,9 +948,8 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         )
         records,stats=select_records(rows,selected,*window)
         # Cross-shift completion credit must be unique across the database --
-        # the ownership engine above already decides which ONE shift a WO
-        # belongs to, but a stale concurrent upload on another shift could
-        # still have beaten this one to the punch. Block rather than silently
+        # the selected-technician and closure-window rules may still overlap
+        # another shift importing the same WO. Block rather than silently
         # double-credit or overwrite the other shift's record.
         completed_wos={r["wo_number"] for r in records if r["kind"] in ("pm","happening")}
         cross_shift=[]
@@ -1095,19 +1094,16 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                       "ON CONFLICT(shift_id) DO UPDATE SET technicians_json=excluded.technicians_json, filename=excluded.filename, imported_at=excluded.imported_at",
                       (shift_id,json.dumps(sorted(persisted_selection)),batch["filename"],datetime.now().strftime("%Y-%m-%d %H:%M")))
             c.execute("DELETE FROM v3_import_batches WHERE token=?",(token,))
-        notice=f"Imported {added} new technician/WO entries; {unchanged} unchanged; {pending} flagged for review. {stats.get('unique_pm_wos',0)} distinct closed PM WOs in this import."
+        notice=f"Imported {added} new technician/WO entries; {unchanged} unchanged. {stats.get('unique_pm_wos',0)} distinct closed PM WOs in this import."
         skipped_parts=[]
-        needs_review_parts=[]
         if stats.get("not_closed"):
             skipped_parts.append(f"{stats['not_closed']} not Closed")
         if stats.get("missing_close_timestamp"):
             skipped_parts.append(f"{stats['missing_close_timestamp']} missing closure timestamp")
         if stats.get("outside_shift"):
             skipped_parts.append(f"{stats['outside_shift']} outside this shift's time window")
-        all_parts=skipped_parts+needs_review_parts
-        if all_parts:
-            tail=" -- see Needs Review for details)." if needs_review_parts else ")."
-            notice += " Skipped " + " and ".join(all_parts) + " (not counted as happenings in this shift" + tail
+        if skipped_parts:
+            notice += " Excluded " + " and ".join(skipped_parts) + " (not counted in this shift)."
         if breakdown_updates:
             notice += f" {breakdown_updates} breakdown WO(s) updated in the OOS/RTS tracker."
         # Import diagnostics (2026-10-24 facility request, triggered by a real
@@ -1115,7 +1111,6 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         # a low or zero count is never ambiguous between "nothing happened
         # this shift" and "the import is broken". source_rows/parsed_rows come
         # from parse_excel() at stage time; everything else from this confirm.
-        review_count=0
         excluded_bits=[]
         if owned_elsewhere: excluded_bits.append(f"{owned_elsewhere} belong to a different shift")
         if stats.get("not_closed"): excluded_bits.append(f"{stats['not_closed']} not Closed")
@@ -1127,9 +1122,9 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             f" | Diagnostics: {parse_stats.get('source_rows',len(all_rows))} source rows, "
             f"{parse_stats.get('parsed_rows',len(all_rows))} parsed, "
             f"{len({r['wo_number'] for r in all_rows})} unique WOs seen, "
-            f"{len(rows)} attributed to this shift, "
+            f"{len(rows)} selected technician rows checked, "
             f"{stats.get('unique_pm_wos',0)} PMs, {stats.get('unique_happening_wos',0)} Shift Happenings, "
-            f"{review_count} need MST review"
+            f"0 ownership reviews"
             + (", excluded: " + "; ".join(excluded_bits) if excluded_bits else "") + "."
         )
         from urllib.parse import quote
