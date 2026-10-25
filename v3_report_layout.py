@@ -69,11 +69,13 @@ def build_shift_happenings(entries: list[dict], meta_by_id: dict[int, dict]
         )
         group = groups.setdefault(key, {
             "asset": asset, "cause": cause, "cause_rank": cause_rank,
-            "wo_number": wo, "remarks": [], "seen": set(),
+            "wo_number": wo, "remarks": [], "seen": set(), "mst_edited": False,
         })
         if cause and (not group["cause"] or cause_rank > group["cause_rank"]):
             group["cause"] = cause
             group["cause_rank"] = cause_rank
+        if meta.get("mst_edited"):
+            group["mst_edited"] = True
         for raw in _raw_remarks(entry):
             corrected = proofread(raw.strip())
             token = _remark_key(corrected)
@@ -84,7 +86,7 @@ def build_shift_happenings(entries: list[dict], meta_by_id: dict[int, dict]
         RewrittenHappening(
             title=g["asset"],
             cause=g["cause"],
-            paragraph=approved_remarks.get(g["wo_number"]) or ("; ".join(g["remarks"]) if g["remarks"] else "No technician remarks recorded."),
+            paragraph=(None if g["mst_edited"] else approved_remarks.get(g["wo_number"])) or ("; ".join(g["remarks"]) if g["remarks"] else "No technician remarks recorded."),
             wo_number=g["wo_number"],
         )
         for g in groups.values()
