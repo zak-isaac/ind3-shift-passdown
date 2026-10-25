@@ -200,7 +200,7 @@ def statuses(shift_id: int) -> list[dict]:
     path = _db_path()
     ensure_table(path)
     with _connect(path) as c:
-        return [dict(r) for r in c.execute("""SELECT wo_number,asset,cause,status,reason,approved,draft
+        return [dict(r) for r in c.execute("""SELECT wo_number,asset,cause,status,reason,approved,draft,source_json
             FROM v3_ollama_drafts WHERE shift_id=? ORDER BY wo_number""",(shift_id,))]
 
 def approve(shift_id: int, wo: str) -> bool:

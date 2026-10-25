@@ -22,6 +22,52 @@
    <button class="button button-blue d2-reupload" onclick="v3OpenImport()" type="button">{{ 'Replace file' if imported_filename else 'Upload Cetaris File' }}</button>
  </section>
 
+<section class="card" id="ollama-writer" style="margin:16px 0;padding:16px" aria-label="AI remark drafts">
+ <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+  <h2 style="margin:0">Maintenance Remark Writer</h2>
+  <small id="ai-draft-summary">Checking background drafts...</small>
+ </div>
+ <p style="margin:10px 0">Ollama writes in the background after Cetaris confirmation. Every draft is unapproved until you compare it with the source. Only approved wording goes into the EML report.</p>
+ <div id="ai-draft-list" aria-live="polite"></div>
+</section>
+<script>
+(function(){
+ const sid={{ shift.id|tojson }};
+ const list=document.getElementById('ai-draft-list');
+ const summary=document.getElementById('ai-draft-summary');
+ if(!list) return;
+ const element=(tag,txt)=>{const el=document.createElement(tag);el.textContent=txt;return el};
+ async function refresh(){
+  try{
+   const resp=await fetch('/v3/ai/drafts?shift_id='+encodeURIComponent(sid),{credentials:'same-origin'});
+   if(!resp.ok) throw new Error('Cannot read AI draft status');
+   const rows=(await resp.json()).drafts||[];
+   list.replaceChildren();
+   summary.textContent=rows.length?rows.filter(r=>r.status==='approved').length+' approved / '+rows.length+' work orders':'No drafts yet';
+   for(const r of rows){
+    const card=document.createElement('details');card.style.cssText='padding:11px;border:1px solid #dae2ee;border-radius:8px;margin:8px 0';
+    const top=element('summary',r.asset+' · WO '+r.wo_number+' — '+r.status);top.style.cursor='pointer';card.append(top);
+    card.append(element('p','Cause: '+r.cause));
+    if(r.draft) card.append(element('p','AI draft: '+r.draft));
+    if(r.reason) card.append(element('small',r.reason));
+    if(r.source_json){try{for(const [i,v] of JSON.parse(r.source_json).entries()){card.append(element('p','Source '+(i+1)+': '+v))}}catch(e){}}
+    if(r.status==='review'){
+     const button=element('button','I compared the source — Approve');button.type='button';button.className='button button-blue';
+     button.addEventListener('click',async()=>{
+      const form=new FormData();form.append('shift_id',String(sid));
+      const response=await fetch('/v3/ai/drafts/'+encodeURIComponent(r.wo_number)+'/approve',{method:'POST',body:form,credentials:'same-origin'});
+      if(response.ok) refresh();else alert('Approval failed. Refresh and review this draft again.');
+     });card.append(button);
+    }
+    list.append(card);
+   }
+  }catch(e){summary.textContent='AI status unavailable';}
+ }
+ refresh();
+ setInterval(refresh,5000);
+})();
+</script>
+
  <section class="d2-kpis" aria-label="Shift overview">
    <div class="card d2-kpi d2-shift-kpi"><div><small>Current shift</small><strong>{{ shift.shift_type }} · {{ shift.date }}</strong><span>IND3 · {{ shift.lead_name }}</span></div></div>
    <div class="card d2-kpi"><div><small>Selected technicians</small><strong>{{ selected_techs|length }}</strong><span>From the Cetaris report</span></div></div>
