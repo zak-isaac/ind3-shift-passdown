@@ -420,7 +420,7 @@ async def _dev_mode_sandbox(request: Request, call_next):
     dev/test traffic can never read or write the live shift.
     """
     if request.cookies.get(dev_mode.DEV_COOKIE) == dev_mode.DEV_TOKEN:
-        with db.use_sandbox_db(dev_mode.DEV_DB_PATH), dev_mode.freeze_time(dev_mode.dev_now(request.cookies.get("dev_clock", ""))):
+        with db.use_sandbox_db(dev_mode.DEV_DB_PATH), dev_mode.freeze_time(dev_mode.dev_now()):
             return await call_next(request)
     return await call_next(request)
 

@@ -6,8 +6,7 @@ without touching real shift data. Two things make this safe:
 1. A completely separate sandbox SQLite file (dbs/_devtest.db) swapped in
    via db.use_sandbox_db() for the lifetime of any request carrying the
    dev-session cookie. Production data is never read or written.
-2. The actual local clock by default, with a per-browser simulated test
-   date/time cookie when the tester explicitly freezes the clock.
+2. The same real local date/time used by normal shift operations.
 
 Entry: /dev/login, accepts either the literal test code below OR any real
 associate number from the roster (so a tech/MST can self-test with their
@@ -47,13 +46,8 @@ def is_dev_credential(entered: str, roster: dict) -> bool:
     return entered in roster
 
 
-def dev_now(clock: str = "") -> datetime:
-    """Use the chosen sandbox clock, otherwise live server-local date/time."""
-    if clock:
-        try:
-            return datetime.strptime(clock, "%Y-%m-%dT%H:%M")
-        except (TypeError, ValueError):
-            pass
+def dev_now() -> datetime:
+    """Use real local date and time for sandbox requests."""
     return datetime.now()
 
 

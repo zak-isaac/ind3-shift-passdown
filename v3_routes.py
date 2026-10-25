@@ -65,7 +65,8 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
     def _v3_live_shifts():
         # Dev sandbox shifts are selectable regardless of the wall clock.
         if __import__("dev_mode").is_active():
-            return db.get_active_shifts()
+            return [s for s in db.get_active_shifts()
+                    if s["date"] == _v3_shift_day(s["shift_type"]).isoformat()]
         now = now_func() if now_func else datetime.now()
         visible = []
         for shift in db.get_active_shifts():
@@ -85,7 +86,12 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
 
     def _v3_shift_day(code):
         if __import__("dev_mode").is_active():
-            return __import__("dev_mode").get_today()
+            now = __import__("dev_mode").get_now()
+            for day in (now.date() - timedelta(days=1), now.date()):
+                window = shift_window(code, day)
+                if window and window[0] <= now <= window[1]:
+                    return day
+            return now.date()
         now = now_func() if now_func else datetime.now()
         for day in (now.date(), now.date() - timedelta(days=1)):
             if allowed_shift_days and day.weekday() not in allowed_shift_days.get(code, ()):
@@ -102,9 +108,6 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             "error":error,"shifts":shifts,"today":now.date().isoformat(),
             "master_verified":master_verified or bool(request.cookies.get("dev_session") == __import__("dev_mode").DEV_TOKEN and decode_session(request) and decode_session(request)["profile"].get("is_manager")),
             "master_auth_prompt":master_auth_prompt, "is_dev_mode": __import__("dev_mode").is_active(),
-            "test_clock_label": (__import__("dev_mode").get_now().strftime("%a, %b %d, %Y at %I:%M %p")
-                                  if __import__("dev_mode").is_active() else ""),
-            "test_clock_frozen": bool(request.cookies.get("dev_clock")),
             "eligible_shifts":[code for code in ("S1","S2","S3","S4","S5") if _v3_shift_day(code)],
             "valid_shifts": [code for code,days in (allowed_shift_days or {}).items()
                              if now.date().weekday() in days] or ["S1","S2","S3","S4","S5"],
@@ -118,27 +121,20 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
     @router.get("/dev/workspace", response_class=HTMLResponse)
     async def sandbox_workspace(request:Request):
         require_dev(request)
-        import dev_mode
-        active = db.get_active_shifts()
-        now = dev_mode.get_now()
-        # Sandbox control center is independent of shift login. A test shift is
-        # created or resumed only when requested in this control center.
-        return templates.TemplateResponse(request, "v3/dev_workspace.html", {
-            "simulated_now": now.strftime("%Y-%m-%dT%H:%M"),
-            "simulated_now_label": now.strftime("%a, %b %d, %Y at %I:%M %p"),
-            "clock_is_frozen": bool(request.cookies.get("dev_clock")),
-            "active_shifts": active, "test_mode": True,
-        })
+        # Hide old simulated-date shifts without deleting any sandbox records.
+        active = [s for s in db.get_active_shifts()
+                  if s["date"] == _v3_shift_day(s["shift_type"]).isoformat()]
+        response = templates.TemplateResponse(request, "v3/dev_workspace.html",
+                                              {"active_shifts":active,"test_mode":True})
+        response.delete_cookie("dev_clock",path="/")
+        return response
 
     @router.post("/dev/clock")
-    async def sandbox_set_clock(request:Request, simulated_at:str=Form(...)):
+    async def retired_sandbox_clock(request:Request):
+        # Support stale cached forms without restoring simulated time.
         require_dev(request)
-        try:
-            value = datetime.strptime(simulated_at, "%Y-%m-%dT%H:%M").strftime("%Y-%m-%dT%H:%M")
-        except (TypeError, ValueError):
-            raise HTTPException(400, "Provide a valid simulated date and time")
-        response = RedirectResponse("/v3/dev/workspace", status_code=303)
-        response.set_cookie("dev_clock", value, httponly=True, samesite="lax", path="/")
+        response=RedirectResponse("/v3/dev/workspace",status_code=303)
+        response.delete_cookie("dev_clock",path="/")
         return response
 
     @router.post("/dev/shift")
@@ -147,7 +143,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         import dev_mode
         if shift_type not in ("S1", "S2", "S3", "S4", "S5"):
             raise HTTPException(400, "Invalid test shift")
-        simulated_day = dev_mode.get_today().isoformat()
+        simulated_day = _v3_shift_day(shift_type).isoformat()
         active = db.get_active_shifts()
         found = next((s for s in active if s["shift_type"] == shift_type and s["date"] == simulated_day), None)
         if found:
@@ -190,6 +186,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             response = RedirectResponse("/v3/dev/workspace", status_code=303)
             response.set_cookie(dev_mode.DEV_COOKIE, dev_mode.DEV_TOKEN,
                                 httponly=True, samesite="lax", path="/")
+            response.delete_cookie("dev_clock",path="/")
             set_session_cookies(response, {"associate":"8972","profile":dev_manager,"elevated":True}, 0)
             return response
         # Two explicitly designated override identifiers open shift selection
