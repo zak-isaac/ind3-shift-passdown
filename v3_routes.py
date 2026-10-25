@@ -933,7 +933,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         suggestion=fix_sentence_capitalization(fix_punctuation_spacing(correct_spelling(text)))
         # Only capitalize a sentence-opening lowercase word; leave acronyms
         # and identifiers alone, and never alter technicians' recorded facts.
-        suggestion=re.sub(r"^(\\s*)([a-z])",
+        suggestion=re.sub(r"^(\s*)([a-z])",
                           lambda m:m.group(1)+m.group(2).upper(),suggestion)
         return JSONResponse({"original":text,"suggested":suggestion,
                              "changed":suggestion!=text})
