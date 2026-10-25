@@ -81,7 +81,7 @@ def _group_sources(entries: list[dict], metadata: dict[int, dict]) -> list[dict]
     return [{"wo": wo, "asset": h.title, "cause": h.cause,
              "notes": grouped.get(wo, [])} for wo, h in current.items()]
 
-def queue_shift(shift_id: int) -> int:
+def queue_shift(shift_id: int, retry_original: bool = False) -> int:
     if not enabled():
         return 0
     path = _db_path()
@@ -103,9 +103,10 @@ def queue_shift(shift_id: int) -> int:
             if not x["notes"] or all(not t.strip() for t in x["notes"]):
                 continue
             stamp = _source_hash(x["asset"], x["cause"], x["notes"])
-            old = c.execute("SELECT source_hash FROM v3_ollama_drafts WHERE shift_id=? AND wo_number=?",
+            old = c.execute("SELECT source_hash,status FROM v3_ollama_drafts WHERE shift_id=? AND wo_number=?",
                             (shift_id, x["wo"])).fetchone()
-            if old and old["source_hash"] == stamp:
+            if old and old["source_hash"] == stamp and not (
+                    retry_original and old["status"] == "original"):
                 continue
             c.execute("""INSERT INTO v3_ollama_drafts
                 (shift_id,wo_number,source_hash,asset,cause,source_json,draft,status,reason,approved)
