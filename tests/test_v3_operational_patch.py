@@ -19,11 +19,16 @@ def test_normal_shift_does_not_filter_by_labor_start():
     assert stats["unique_happening_wos"]==1
     assert {r["remarks"] for r in selected}=={"Adjusted","Validated; RTS"}
 
-def test_completed_breakdown_happening_and_in_process_oos():
+def test_completed_breakdown_requires_mst_closure_review_and_in_process_stays_oos():
     rows=[sample(wo="101",rfr="Breakdown",status="Completed"),
           sample(wo="102",rfr="Breakdown",status="In Process")]
     records,stats=select_records(rows,{"Tech A"},datetime(2026,10,22,12),datetime(2026,10,22,22))
-    assert {r["wo_number"]:r["kind"] for r in records}=={"101":"happening","102":"oos"}
+    assert {r["wo_number"]:r["kind"] for r in records}=={"102":"oos"}
+    accepted,counts=select_records(rows,{"Tech A"},datetime(2026,10,22,12),
+                                   datetime(2026,10,22,22),closure_reviews={"101":"add"})
+    assert {r["wo_number"]:r["kind"] for r in accepted}=={"101":"happening","102":"oos"}
+    assert "Please close this WO" in next(r["remarks"] for r in accepted if r["wo_number"]=="101")
+    assert counts["unique_pm_wos"]==0
 
 def test_only_preventive_maintenance_counts():
     rows=[sample(wo="201",rfr="Preventive Maintenance"),sample(wo="202",rfr="Found During PM"),sample(wo="203",rfr="PM")]
