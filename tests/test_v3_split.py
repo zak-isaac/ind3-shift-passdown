@@ -116,7 +116,7 @@ def test_older_work_completing_tech_is_automatically_credited_to_s5():
 
 
 def test_s5_record_after_midnight_does_not_count_for_prior_s4():
-    rows=[{**row(wo="S5-ONLY",start="2026-10-25T03:00:00"),
+    rows=[{**row(wo="S5-ONLY",start="2026-10-25T03:00:00",completed_by="Tech A"),
            "last_complete_at":"2026-10-25T03:15:00"}]
     assert assign(rows,{"Tech A"},"S4","2026-10-24")==([],[])
     assert assign(rows,{"Tech A"},"S5","2026-10-24")==(rows,[])
