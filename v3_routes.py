@@ -18,6 +18,7 @@ import v3_breakdown
 import v3_split
 from v3_cetaris import parse_excel, select_records, technician_counts, MAX_SIZE
 from v3_proofread import proofread
+from v3_report_layout import build_shift_happenings
 
 
 def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shift,
@@ -1128,6 +1129,20 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
     async def preview(request:Request,shift_id:int):
         shift=secure(request,shift_id)
         data=model(shift_id)
-        return templates.TemplateResponse(request,"v3/preview.html",{"shift":shift,**data,"loto":db.get_loto(shift_id),"shift_notes":db.get_shift_notes(shift_id),"oos_units":db.get_oos_units(),"rts_units":db.get_rts_events(shift_id),"vendors":v3_vendors(shift_id),"carry_overs":db.get_carry_over_entries(shift_id)})
+        # Use exactly the same WO grouping/remarks as the generated report.
+        with db._conn() as c:
+            meta_rows = c.execute(
+                "SELECT * FROM v3_entry_meta WHERE shift_id=?", (shift_id,)
+            ).fetchall()
+        report_happenings = build_shift_happenings(
+            db.get_entries(shift_id),
+            {m["entry_id"]: dict(m) for m in meta_rows},
+        )
+        return templates.TemplateResponse(request,"v3/preview.html",{
+            "shift":shift,**data,"report_happenings":report_happenings,
+            "loto":db.get_loto(shift_id),"shift_notes":db.get_shift_notes(shift_id),
+            "oos_units":db.get_oos_units(),"rts_units":db.get_rts_events(shift_id),
+            "vendors":v3_vendors(shift_id),
+            "carry_overs":db.get_carry_over_entries(shift_id)})
 
     return router

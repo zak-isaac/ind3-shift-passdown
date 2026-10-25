@@ -1,7 +1,9 @@
 """DOCX and PDF exporters for shift passdown reports."""
 from __future__ import annotations
 import io
+from html import escape
 from datetime import datetime
+from v3_report_layout import heading as _heading, remark as _remark
 from report_models import ReportData
 from pm_table_style import pm_zebra_hex, PM_HEADER_HEX
 
@@ -175,11 +177,11 @@ def export_docx(data: ReportData, pending_pms: list[dict] | None = None, loto_mi
         r.font.size, r.font.color.rgb = Pt(10), MED_GRAY
     if data.happenings:
         for h in data.happenings:
-            _item(h.title, color=BLACK, bold=True)
+            _item(_heading(h), color=BLACK, bold=True)
             p = doc.add_paragraph()
-            p.paragraph_format.left_indent = Inches(0.25)
+            p.paragraph_format.left_indent = Inches(0.44)
             p.paragraph_format.space_after = Pt(5)
-            r = p.add_run(h.paragraph)
+            r = p.add_run("\u2022  " + _remark(h))
             r.font.size, r.font.color.rgb = Pt(10), MED_GRAY
     else:
         if not (getattr(data, "shift_notes", "") and data.shift_notes.strip()):
@@ -432,8 +434,8 @@ def export_pdf(data: ReportData, pending_pms: list[dict] | None = None, loto_mis
     if data.happenings:
         for h in data.happenings:
             story.append(KeepTogether([
-                Paragraph(h.title, ITEM_TITLE),
-                Paragraph(h.paragraph, BODY),
+                Paragraph(escape(_heading(h)), ITEM_TITLE),
+                Paragraph("&#8226;&#160;&#160;" + escape(_remark(h)), BODY),
                 Spacer(1, 2),
             ]))
     else:
