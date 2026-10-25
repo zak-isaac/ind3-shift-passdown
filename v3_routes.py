@@ -931,49 +931,22 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         if not window:
             return render(request,shift,warning="Shift timing is not configured. Import cannot continue.")
 
-        # Every shift (S1-S5, including Thursday S3 carried into Friday
-        # morning, and the S4/S5 Friday-evening overlap) uses the same WO
-        # ownership engine: technician work-start evidence first, roster home
-        # shift and technician continuity to resolve overlaps, equipment-return
-        # evidence (In Service / Update Date) as a fallback, and an explicit
-        # MST shift choice when evidence is missing or genuinely conflicting.
-        # A later administrative WO Closed Date/Time never transfers ownership.
-        split_pending=[]
-        submitted=await request.form()
-        decisions={key[len("split_wo_"):]:value for key,value in submitted.multi_items()
-                   if key.startswith("split_wo_") and value in ("S1","S2","S3","S4","S5")}
-        # Standing MST ownership calls apply here too -- a decision made once
-        # (by any shift) is honored on every later re-upload of that WO,
-        # never re-asked, and this form's own explicit choice wins if both
-        # are present in the same submission.
-        decisions={**v3_import_review.ownership_decisions(db),**decisions}
-        roster_shifts=_roster_home_shift_map(allowed)
-        # S5's 06:00-06:30 morning grace is resolved by v3_split.py as just
-        # another scheduled overlap (roster home shift, then the technician's
-        # own earlier unambiguous S5 work-start that same night) -- technician
-        # SELECTION for S5 only confirms shift participation, never grants
-        # automatic ownership of grace-window work on its own.
+        # Technician selection establishes shift participation. Official WO
+        # closure time determines whether a selected technician's work is
+        # eligible for this shift. Never infer ownership from roster or start.
         all_rows=rows
-        rows,split_pending,owned_elsewhere=v3_split.assign(rows,selected,shift["shift_type"],date.fromisoformat(shift["date"]),
-                                           decisions,roster_shifts=roster_shifts)
-        if split_pending:
-            v3_import_review.record(db,shift_id,{"ownership":split_pending})
-
-        # Breakdown WOs get sidecar OOS/RTS lifecycle tracking independent of
-        # the happenings/PM report -- runs on every import, every shift type.
-        # Shares the existing oos_units/rts_log tables, so a WO going "in
-        # process" shows up in the OOS panel you already have.
-        # allowed_new_wos restricts tracking to WOs the ownership engine just
-        # attributed to THIS shift -- a breakdown opened by another shift must
-        # never start being tracked here just because its technician also
-        # appears in this file. all_rows (pre-attribution) is still what gets
-        # scanned, so a STATUS UPDATE to an already-tracked WO (e.g. someone
-        # closing out a breakdown that belongs to a different shift) still
-        # flows through -- OOS/RTS state is shared infrastructure, not
-        # shift-exclusive; only *starting* new tracking is ownership-gated.
-        breakdown_updates=v3_breakdown.sync(db,all_rows,selected,shift_id,
-                                            allowed_new_wos={r["wo_number"] for r in rows})
-        records,stats=select_records(rows,selected,*window,trust_attribution=True)
+        rows=[r for r in all_rows if r.get("tech_name") in selected]
+        owned_elsewhere=0
+        split_pending=[]
+        # Keep breakdown lifecycle tracking separate from completed-WO credit.
+        # A not-yet-closed breakdown can still require OOS/RTS tracking.
+        breakdown_updates=v3_breakdown.sync(
+            db, all_rows, selected, shift_id,
+            allowed_new_wos={r["wo_number"] for r in rows
+                if str(r.get("status","")).strip().casefold()=="closed"
+                and r.get("closed_at")}
+        )
+        records,stats=select_records(rows,selected,*window)
         # Cross-shift completion credit must be unique across the database --
         # the ownership engine above already decides which ONE shift a WO
         # belongs to, but a stale concurrent upload on another shift could
@@ -999,12 +972,8 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                         ". Review the existing shift's WO before retrying.",
                 staged={"token":token,"filename":batch["filename"],
                         "counts":technician_counts(rows),"total_rows":len(rows)})
-        # Persist WHICH WOs were excluded/ambiguous, with their close time and
-        # reason, not just an aggregate count -- an MST couldn't previously
-        # see or act on anything beyond "N skipped". Hits overnight shifts
-        # (S3, S5) hardest since midnight-crossing timestamps are the most
-        # likely to disagree with a shift's computed window.
-        v3_import_review.record(db,shift_id,{"ambiguous":stats.get("ambiguous",[]),"excluded":stats.get("excluded",[])})
+        # No skipped-WO review queue. In-process, Completed without closure,
+        # and outside-window WOs are automatically excluded.
         added,unchanged,pending=0,0,0
         # Use short transactions. Existing db helpers open their own connections;
         # nesting them inside an active SQLite write transaction risks 'database locked'.
@@ -1130,20 +1099,11 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         skipped_parts=[]
         needs_review_parts=[]
         if stats.get("not_closed"):
-            skipped_parts.append(f"{stats['not_closed']} not yet closed")
+            skipped_parts.append(f"{stats['not_closed']} not Closed")
+        if stats.get("missing_close_timestamp"):
+            skipped_parts.append(f"{stats['missing_close_timestamp']} missing closure timestamp")
         if stats.get("outside_shift"):
             skipped_parts.append(f"{stats['outside_shift']} outside this shift's time window")
-        if stats.get("ambiguous_shift"):
-            needs_review_parts.append(f"{stats['ambiguous_shift']} flagged for MST review (timestamps don't clearly establish the shift)")
-        if split_pending:
-            needs_review_parts.append(f"{len(split_pending)} need an explicit shift ownership call")
-        if owned_elsewhere:
-            # Common and EXPECTED when a Cetaris export spans multiple shifts
-            # or days -- these WOs' work-start evidence confidently belongs to
-            # a different, already-recorded shift (nothing to review -- it's
-            # not ambiguous, just not this shift's). Surfaced so "0 new
-            # entries" never reads as "something's broken".
-            skipped_parts.append(f"{owned_elsewhere} already belong to a different shift's record")
         all_parts=skipped_parts+needs_review_parts
         if all_parts:
             tail=" -- see Needs Review for details)." if needs_review_parts else ")."
@@ -1155,10 +1115,11 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         # a low or zero count is never ambiguous between "nothing happened
         # this shift" and "the import is broken". source_rows/parsed_rows come
         # from parse_excel() at stage time; everything else from this confirm.
-        review_count=len(split_pending)+stats.get("ambiguous_shift",0)
+        review_count=0
         excluded_bits=[]
         if owned_elsewhere: excluded_bits.append(f"{owned_elsewhere} belong to a different shift")
-        if stats.get("not_closed"): excluded_bits.append(f"{stats['not_closed']} not yet closed")
+        if stats.get("not_closed"): excluded_bits.append(f"{stats['not_closed']} not Closed")
+        if stats.get("missing_close_timestamp"): excluded_bits.append(f"{stats['missing_close_timestamp']} missing closure timestamp")
         if stats.get("outside_shift"): excluded_bits.append(f"{stats['outside_shift']} outside shift window")
         if parse_stats.get("skipped_no_tech"): excluded_bits.append(f"{parse_stats['skipped_no_tech']} unassigned (no technician on record)")
         if parse_stats.get("skipped_no_wo"): excluded_bits.append(f"{parse_stats['skipped_no_wo']} missing WO number")
