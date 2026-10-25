@@ -156,6 +156,46 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
                 owner = labels[0]
             else:
                 reason = "Missing or conflicting work-start and in-service evidence"
+        # Shared S3 work completed before the 07:00 boundary belongs to S3,
+        # even if an arriving S1/S4 technician has the latest labor start.
+        # Require actual return/completion evidence instead of guessing from
+        # an administratively delayed WO close.
+        finish_times = [
+            parse_close(r.get("in_service_at")) or parse_close(r.get("last_complete_at"))
+            for r in items
+        ]
+        final_times = [value for value in finish_times if value]
+        final_work_time = max(final_times) if final_times else None
+        participant_shifts = {pair for _, _, pair in starts}
+        s3_pairs = [pair for pair in participant_shifts if pair[0] == "S3"]
+        incoming_pairs = [pair for pair in participant_shifts if pair[0] in ("S1", "S4")]
+        if s3_pairs and incoming_pairs:
+            s3_pair = s3_pairs[0]
+            s3_day = date.fromisoformat(s3_pair[1])
+            end_s3 = datetime.combine(s3_day + timedelta(days=1), time(7))
+            if final_work_time is None:
+                owner = None
+                reason = "Shared S3 work needs a recorded completion or In Service time"
+            elif final_work_time < end_s3 and s3_pair in _windows(final_work_time):
+                owner = s3_pair
+            # After 07:00 the later-shift attribution remains subject to
+            # technician evidence and the normal conflict checks.
+
+        # For S4/S5, equipment actually returned after 18:00 belongs to S5
+        # even if its technician began the WO during S4. Finishing during
+        # the S4 overlap before 18:00 remains S4 work.
+        s4_pairs = [pair for pair in participant_shifts if pair[0] == "S4"]
+        if final_work_time and s4_pairs:
+            candidates = _windows(final_work_time)
+            if (s4_pairs[0] in _windows(parse_close(items[0].get("start_at")))
+                if parse_close(items[0].get("start_at")) else True):
+                s5_candidates = [pair for pair in candidates if pair[0] == "S5"]
+                if s5_candidates and final_work_time.time() >= time(18):
+                    owner = s5_candidates[0]
+                elif s4_pairs[0] in candidates and any(
+                    pair[0] == "S5" for pair in participant_shifts
+                ) and final_work_time.time() < time(18):
+                    owner = s4_pairs[0]
         # A recorded equipment return during the technician's scheduled
         # shift (including S3/S4 overlap) does not transfer ownership.
         if owner:
