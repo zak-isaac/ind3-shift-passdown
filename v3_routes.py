@@ -991,14 +991,55 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                 and r.get("closed_at")}
         )
         records,stats=select_records(rows,selected,*window)
-        # Cross-shift completion credit must be unique across the database --
-        # the selected-technician and closure-window rules may still overlap
-        # another shift importing the same WO. Block rather than silently
-        # double-credit or overwrite the other shift's record.
-        completed_wos={r["wo_number"] for r in records if r["kind"] in ("pm","happening")}
+        # Resolve overlap deterministically, regardless of import order.
+        # Earlier-ending active shift has priority: S3 through 07:00,
+        # S5 through 06:00. The incoming shift takes over at that boundary.
+        def _scheduled_window(other):
+            w=shift_window(other["shift_type"],date.fromisoformat(other["date"]))
+            return (w[0],w[1]-timedelta(hours=1)) if w else None
+
+        def _priority_owner(close_time, candidate_shifts):
+            active=[]
+            for candidate in candidate_shifts:
+                w=_scheduled_window(candidate)
+                if w and w[0] <= close_time < w[1]:
+                    active.append((w[1],w[0],candidate["id"]))
+            # The outgoing shift ends sooner, and wins while still on duty.
+            return min(active)[2] if active else None
+
+        completed_wos={r["wo_number"] for r in records}
+        with db._conn() as c:
+            other_shifts=[dict(x) for x in c.execute(
+                "SELECT id,shift_type,date FROM shifts WHERE id<>?",(shift_id,)).fetchall()]
+        shift_info={"id":shift_id,"shift_type":shift["shift_type"],"date":shift["date"]}
+        owner_by_wo={}
+        for r in records:
+            try: closed=datetime.fromisoformat(r["closed_at"])
+            except (TypeError,ValueError): continue
+            owner_by_wo[r["wo_number"]]=_priority_owner(closed,[shift_info,*other_shifts])
+        # Losing shift never credits an overlapping WO, even when imported first.
+        records=[r for r in records if owner_by_wo.get(r["wo_number"])==shift_id]
+        owned_elsewhere=len(completed_wos-{r["wo_number"] for r in records})
+        # Reconcile earlier imports on lower-priority shifts, only for entries
+        # originally imported by V3. Never delete manually entered records.
+        winning_wos={r["wo_number"] for r in records}
+        with db._conn() as c:
+            for wo in winning_wos:
+                losing=[x for x in c.execute(
+                    "SELECT id FROM shifts WHERE id<>?",(shift_id,)).fetchall()
+                    if x["id"]!=shift_id]
+                for other in losing:
+                    oid=other["id"]
+                    c.execute("""UPDATE entries SET excluded=1 WHERE shift_id=? AND wo_number=?
+                        AND id IN (SELECT entry_id FROM v3_entry_meta WHERE imported_v3=1)""",(oid,wo))
+                    c.execute("""DELETE FROM pm_wos WHERE shift_id=? AND wo_number=?
+                        AND EXISTS (SELECT 1 FROM v3_pm_tracking WHERE shift_id=? AND wo_number=? AND was_preexisting=0)""",
+                        (oid,wo,oid,wo))
+                    c.execute("DELETE FROM v3_pm_tracking WHERE shift_id=? AND wo_number=? AND was_preexisting=0",(oid,wo))
+        # A manual or legacy entry in another shift must not be silently changed.
         cross_shift=[]
-        if completed_wos:
-            placeholders=",".join("?" for _ in completed_wos)
+        if winning_wos:
+            placeholders=",".join("?" for _ in winning_wos)
             with db._conn() as c:
                 cross_shift=c.execute(f"""
                     SELECT DISTINCT wo_number,shift_id FROM pm_wos
@@ -1006,13 +1047,10 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                     UNION
                     SELECT DISTINCT wo_number,shift_id FROM entries
                     WHERE shift_id<>? AND excluded=0 AND wo_number IN ({placeholders})
-                """,(shift_id,*sorted(completed_wos),shift_id,*sorted(completed_wos))).fetchall()
+                """,(shift_id,*sorted(winning_wos),shift_id,*sorted(winning_wos))).fetchall()
         if cross_shift:
             labels=", ".join(f"WO {r['wo_number']} (shift #{r['shift_id']})" for r in cross_shift[:8])
-            return render(request,shift,
-                warning="Import blocked to prevent double-credit across shifts: "+labels+
-                        (f" and {len(cross_shift)-8} more" if len(cross_shift)>8 else "")+
-                        ". Review the existing shift's WO before retrying.",
+            return render(request,shift,warning="Manual or legacy shift records need review before import: "+labels,
                 staged={"token":token,"filename":batch["filename"],
                         "counts":technician_counts(rows),"total_rows":len(rows)})
         # No skipped-WO review queue. In-process, Completed without closure,
