@@ -1312,6 +1312,16 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         secure(request, shift_id)
         return {"drafts": ollama_drafts.statuses(shift_id)}
 
+    @router.post("/ai/retry")
+    async def v3_retry_local_ai(request:Request,shift_id:int=Form(...)):
+        secure(request,shift_id)
+        if not ollama_drafts.enabled():
+            return return_workspace(shift_id,
+                "Local AI is disabled; set IND3_OLLAMA_REWRITE=1 in .env and restart")
+        count=ollama_drafts.queue_shift(shift_id,retry_original=True)
+        return return_workspace(shift_id,
+            f"Queued {count} technician work orders for local AI validation; original remarks remain protected")
+
     @router.get("/preview",response_class=HTMLResponse)
     async def preview(request:Request,shift_id:int):
         shift=secure(request,shift_id)
