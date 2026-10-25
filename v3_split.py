@@ -286,8 +286,9 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
                     when, completing_tech, items, history, roster_shifts, confirmed)
                 reason = ("Completion timestamp falls in overlapping shifts without reliable technician shift evidence"
                           if owner is None else "")
-            if owner is None and not reason:
-                reason = "Completion timestamp lacks reliable technician shift evidence"
+            if owner is None:
+                if not reason:
+                    reason = "Completion timestamp lacks reliable technician shift evidence"
             elif _grace_requires_confirmation(when, owner, confirmed, completing_tech):
                 owner = None
                 reason = "S5 completion during grace requires confirmed S5 technician"
