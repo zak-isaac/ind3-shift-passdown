@@ -23,19 +23,6 @@ from v3_report_layout import build_shift_happenings
 import v3_ollama_background as ollama_drafts
 
 
-# Sandbox-only roster mapping. Never modifies Drax or production rosters.
-_TEST_TECH_SHIFTS = {
-    "alexander carr": "S4",
-    "bradley spires": "S4",
-    "kpedekpo koukpo": "S4",
-    "robert jones": "S4",
-    "isaac ssaku": "S2",
-    "douglas melvin": "S2",
-    "mang bawi": "S2",
-    "waheed popoola": "S2",
-    "rob tice": "N/A",
-}
-
 def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shift,
                      shift_window, lead_redirect, get_mst_roster=None, verify_mst_pin=None,
                      start_eligibility=None, allowed_shift_days=None, now_func=None,
@@ -64,10 +51,6 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             response.delete_cookie(cookie,path="/")
 
     def _v3_live_shifts():
-        # Dev sandbox shifts are selectable regardless of the wall clock.
-        if __import__("dev_mode").is_active():
-            return [s for s in db.get_active_shifts()
-                    if s["date"] == _v3_shift_day(s["shift_type"]).isoformat()]
         now = now_func() if now_func else datetime.now()
         visible = []
         for shift in db.get_active_shifts():
@@ -86,13 +69,6 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         return visible
 
     def _v3_shift_day(code):
-        if __import__("dev_mode").is_active():
-            now = __import__("dev_mode").get_now()
-            for day in (now.date() - timedelta(days=1), now.date()):
-                window = shift_window(code, day)
-                if window and window[0] <= now <= window[1]:
-                    return day
-            return now.date()
         now = now_func() if now_func else datetime.now()
         for day in (now.date(), now.date() - timedelta(days=1)):
             if allowed_shift_days and day.weekday() not in allowed_shift_days.get(code, ()):
@@ -104,62 +80,15 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
 
     def entry_page(request, error="", master_verified=False, master_auth_prompt=False):
         shifts=_v3_live_shifts()
-        now=__import__("dev_mode").get_now() if __import__("dev_mode").is_active() else (now_func() if now_func else datetime.now())
+        now=now_func() if now_func else datetime.now()
         return templates.TemplateResponse(request,"v3/login.html",{
             "error":error,"shifts":shifts,"today":now.date().isoformat(),
-            "master_verified":master_verified or bool(request.cookies.get("dev_session") == __import__("dev_mode").DEV_TOKEN and decode_session(request) and decode_session(request)["profile"].get("is_manager")),
-            "master_auth_prompt":master_auth_prompt, "is_dev_mode": __import__("dev_mode").is_active(),
+            "master_verified":master_verified,
+            "master_auth_prompt":master_auth_prompt,
             "eligible_shifts":[code for code in ("S1","S2","S3","S4","S5") if _v3_shift_day(code)],
             "valid_shifts": [code for code,days in (allowed_shift_days or {}).items()
                              if now.date().weekday() in days] or ["S1","S2","S3","S4","S5"],
         })
-
-    def require_dev(request):
-        import dev_mode
-        if request.cookies.get(dev_mode.DEV_COOKIE) != dev_mode.DEV_TOKEN:
-            raise HTTPException(403, "Developer workspace is not active")
-
-    @router.get("/dev/workspace", response_class=HTMLResponse)
-    async def sandbox_workspace(request:Request):
-        require_dev(request)
-        # Hide old simulated-date shifts without deleting any sandbox records.
-        active = [s for s in db.get_active_shifts()
-                  if s["date"] == _v3_shift_day(s["shift_type"]).isoformat()]
-        response = templates.TemplateResponse(request, "v3/dev_workspace.html",
-                                              {"active_shifts":active,"test_mode":True})
-        response.delete_cookie("dev_clock",path="/")
-        return response
-
-    @router.post("/dev/clock")
-    async def retired_sandbox_clock(request:Request):
-        # Support stale cached forms without restoring simulated time.
-        require_dev(request)
-        response=RedirectResponse("/v3/dev/workspace",status_code=303)
-        response.delete_cookie("dev_clock",path="/")
-        return response
-
-    @router.post("/dev/shift")
-    async def sandbox_open_shift(request:Request, shift_type:str=Form(...)):
-        require_dev(request)
-        import dev_mode
-        if shift_type not in ("S1", "S2", "S3", "S4", "S5"):
-            raise HTTPException(400, "Invalid test shift")
-        simulated_day = _v3_shift_day(shift_type).isoformat()
-        active = db.get_active_shifts()
-        found = next((s for s in active if s["shift_type"] == shift_type and s["date"] == simulated_day), None)
-        if found:
-            sid=found["id"]
-        else:
-            # Test shifts must never prevent each other from being explored.
-            # End previous sandbox shifts when switching shift/date.
-            for sh in active:
-                db.close_shift(sh["id"])
-            sid=db.start_shift(simulated_day, shift_type, "Developer Test",
-                               opened_by_role="mst", is_ot=False, opened_by_assoc="8972")
-        manager=get_mst_roster().get("8972")
-        response=RedirectResponse(f"/v3?shift_id={sid}",status_code=303)
-        set_session_cookies(response, {"associate":"8972","profile":manager,"elevated":True}, sid)
-        return response
 
     @router.get("/login",response_class=HTMLResponse)
     async def v3_login_page(request:Request):
@@ -177,19 +106,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         if get_mst_roster is None:
             return lead_redirect("/v3")
         associate=associate_id.strip()
-        # Test entry and management entry share the ordinary V3 login form.
-        # Developer access changes ONLY the database context, never live shifts.
-        if associate == "T8972":
-            import dev_mode
-            dev_manager = get_mst_roster().get("8972")
-            if not dev_manager or not dev_manager.get("is_manager"):
-                return entry_page(request, "Developer test profile is unavailable.")
-            response = RedirectResponse("/v3/dev/workspace", status_code=303)
-            response.set_cookie(dev_mode.DEV_COOKIE, dev_mode.DEV_TOKEN,
-                                httponly=True, samesite="lax", path="/")
-            response.delete_cookie("dev_clock",path="/")
-            set_session_cookies(response, {"associate":"8972","profile":dev_manager,"elevated":True}, 0)
-            return response
+        # Ordinary associate and authorized management entry only.
         # Two explicitly designated override identifiers open shift selection
         # directly. This is an operational override, not a second login form.
         if associate in ("8972", "2759"):
@@ -575,11 +492,6 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         import re
         def key(name):
             return " ".join(sorted(re.findall(r"[a-z]+", str(name).casefold())))
-        if __import__("dev_mode").is_active():
-            sandbox = {key(name): code for name, code in _TEST_TECH_SHIFTS.items()}
-            return [{**c, "shift_label": sandbox.get(key(c["name"]), "N/A"),
-                     "assigned": sandbox.get(key(c["name"])) == shift["shift_type"]}
-                    for c in counts]
         assigned = set()
         if get_mst_roster:
             for person in get_mst_roster().values():
@@ -603,7 +515,6 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                 extra["staged"]["preview"] = preview_status(json.loads(batch_preview["rows_json"]))
         context = {
             "shift":shift,
-            "is_dev_mode": __import__("dev_mode").is_active(),
             **info,
             "loto":db.get_loto(shift["id"]),
             "oos_units":db.get_oos_units(),

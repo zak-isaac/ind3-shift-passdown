@@ -13,7 +13,6 @@
  {% if notice %}<div class="banner success" role="status">{{ notice }}</div>{% endif %}
  {% if warning %}<div class="banner warn" role="alert">{{ warning }}</div>{% endif %}
 
- {% if is_dev_mode %}<div class="banner warn" role="status">TEST MODE · Isolated sandbox · Live Indianapolis time · <a href="/v3/dev/workspace">Test workspace</a> · <a href="/dev/exit">Exit</a></div>{% endif %}
  <section class="d2-import-flow card" id="cetaris" aria-label="Cetaris extraction steps">
    <div class="d2-flow-step {{ 'is-complete' if imported_filename or staged else '' }}"><span class="d2-step-number">1</span><div><strong>Upload Cetaris File</strong><small>{{ staged.filename if staged else (imported_filename if imported_filename else 'One Cetaris Desktop XLSX') }}</small><span class="d2-step-status">{{ 'File ready' if staged else ('Uploaded' if imported_filename else 'Awaiting upload') }}</span></div></div>
    <span class="d2-flow-arrow">—</span>
@@ -62,7 +61,7 @@
         Counts are from the file before shift filtering.</p>
      {% endif %}
      <div class="d2-tech-toolbar"><input type="search" id="v3-tech-search" placeholder="Search technicians by name" aria-label="Search technicians"><button type="button" class="button button-outline" onclick="v3ToggleAllTechs(true)">Select all</button><button type="button" class="button button-outline" onclick="v3ToggleAllTechs(false)">Clear all</button></div>
-     <div class="d2-tech-grid">{% for t in staged.counts %}<label class="d2-tech-choice"><input type="checkbox" name="techs" value="{{ t.name }}" {% if (staged.checked_techs is defined and t.name in staged.checked_techs) or (staged.checked_techs is not defined and (t.name in selected_techs or (not imported_filename and t.assigned))) %}checked{% endif %}><span>{{ t.name }}{% if is_dev_mode %} · {{ t.shift_label }}{% elif t.assigned %} · Assigned{% else %} · Other shift / OT{% endif %}</span><small>{{ t.count }} record{{ 's' if t.count != 1 else '' }}</small></label>{% endfor %}</div>
+     <div class="d2-tech-grid">{% for t in staged.counts %}<label class="d2-tech-choice"><input type="checkbox" name="techs" value="{{ t.name }}" {% if (staged.checked_techs is defined and t.name in staged.checked_techs) or (staged.checked_techs is not defined and (t.name in selected_techs or (not imported_filename and t.assigned))) %}checked{% endif %}><span>{{ t.name }}{% if t.assigned %} · Assigned{% else %} · Other shift / OT{% endif %}</span><small>{{ t.count }} record{{ 's' if t.count != 1 else '' }}</small></label>{% endfor %}</div>
      {% if staged.split_review is defined and staged.split_review %}
      <div class="d2-dialog-note"><strong>Resolve ambiguous WO ownership</strong>
        <p>These work orders have missing or conflicting technician work times, span shifts, or fall outside the configured window. Confirm the owning shift.</p>

@@ -18,7 +18,6 @@ import httpx
 from starlette.middleware.base import BaseHTTPMiddleware
 import associates as assoc_mod
 import db
-import dev_mode
 import emailer
 import signatures as _sigs
 import outlook_sender
@@ -226,7 +225,7 @@ def _find_end_shift_grace_shift(entered: str):
     entered = entered.strip()
     if not entered:
         return None
-    now = dev_mode.get_now()
+    now = datetime.now()
     for s in db.get_active_shifts():
         if s.get("opened_by_role") != "tech":
             continue
@@ -323,13 +322,6 @@ async def lifespan(_: FastAPI):
         dc_number=active_slug,
     )
 
-    # 2b. Boot the dev/test-mode sandbox DB (separate file, own schema) so
-    # /dev/* routes have somewhere safe to write immediately on first use.
-    with db.use_sandbox_db(dev_mode.DEV_DB_PATH):
-        db.init_db()
-        db.purge_orphaned_shifts()
-        db.init_settings(lead_pin_hash=_LEAD_PIN_DEFAULT, dc_number="DEVTEST")
-
     # 3. Seed associates from Excel if DB table is empty
     db.seed_associates(_ROSTER)
 
@@ -409,20 +401,6 @@ def _sync_facility_globals(fac: dict) -> None:
 
 
 app = FastAPI(title="Shift Passdown Generator", lifespan=lifespan)
-
-
-@app.middleware("http")
-async def _dev_mode_sandbox(request: Request, call_next):
-    """If this request carries a valid dev-mode session cookie, route the
-    ENTIRE request through the sandbox DB + frozen test date. Every other
-    request (the vast majority -- real production traffic) passes through
-    completely untouched. This is the single choke point that guarantees
-    dev/test traffic can never read or write the live shift.
-    """
-    if request.cookies.get(dev_mode.DEV_COOKIE) == dev_mode.DEV_TOKEN:
-        with db.use_sandbox_db(dev_mode.DEV_DB_PATH), dev_mode.freeze_time(dev_mode.dev_now()):
-            return await call_next(request)
-    return await call_next(request)
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -583,47 +561,6 @@ def _local_ip() -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────────────
-# DEV / TEST MODE  (T8972 or any real associate number)
-#
-# Completely sandboxed: own SQLite file, frozen date. The middleware
-# installed on `app` (see near FastAPI() construction) does the actual
-# swap for every request carrying the dev-session cookie -- these routes
-# just handle getting the cookie set/cleared and landing on the exact
-# same home page production uses.
-# ─────────────────────────────────────────────────────────────────────────────────────
-
-@app.get("/dev/login", response_class=HTMLResponse)
-async def dev_login_get(request: Request, error: str = ""):
-    return templates.TemplateResponse(
-        request, "dev_login.html", {"error": error}
-    )
-
-
-@app.post("/dev/login")
-async def dev_login_post(request: Request, code: str = Form(...)):
-    if not dev_mode.is_dev_credential(code, _ROSTER):
-        from urllib.parse import quote
-        err = quote("Not recognized. Use the test code or your associate number.")
-        return RedirectResponse(f"/dev/login?error={err}", status_code=303)
-    resp = RedirectResponse("/v3/login", status_code=303)
-    resp.set_cookie(dev_mode.DEV_COOKIE, dev_mode.DEV_TOKEN,
-                     httponly=True, samesite="lax", path="/")
-    return resp
-
-
-@app.get("/dev/exit")
-async def dev_exit():
-    # Exit test mode and clear the sandbox's V3 manager session together.
-    # Redirect to V3 login, never the retired V2 home.
-    resp = RedirectResponse("/v3/login", status_code=303)
-    for cookie in (dev_mode.DEV_COOKIE, "ind3_v3_mst_session", "dev_clock", "lead_auth",
-                   "lead_shift_id", "mgr_session", "tech_assoc",
-                   "tech_shift", "tech_name"):
-        resp.delete_cookie(cookie, path="/")
-    return resp
-
-
-# ─────────────────────────────────────────────────────────────────────────────────────
 # HOME
 # ─────────────────────────────────────────────────────────────
 
@@ -631,7 +568,7 @@ async def dev_exit():
 async def home(request: Request, error: str = ""):
     shifts = db.get_active_shifts()          # 0-2 active shifts
     shift  = shifts[0] if shifts else None   # backwards-compat for single-shift logic
-    now   = dev_mode.get_now()
+    now   = datetime.now()
     today = now.date().isoformat()
     elapsed_hours: float = 0.0
     if shift:
@@ -646,7 +583,7 @@ async def home(request: Request, error: str = ""):
     return templates.TemplateResponse(
         request, "home.html",
         {"shift": shift, "shifts": shifts, "today": today,
-         "elapsed_hours": elapsed_hours, "is_dev_mode": dev_mode.is_active(),
+         "elapsed_hours": elapsed_hours, 
          "day_name": day_name, "valid_shifts_today": valid_now, "error": error}
     )
 
@@ -733,7 +670,7 @@ async def shift_start(
         return RedirectResponse("/?error=Invalid+date+format", status_code=303)
 
     # No future dates -- today or earlier only (today = frozen dev date in test mode)
-    if parsed_date > dev_mode.get_today():
+    if parsed_date > date.today():
         return RedirectResponse(
             "/?error=Future+dates+are+not+allowed.+Pick+today+or+an+earlier+date.",
             status_code=303,
@@ -742,7 +679,7 @@ async def shift_start(
     # Dev/test mode intentionally bypasses the weekday<->shift_type pairing
     # (frozen date is always a Friday) so every shift type can be exercised
     # on the single frozen test date. Production traffic keeps the real rule.
-    allowed_days = None if dev_mode.is_active() else _WEEKDAY_SHIFTS.get(shift_type)
+    allowed_days = _WEEKDAY_SHIFTS.get(shift_type)
     if allowed_days is not None and parsed_date.weekday() not in allowed_days:
         day_label = parsed_date.strftime("%A")
         rule = ("S1, S2 and S3 run Monday - Thursday only"
@@ -782,7 +719,7 @@ async def shift_start(
         return RedirectResponse(f"/?error={err}", status_code=303)
 
     # -- Assigned-shift + time-window eligibility --
-    now = dev_mode.get_now()
+    now = datetime.now()
     allowed, is_ot, elig_err = _check_shift_start_eligibility(assoc, shift_type, now)
     if not allowed:
         from urllib.parse import quote
@@ -1384,7 +1321,7 @@ async def lead_login_post(
             try:
                 p = json.loads(pending_raw)
                 assoc = _ROSTER.get(entered)
-                _, is_ot, _ = _check_shift_start_eligibility(assoc, p["shift_type"], dev_mode.get_now())
+                _, is_ot, _ = _check_shift_start_eligibility(assoc, p["shift_type"], datetime.now())
                 bound_shift_id = db.start_shift(
                     p["date"], p["shift_type"], p["lead_name"],
                     opened_by_role="mst", is_ot=is_ot, opened_by_assoc=entered,
@@ -3398,7 +3335,7 @@ _v3_router = create_v3_router(
     verify_mst_pin=lambda pin: bool(pin) and hashlib.sha256(pin.encode()).hexdigest() == _get_pin_hash(),
     start_eligibility=_check_shift_start_eligibility,
     allowed_shift_days=_WEEKDAY_SHIFTS,
-    now_func=dev_mode.get_now,
+    now_func=datetime.now,
     get_v2_cookie_value=_get_pin_hash,
     legacy_lead_page=lead_page,
     generate_report=lead_generate,
