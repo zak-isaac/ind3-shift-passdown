@@ -278,6 +278,11 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                 CREATE TABLE IF NOT EXISTS v3_shift_source (
                   shift_id INTEGER PRIMARY KEY, filename TEXT NOT NULL, rows_json TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS v3_wo_completion_times (
+                  shift_id INTEGER NOT NULL, wo_number TEXT NOT NULL,
+                  completed_at TEXT NOT NULL, time_source TEXT NOT NULL,
+                  PRIMARY KEY (shift_id,wo_number)
+                );
                 CREATE TABLE IF NOT EXISTS v3_vendors (
                   id INTEGER PRIMARY KEY AUTOINCREMENT, shift_id INTEGER NOT NULL,
                   name TEXT NOT NULL, notes TEXT NOT NULL DEFAULT '',
@@ -329,6 +334,9 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             selection = c.execute("SELECT * FROM v3_shift_selection WHERE shift_id=?", (shift_id,)).fetchone()
             audit_row = c.execute("SELECT audit_json FROM v3_import_audit WHERE shift_id=?", (shift_id,)).fetchone()
             source_row = c.execute("SELECT rows_json FROM v3_shift_source WHERE shift_id=?", (shift_id,)).fetchone()
+            saved_times = {r["wo_number"]: dict(r) for r in c.execute(
+                "SELECT wo_number,completed_at,time_source FROM v3_wo_completion_times WHERE shift_id=?",
+                (shift_id,))}
             reminders = {r[0] for r in c.execute(
                 "SELECT wo_number FROM v3_pending_closure WHERE shift_id=? AND decision='add'",
                 (shift_id,)).fetchall()}
@@ -378,15 +386,23 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             group["work_time_label"] = ""
             group["work_time_source"] = ""
             group["next_day_work"] = False
-            source_items=source_by_wo.get(str(group["wo_number"] or ""),[])
-            if source_items:
-                event=v3_split._actual_completion(source_items)
-                if event:
-                    completed_at, _tech, evidence = event
-                    group["work_time"] = completed_at.isoformat(timespec="minutes")
-                    group["work_time_label"] = completed_at.strftime("%b %d, %-I:%M %p") if os.name != "nt" else completed_at.strftime("%b %d, %#I:%M %p")
-                    group["work_time_source"] = evidence
-                    group["next_day_work"] = completed_at.date() > shift_date
+            wo_number=str(group["wo_number"] or "")
+            saved=saved_times.get(wo_number)
+            event=None
+            if saved:
+                when=v3_split.parse_close(saved["completed_at"])
+                if when:
+                    event=(when,None,saved["time_source"])
+            if event is None:
+                source_items=source_by_wo.get(wo_number,[])
+                if source_items:
+                    event=v3_split._actual_completion(source_items)
+            if event:
+                completed_at, _tech, evidence = event
+                group["work_time"] = completed_at.isoformat(timespec="minutes")
+                group["work_time_label"] = completed_at.strftime("%b %d, %-I:%M %p") if os.name != "nt" else completed_at.strftime("%b %d, %#I:%M %p")
+                group["work_time_source"] = evidence
+                group["next_day_work"] = completed_at.date() > shift_date
 
         # Match the very same source-of-truth paragraphs used by preview,
         # reports and EML, rather than listing each raw labor line separately.
@@ -1139,6 +1155,18 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             audit_by_wo.setdefault(wo, []).append(raw)
         with db._conn() as c:
             for wo, labor in audit_by_wo.items():
+                if wo in eligible_happenings:
+                    # Persist verified completion even when a subsequent
+                    # cumulative import replaces the most recent source XLSX.
+                    # Never use the later administrative WO closure timestamp.
+                    verified=v3_split._actual_completion(labor)
+                    if verified:
+                        work_end, _actor, time_evidence=verified
+                        c.execute("""INSERT INTO v3_wo_completion_times
+                            (shift_id,wo_number,completed_at,time_source) VALUES (?,?,?,?)
+                            ON CONFLICT(shift_id,wo_number) DO UPDATE SET
+                            completed_at=excluded.completed_at,time_source=excluded.time_source""",
+                            (shift_id,wo,work_end.isoformat(timespec="seconds"),time_evidence))
                 evidence = {
                     "shift_type": shift["shift_type"], "shift_date": shift["date"],
                     "asset_id": labor[0].get("asset_id", ""),
