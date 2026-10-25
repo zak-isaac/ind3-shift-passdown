@@ -97,6 +97,10 @@ def test_s5_saturday_shift_credits_sunday_early_work_and_imports_nonduplicates(t
         screen=client.get(f"/v3?shift_id={shift_id}")
         assert screen.status_code==200
         assert "Already credited to another shift (not counted)" in screen.text
+        assert "after-midnight WOs in file" in screen.text
+        assert "after-midnight included" in screen.text
+        assert "4</strong> after-midnight WOs in file" in screen.text
+        assert "3</strong> after-midnight included" in screen.text
         assert "S5-AM" in screen.text
         assert "S5-REVIEW" in screen.text
         assert {e["wo_number"] for e in db.get_entries(shift_id)} == {
