@@ -85,7 +85,7 @@ def test_s4_started_and_finished_before_1800_stays_s4():
     assert assign(rows,{"Tech S4"},"S5","2026-10-23",roster_shifts=roster)==([],[])
 
 
-def test_completed_pm_is_not_counted_as_closed_pm():
+def test_completed_pm_counts_without_closed_status_or_reminder():
     rows = [
         wo("201","Tech A","2026-10-22T17:00:00","2026-10-22T17:20:00",
            status="Closed",rfr="Preventive Maintenance"),
@@ -94,9 +94,9 @@ def test_completed_pm_is_not_counted_as_closed_pm():
     ]
     results, summary = select_records(rows,{"Tech A"},None,None,
                                       closure_reviews={"202":"add"})
-    assert summary["unique_pm_wos"] == 1
-    assert summary["unique_happening_wos"] == 1
-    assert next(r for r in results if r["wo_number"]=="202")["closure_reminder"]
+    assert summary["unique_pm_wos"] == 2
+    assert summary["unique_happening_wos"] == 0
+    assert {r["kind"] for r in results} == {"pm"}
 
 
 @pytest.fixture
@@ -120,17 +120,44 @@ def workspace_client(tmp_path):
         yield client, sid
 
 
-def test_spelling_preview_is_opt_in_and_auth_required(workspace_client):
+def test_automatic_spelling_does_not_need_mst_approval(workspace_client):
     client, sid = workspace_client
-    r = client.post("/v3/spelling/preview",data={
-        "shift_id":str(sid), "text":"colum tention at VOIDFILL0501; PLC RTS"})
-    assert r.status_code == 200
-    assert "Column tension" in r.json()["suggested"]
-    assert "VOIDFILL0501" in r.json()["suggested"]
-    assert "PLC RTS" in r.json()["suggested"]
+    r = client.post("/v3/manual", data={
+        "shift_id":str(sid), "unit":"VOIDFILL0501",
+        "issue":"colum tention", "remarks":"checked colum tention; PLC RTS"})
+    assert r.status_code == 200  # default client follows the Save redirect
+    assert "Column tension" in r.text
+    assert "Checked column tension; PLC RTS" in r.text
+    assert "Check spelling" not in r.text
+    saved = next(e for e in db.get_entries(sid) if e["unit"] == "VOIDFILL0501")
+    assert "Checked column tension; PLC RTS" in saved["raw_remarks"]
     client.cookies.clear()
-    assert client.post("/v3/spelling/preview",
-                       data={"shift_id":str(sid),"text":"colum"}).status_code == 401
+    assert client.post("/v3/manual", data={
+        "shift_id":str(sid), "unit":"M1","issue":"colum"}).status_code == 401
+
+
+
+def test_completed_pm_needs_no_closure_popup_and_counts_once(workspace_client):
+    client, sid = workspace_client
+    rows = [
+        wo("301", "Tech A", "2026-10-22T17:30:00",
+           "2026-10-22T17:45:00", status="Completed",
+           rfr="Preventive Maintenance"),
+        wo("301", "Tech A", "2026-10-22T17:30:00",
+           "2026-10-22T17:45:00", status="Completed",
+           rfr="Preventive Maintenance")
+    ]
+    token = uuid.uuid4().hex
+    with db._conn() as c:
+        c.execute("INSERT INTO v3_import_batches(token,shift_id,filename,created_at,rows_json) VALUES (?,?,?,?,?)",
+                  (token,sid,"completed_pm.xlsx",datetime.now().isoformat(timespec="seconds"),json.dumps(rows)))
+    response=client.post(f"/v3/import/{token}/confirm", data={
+        "shift_id":str(sid), "techs":["Tech A"]},follow_redirects=False)
+    assert response.status_code == 303
+    assert db.get_pm_count(sid)==1
+    with db._conn() as c:
+        assert c.execute("SELECT count(*) FROM v3_pending_closure WHERE shift_id=?",
+                         (sid,)).fetchone()[0]==0
 
 
 def test_completed_wo_requires_two_choices_and_has_auditable_reminder(workspace_client):
