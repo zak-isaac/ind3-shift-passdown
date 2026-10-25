@@ -11,12 +11,13 @@ import secrets
 import time
 from datetime import date, datetime, timedelta, timezone
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 import db
 import v3_breakdown
 import v3_split
 from v3_cetaris import parse_excel, select_records, technician_counts, MAX_SIZE
+from v3_proofread import proofread
 
 
 def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shift,
@@ -338,12 +339,12 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             key = e.get("wo_number") or f"manual:{e['id']}"
             m = meta.get(e["id"], {})
             r = dict(e)
-            r["reported_issue"] = m.get("reported_issue") or e.get("issue", "")
-            r["cause_text"] = m.get("cause_text") or ""
+            r["reported_issue"] = proofread(m.get("reported_issue") or e.get("issue", ""))
+            r["cause_text"] = proofread(m.get("cause_text") or "")
             r["needs_review"] = bool(m.get("needs_review"))
             r["mst_edited"] = bool(m.get("mst_edited"))
             r["rfr_type"] = m.get("rfr_type") or ("Work Request" if e.get("tech_name") in ("MST (Manual)","Shift Owner (Manual)") else "Other")
-            r["remarks_list"] = _remarks(e)
+            r["remarks_list"] = [proofread(v) for v in _remarks(e)]
             r["needs_closure"] = bool(e.get("wo_number") in reminders)
             g = groups.setdefault(key, {
                 "key": key, "wo_number": e.get("wo_number") or "", "main_id":e["id"],
@@ -1020,23 +1021,6 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         from urllib.parse import quote
         return RedirectResponse(f"/v3?shift_id={shift_id}&notice={quote(notice)}",status_code=303)
 
-    @router.post("/spelling/preview")
-    async def preview_spelling(request:Request,shift_id:int=Form(...),text:str=Form("")):
-        """Preview deterministic corrections. Never save Cetaris source or MST edits."""
-        secure(request,shift_id)
-        if len(text)>12000:
-            raise HTTPException(413,"Text is too long for spelling review.")
-        from spelling_fix import correct_spelling
-        from text_normalize import fix_punctuation_spacing, fix_sentence_capitalization
-        import re
-        suggestion=fix_sentence_capitalization(fix_punctuation_spacing(correct_spelling(text)))
-        # Only capitalize a sentence-opening lowercase word; leave acronyms
-        # and identifiers alone, and never alter technicians' recorded facts.
-        suggestion=re.sub(r"^(\s*)([a-z])",
-                          lambda m:m.group(1)+m.group(2).upper(),suggestion)
-        return JSONResponse({"original":text,"suggested":suggestion,
-                             "changed":suggestion!=text})
-
     @router.get("/happening/{entry_id}",response_class=HTMLResponse)
     async def view_happening(request:Request,entry_id:int,shift_id:int):
         shift=secure(request,shift_id)
@@ -1050,9 +1034,9 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         items=[]
         for r in rows:
             m=meta.get(r["id"],{})
-            items.append({**r, "remarks": "\n".join(_remarks(r)),
-                          "cause_text":m.get("cause_text") or "",
-                          "reported_issue":m.get("reported_issue") or (r.get("issue") or "").split(" — ",1)[-1],
+            items.append({**r, "remarks": "\n".join(proofread(v) for v in _remarks(r)),
+                          "cause_text":proofread(m.get("cause_text") or ""),
+                          "reported_issue":proofread(m.get("reported_issue") or (r.get("issue") or "").split(" — ",1)[-1]),
                           "needs_review":m.get("needs_review",0), "pending":json.loads(m["pending_json"]) if m.get("pending_json") else None})
         return templates.TemplateResponse(request,"v3/happening_modal.html",{
             "shift":shift,"items":items,"happening":items[0],
@@ -1065,9 +1049,9 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         form=await request.form()
         with db._conn() as c:
             for r in group:
-                remarks=str(form.get(f"remarks_{r['id']}",""))[:12000].strip()
-                issue=reported_issue[:4000].strip()
-                cause=cause_text[:4000].strip()
+                remarks=proofread(str(form.get(f"remarks_{r['id']}",""))[:12000].strip())
+                issue=proofread(reported_issue[:4000].strip())
+                cause=proofread(cause_text[:4000].strip())
                 raw=json.dumps([part.strip() for part in remarks.splitlines() if part.strip()])
                 prefix=f"WO #{r['wo_number']} — " if r.get("wo_number") else ""
                 c.execute("UPDATE entries SET issue=?, raw_remarks=? WHERE id=?",(prefix+issue,raw,r["id"]))
@@ -1113,7 +1097,9 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         secure(request,shift_id)
         if not unit.strip() or not issue.strip():
             raise HTTPException(400,"Asset ID and reported issue are required")
-        eid=db.add_entry(shift_id,"Shift Owner (Manual)",unit.strip()[:100],issue.strip()[:4000],remarks.strip()[:12000],"", "monitor")
+        issue=proofread(issue.strip()[:4000])
+        remarks=proofread(remarks.strip()[:12000])
+        eid=db.add_entry(shift_id,"Shift Owner (Manual)",unit.strip()[:100],issue,remarks,"", "monitor")
         with db._conn() as c:
             if wo_number.strip():
                 c.execute("UPDATE entries SET wo_number=? WHERE id=?",(wo_number.strip()[:50],eid))
@@ -1131,7 +1117,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
     @router.post("/notes")
     async def notes(request:Request,shift_id:int=Form(...),notes:str=Form("")):
         secure(request,shift_id)
-        db.save_shift_notes(shift_id,notes[:20000])
+        db.save_shift_notes(shift_id,proofread(notes[:20000]))
         return RedirectResponse(f"/v3?shift_id={shift_id}&notice=Notes+saved",status_code=303)
 
     @router.get("/preview",response_class=HTMLResponse)
