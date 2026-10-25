@@ -5,6 +5,7 @@ Each row represents one source WO, regardless of labor-line duplication.
 """
 from collections import defaultdict
 from datetime import date, datetime, timedelta
+from v3_split import _actual_completion
 
 
 def preview_status(rows):
@@ -30,11 +31,13 @@ def preview_status(rows):
 
 
 def build_audit(rows, selected, attributed, records, conflicting_wos=None,
-                shift_type=None, shift_day=None):
+                shift_type=None, shift_day=None, unresolved_wos=None):
     """Preserve ignored WOs and explain why they do not count for this shift."""
     by_wo = defaultdict(list)
     selected = set(selected)
     conflicting_wos = set(conflicting_wos or ())
+    ownership_reasons = {str(item.get('wo_number')): item.get('reason', '')
+                         for item in (unresolved_wos or [])}
     for row in rows:
         wo = str(row.get("wo_number") or "").strip()
         if wo:
@@ -59,8 +62,10 @@ def build_audit(rows, selected, attributed, records, conflicting_wos=None,
             why = "Technician not selected (other shift or vendor)"
         elif not selected_statuses.intersection({"closed", "completed"}):
             why = "Not Closed or Completed"
+        elif wo in ownership_reasons:
+            why = "No automatic ownership: " + ownership_reasons[wo]
         elif wo not in attributed_wos:
-            why = "Outside this shift or missing shift-time evidence"
+            why = "Outside this shift or missing verified technician completion evidence"
         elif "completed" in selected_statuses and "closed" not in selected_statuses:
             why = "Completed but not Closed — not included"
         else:
@@ -82,23 +87,20 @@ def build_audit(rows, selected, attributed, records, conflicting_wos=None,
         following = date.fromisoformat(str(shift_day)) + timedelta(days=1)
         included_wos = {wo for wo, kinds in kept.items()
                         if kinds.intersection({"pm", "happening"})}
-        for r in rows:
-            wo = str(r.get("wo_number") or "").strip()
-            if not wo:
-                continue
-            for field in ("start_at", "in_service_at", "last_complete_at"):
-                value = r.get(field)
-                if not value:
-                    continue
-                try:
-                    when = datetime.fromisoformat(str(value))
-                except (TypeError, ValueError):
-                    continue
-                if when.date() == following and (when.hour, when.minute) <= (6, 30):
-                    after_midnight_source.add(wo)
-                    if wo in included_wos:
-                        after_midnight_included.add(wo)
-                    break
+        # A WO Last Complete value may represent delayed administration,
+        # not a technician's actual after-midnight work. Only count real labor
+        # start or verified completion/in-service signals.
+        for wo, labor in by_wo.items():
+            completion = _actual_completion(labor)
+            evidences = [datetime.fromisoformat(str(r["start_at"]))
+                         for r in labor if r.get("start_at")]
+            if completion:
+                evidences.append(completion[0])
+            if any(when.date() == following and
+                   (when.hour, when.minute) <= (6, 30) for when in evidences):
+                after_midnight_source.add(wo)
+                if wo in included_wos:
+                    after_midnight_included.add(wo)
     return {**preview_status(rows), "source_rows":len(rows),
             "after_midnight_source_wos":len(after_midnight_source),
             "after_midnight_included_wos":len(after_midnight_included),
