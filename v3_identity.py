@@ -19,7 +19,7 @@ def read(request, roster):
         if len(parts) not in (3,4): return None
         assoc,sid,issued=parts[:3]
         elevated=parts[3]=="1" if len(parts)==4 else False
-        if not (0 <= time.time()-int(issued) < 12*3600): return None
+        if not (0 <= time.time()-int(issued) < 18*3600): return None
         person=roster.get(assoc)
         if not person: return None
         # Only the designated V3 override identifiers may hold elevated
