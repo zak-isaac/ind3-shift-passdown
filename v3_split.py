@@ -113,12 +113,21 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
     confirmed = set(confirmed_s5_techs or ())
     history = defaultdict(list)
     by_wo = defaultdict(list)
+    # The selected technician controls which WOs are eligible to appear.
+    # Ownership must inspect ALL labor participants on those WOs, including
+    # incoming-shift collaborators who are not selected for this passdown.
+    participating_wos = {
+        str(r.get("wo_number", "")) for r in rows
+        if r.get("tech_name") in selected and
+           str(r.get("status", "")).strip().casefold() in ("closed", "completed")
+    }
     for r in rows:
         tech = r.get("tech_name", "")
         when = parse_close(r.get("start_at"))
         if when and len(_windows(when)) == 1:
             history[tech].append((when, _windows(when)[0]))
-        if tech in selected and str(r.get("status", "")).strip().casefold() in ("closed", "completed"):
+        if (str(r.get("wo_number", "")) in participating_wos and
+            str(r.get("status", "")).strip().casefold() in ("closed", "completed")):
             by_wo[str(r.get("wo_number", ""))].append(r)
     ownership = {}
     pending = []
