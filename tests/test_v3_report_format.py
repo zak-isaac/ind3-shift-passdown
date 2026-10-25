@@ -27,6 +27,55 @@ def example():
     happenings=build_shift_happenings(rows,{1:{"cause_text":"Side guide not gripping boxes"}})
     return happenings, ReportData(date="2026-10-24",shift_type="S2",lead_name="Test MST",happenings=happenings,pm_count=3)
 
+def test_multi_tech_duplicates_not_repeated_but_unique_details_survive():
+    rows=[
+        {"id":101,"unit":"FLEX0009","wo_number":"900101","source":"cmms",
+         "issue":"WO #900101 — Motor brush maintenance",
+         "raw_remarks":'["Motor brush cleanup"]',"excluded":0},
+        {"id":102,"unit":"FLEX0009","wo_number":"900101","source":"cmms",
+         "issue":"WO #900101 — Motor brush maintenance",
+         "raw_remarks":'["motor brush cleanup."]',"excluded":0},
+        {"id":103,"unit":"FLEX0009","wo_number":"900101","source":"cmms",
+         "issue":"WO #900101 — Motor brush maintenance",
+         "raw_remarks":'["Inspected both motor brushes"]',"excluded":0},
+    ]
+    h=build_shift_happenings(rows)
+    assert len(h)==1
+    assert heading(h[0])=="FLEX0009: Motor brush maintenance"
+    assert remark(h[0])=="Motor brush cleanup; Inspected both motor brushes"
+    assert "replaced" not in remark(h[0]).casefold()
+
+
+def test_distinct_measurements_and_status_are_never_fuzzy_deduped():
+    rows=[
+        {"id":201,"unit":"M1234","wo_number":"900202","source":"cmms",
+         "issue":"WO #900202 — Brake troubleshooting",
+         "raw_remarks":'["Braking distance 6ft; OOS"]',"excluded":0},
+        {"id":202,"unit":"M1234","wo_number":"900202","source":"cmms",
+         "issue":"WO #900202 — Brake troubleshooting",
+         "raw_remarks":'["Plugging distance 10ft; RTS"]',"excluded":0},
+    ]
+    h=build_shift_happenings(rows)
+    assert len(h)==1
+    assert "6ft" in remark(h[0]) and "10ft" in remark(h[0])
+    assert "OOS" in remark(h[0]) and "RTS" in remark(h[0])
+    assert remark(h[0]).count("; ")>=1
+
+
+def test_different_components_or_directions_are_never_lost():
+    rows=[
+        {"id":301,"unit":"VOIDFILL1101","wo_number":"900303","source":"cmms",
+         "issue":"WO #900303 — Rail damage",
+         "raw_remarks":'["Replaced left rail"]',"excluded":0},
+        {"id":302,"unit":"VOIDFILL1101","wo_number":"900303","source":"cmms",
+         "issue":"WO #900303 — Rail damage",
+         "raw_remarks":'["Assisted with right rail"]',"excluded":0},
+    ]
+    h=build_shift_happenings(rows)
+    assert len(h)==1
+    assert "Replaced left rail" in remark(h[0])
+    assert "Assisted with right rail" in remark(h[0])
+
 def test_one_heading_one_bullet_per_work_order():
     h,data=example()
     assert len(h)==2

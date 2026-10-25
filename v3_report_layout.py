@@ -34,6 +34,15 @@ def _raw_remarks(entry: dict) -> list[str]:
     return [action] if action else []
 
 
+def _remark_key(text: str) -> str:
+    """Ignore only harmless trailing full stops and whitespace when deduping.
+
+    Never use fuzzy/string-similarity dedup: "left" vs "right", different
+    measurements, different component IDs and RTS vs OOS must all survive.
+    """
+    return re.sub(r"\\.+$", "", re.sub(r"\\s+", " ", text).strip()).casefold()
+
+
 def build_shift_happenings(entries: list[dict], meta_by_id: dict[int, dict]
                            | None = None) -> list[RewrittenHappening]:
     """Build one report happening per unique WO (or individual manual entry)."""
@@ -66,7 +75,7 @@ def build_shift_happenings(entries: list[dict], meta_by_id: dict[int, dict]
             group["cause_rank"] = cause_rank
         for raw in _raw_remarks(entry):
             corrected = proofread(raw.strip())
-            token = corrected.casefold()
+            token = _remark_key(corrected)
             if token and token not in group["seen"]:
                 group["seen"].add(token)
                 group["remarks"].append(corrected)
