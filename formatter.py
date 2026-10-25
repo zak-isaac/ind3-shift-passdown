@@ -7,6 +7,8 @@ format_email(data)         -> str   (plain-text email version)
 """
 from __future__ import annotations
 from datetime import datetime
+from html import escape
+from v3_report_layout import heading as _heading, remark as _remark
 from report_models import ReportData
 from pm_table_style import pm_zebra_hex, PM_HEADER_HEX
 
@@ -72,30 +74,14 @@ def format_html_preview(data: ReportData) -> str:
         )
 
     for h in data.happenings:
-        wo_tag = f" <span style='color:#555;font-size:13px;'>(WO#{h.wo_number})</span>" if h.wo_number else ""
-        if h.sub_points:
-            # Sub-points: either (wo_number, remark) for multi-WO asset
-            # or (tech_name, remark) for multi-tech single WO
-            # Detect multi-WO by checking if first element looks like a WO number
-            is_multi_wo = h.sub_points and h.sub_points[0][0].isdigit()
-            sub_html = "".join(
-                f'<li style="padding:4px 0 4px 16px;font-size:13px;color:#222;line-height:1.75;list-style:disc;">'
-                f'{remark}'
-                + (f' <span style="color:#666;font-size:12px;">(WO #{wo_or_tech})</span>' if is_multi_wo and wo_or_tech else '')
-                + '</li>'
-                for wo_or_tech, remark in h.sub_points
-            )
-            happening_lines.append(
-                f'<li style="padding:8px 0;border-bottom:1px solid #eee;font-size:14px;color:#111;line-height:1.7;">'
-                f'<strong style="color:#000;">{h.title}</strong>'
-                f'<ul style="list-style:none;margin:4px 0 0 8px;padding:0;">{sub_html}</ul></li>'
-            )
-        else:
-            para = h.paragraph.rstrip(".")
-            happening_lines.append(
-                f'<li style="padding:8px 0;border-bottom:1px solid #eee;font-size:14px;color:#111;line-height:1.7;">'
-                f'<strong style="color:#000;">{h.title}:</strong> {para}{wo_tag}.</li>'
-            )
+        happening_lines.append(
+            '<li style="padding:8px 0;border-bottom:1px solid #eee;'
+            'font-size:14px;line-height:1.7;">'
+            f'<strong>{escape(_heading(h))}</strong>'
+            '<ul style="margin:4px 0 0 6px;padding-left:20px;list-style:disc;">'
+            f'<li style="font-size:13px;white-space:pre-wrap;">{escape(_remark(h))}</li>'
+            '</ul></li>'
+        )
 
     if happening_lines:
         body = f'<ul style="list-style:none;margin:0;padding:0;">{"".join(happening_lines)}</ul>'
@@ -188,20 +174,15 @@ def format_email_passdown(data: ReportData) -> str:
     lines += ["Vendors", _bullets(data.vendors), ""]
 
     # ── Shift Happenings ── (MST notes lead, then PM count, then asset entries)
-    h_items: list[str] = []
+    h_lines: list[str] = []
     if data.shift_notes and data.shift_notes.strip():
-        h_items.append(data.shift_notes.strip())
+        h_lines.append("\u2022 " + data.shift_notes.strip())
     if data.pm_count:
-        label = f"{data.pm_count} PM{'s' if data.pm_count != 1 else ''} completed this shift"
-        h_items.append(label)
+        h_lines.append(f"\u2022 {data.pm_count} PM{'s' if data.pm_count != 1 else ''} completed this shift")
     for h in data.happenings:
-        # Use unit prefix if title looks like a unit code, else just the paragraph
-        prefix = h.title.split("\u2013")[0].split("-")[0].strip()
-        if prefix and not any(c in prefix for c in (" ", ",")):
-            h_items.append(f"{prefix}: {h.paragraph}")
-        else:
-            h_items.append(h.paragraph)
-    lines += ["Shift Happenings", _bullets(h_items), ""]
+        h_lines.append(_heading(h))
+        h_lines.append(f"  \u2022 {_remark(h)}")
+    lines += ["Shift Happenings", "\n".join(h_lines) if h_lines else "\u2022 None", ""]
 
     # ── Reliable Operations ──
     lines += ["Reliable Operations", _bullets(list(data.ro)), ""]
@@ -244,33 +225,27 @@ def format_email_passdown_html(
         )
 
     # Shift Happenings (MST notes lead, then PM count, then asset entries)
-    h_items: list[str] = []
+    h_blocks: list[str] = []
     if data.shift_notes and data.shift_notes.strip():
-        h_items.append(data.shift_notes.strip().replace("\n", "<br>"))
+        h_blocks.append(f'<p style="margin:6px 0;font-size:14px;">{escape(data.shift_notes.strip())}</p>')
     if data.pm_count:
-        h_items.append(f"{data.pm_count} PM{'s' if data.pm_count != 1 else ''} completed this shift")
-    for h in data.happenings:
-        prefix = h.title.split("\u2013")[0].split("-")[0].strip()
-        wo_tag = (
-            f" <span style='color:#6b7280;font-size:12px;'>(WO# {h.wo_number})</span>"
-            if getattr(h, "wo_number", "") else ""
+        h_blocks.append(
+            f"<p style='margin:6px 0;font-size:14px;'>{data.pm_count} PM"
+            f"{'s' if data.pm_count != 1 else ''} completed this shift</p>"
         )
-        if getattr(h, "sub_points", []):
-            # Multi-tech: build a nested sub-list inside this bullet
-            sub_s = "font-size:13px;font-family:Calibri,Arial,sans-serif;margin:2px 0;"
-            sub_items = "".join(
-                f"<li style='{sub_s}'>{remark}</li>"
-                for _, remark in h.sub_points
-            )
-            entry = (
-                f"<strong>{prefix}</strong>{wo_tag}"
-                f"<ul style='margin:4px 0 0 0;padding-left:20px;'>{sub_items}</ul>"
-            )
-            h_items.append(entry)
-        elif prefix and " " not in prefix and "," not in prefix:
-            h_items.append(f"<strong>{prefix}:</strong> {h.paragraph}{wo_tag}")
-        else:
-            h_items.append(f"{h.paragraph}{wo_tag}")
+    for h in data.happenings:
+        h_blocks.append(
+            f'<div style="margin:8px 0 10px;">'
+            f'<strong style="font-size:14px;">{escape(_heading(h))}</strong>'
+            f'<ul style="margin:2px 0 0;padding-left:22px;">'
+            f'<li style="font-size:13px;white-space:pre-wrap;">{escape(_remark(h))}</li>'
+            '</ul></div>'
+        )
+    shift_happenings_html = (
+        "<p style='margin:16px 0 4px;font-family:Calibri,Arial,sans-serif;'>"
+        "<strong style='font-size:16px;'>Shift Happenings</strong></p>"
+        + "".join(h_blocks or ["<p>None</p>"])
+    )
 
     # PM section: proper bordered table or bullet fallback
     # No due-date alarm color -- these are routine daily PMs, "due today"
@@ -328,7 +303,7 @@ def format_email_passdown_html(
         "color:#111;max-width:700px;line-height:1.6;'>"
         f"<p style='margin:0 0 18px;font-size:18px;'><strong>{data.shift_type} End of Shift Passdown</strong></p>"
         + _bullet_sec("Vendors", list(data.vendors))
-        + _bullet_sec("Shift Happenings", h_items)
+        + shift_happenings_html
         + _bullet_sec("Reliable Operations", list(data.ro))
         + pm_html
         + _bullet_sec("Out of Service \u2014 Returned to Service (RTS)", list(data.rts))
@@ -377,9 +352,8 @@ def format_email(data: ReportData) -> str:
     if data.pm_count:
         h_lines.append(f"  \u2022  {data.pm_count} PM{'s' if data.pm_count != 1 else ''} completed")
     for h in data.happenings:
-        wo = f" (WO#{h.wo_number})." if h.wo_number else "."
-        para = h.paragraph.rstrip(".")
-        h_lines.append(f"  \u2022  {h.title}: {para}{wo}")
+        h_lines.append(f"  {_heading(h)}")
+        h_lines.append(f"    \u2022  {_remark(h)}")
     secs.append(_txt_sec("Shift Happenings",
         h_lines or ["  No shift happenings recorded."]))
 
