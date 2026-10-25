@@ -747,7 +747,39 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                         "split_review":unresolved,
                         "checked_techs":sorted(selected),
                         "checked_split_techs":sorted(split_selected)})
-        records,stats=select_records(attributed,selected,*window)
+        # A Cetaris Completed WO is not officially Closed. Offer exactly
+        # two MST choices before counting anything from this import.
+        closure_candidates = {}
+        for raw in attributed:
+            if str(raw.get("status", "")).strip().casefold() != "completed":
+                continue
+            wo = str(raw.get("wo_number", "")).strip()
+            if wo:
+                item = closure_candidates.setdefault(wo, {
+                    "wo_number": wo, "asset_id": raw.get("asset_id") or "",
+                    "technicians": set(), "rfr": raw.get("rfr") or ""})
+                item["technicians"].add(raw.get("tech_name", ""))
+        closure_decisions = {
+            key[len("completed_wo_"):]: value
+            for key, value in submitted.multi_items()
+            if key.startswith("completed_wo_") and value in ("add", "ignore")
+        }
+        missing_closure = [
+            {**item, "technicians": ", ".join(sorted(item["technicians"]))}
+            for wo, item in closure_candidates.items() if wo not in closure_decisions
+        ]
+        if missing_closure:
+            return render(request, shift,
+                warning="Review completed work orders that are not yet Closed in Cetaris.",
+                staged={"token": token, "filename": batch["filename"],
+                        "counts": technician_counts(rows), "total_rows": len(rows),
+                        "checked_techs": sorted(selected),
+                        "checked_split_techs": sorted(split_selected),
+                        "confirmed_split_decisions": decisions,
+                        "closure_review": missing_closure,
+                        "checked_closure_decisions": closure_decisions})
+        records,stats=select_records(attributed,selected,*window,
+                                     closure_reviews=closure_decisions)
         # Cross-shift completion credit must be unique across the database,
         # including older PM records. Never silently overwrite another shift.
         completed_wos={r["wo_number"] for r in records if r["kind"] in ("pm","happening")}
