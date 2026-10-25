@@ -187,15 +187,12 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
         s4_pairs = [pair for pair in participant_shifts if pair[0] == "S4"]
         if final_work_time and s4_pairs:
             candidates = _windows(final_work_time)
-            if (s4_pairs[0] in _windows(parse_close(items[0].get("start_at")))
-                if parse_close(items[0].get("start_at")) else True):
-                s5_candidates = [pair for pair in candidates if pair[0] == "S5"]
-                if s5_candidates and final_work_time.time() >= time(18):
-                    owner = s5_candidates[0]
-                elif s4_pairs[0] in candidates and any(
-                    pair[0] == "S5" for pair in participant_shifts
-                ) and final_work_time.time() < time(18):
-                    owner = s4_pairs[0]
+            s5_candidates = [pair for pair in candidates if pair[0] == "S5"]
+            if s5_candidates and not any(pair in candidates for pair in s4_pairs):
+                owner = s5_candidates[0]
+            elif any(pair in candidates for pair in s4_pairs):
+                # S4 has priority until 18:00 in the shared evening window.
+                owner = next(pair for pair in s4_pairs if pair in candidates)
         # A recorded equipment return during the technician's scheduled
         # shift (including S3/S4 overlap) does not transfer ownership.
         if owner:
