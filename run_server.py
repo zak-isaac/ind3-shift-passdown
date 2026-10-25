@@ -11,6 +11,7 @@ setInterval bug if every line looks the same with no "when".
 This wraps uvicorn.run() with a patched LOGGING_CONFIG that prefixes
 both the "default" and "access" loggers with a timestamp.
 """
+import os
 import uvicorn
 from uvicorn.config import LOGGING_CONFIG
 
@@ -29,7 +30,7 @@ LOGGING_CONFIG["formatters"]["access"]["datefmt"] = TIMESTAMP_FMT
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",
+        host=host,
         port=8765,
         log_config=LOGGING_CONFIG,
     )
