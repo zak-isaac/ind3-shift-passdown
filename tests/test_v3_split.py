@@ -2,10 +2,10 @@
 from v3_split import assign, owner_for_close
 
 
-def row(wo="101", tech="Tech A", start="", service="", opened="", closed="", status="Closed"):
+def row(wo="101", tech="Tech A", start="", service="", opened="", closed="", status="Closed", completed_by=""):
     return {"wo_number":wo,"tech_name":tech,"status":status,"asset_id":"M1",
             "start_at":start,"in_service_at":service,"opened_at":opened,
-            "closed_at":closed,"last_complete_at":""}
+            "closed_at":closed,"last_complete_at":"","completed_by":completed_by}
 
 
 def test_overlap_s4_and_s5_boundary():
@@ -27,16 +27,15 @@ def test_s5_real_work_overrides_earlier_open():
     assert assign(rows,{"Tech A"},"S5","2026-10-23")==(rows,[])
 
 
-def test_cross_shift_work_requires_review():
+def test_cross_shift_work_resolved_by_actual_in_service():
     rows=[row(start="2026-10-23T17:45:00",service="2026-10-23T18:15:00")]
-    accepted,pending=assign(rows,{"Tech A"},"S5","2026-10-23")
-    assert not accepted and len(pending)==1
-    assert assign(rows,{"Tech A"},"S5","2026-10-23",{"101":"S5"})==(rows,[])
+    assert assign(rows,{"Tech A"},"S5","2026-10-23")==(rows,[])
+    assert assign(rows,{"Tech A"},"S4","2026-10-23")==([],[])
 
 
 def test_s5_grace_requires_confirmation_for_actual_work():
     rows=[row(start="2026-10-24T06:15:00",service="2026-10-24T06:20:00")]
-    assert assign(rows,{"Tech A"},"S5","2026-10-23")[1]
+    assert assign(rows,{"Tech A"},"S5","2026-10-23")==([],[])
     assert assign(rows,{"Tech A"},"S5","2026-10-23",confirmed_s5_techs={"Tech A"})==(rows,[])
 
 
@@ -86,9 +85,9 @@ def test_no_timestamps_prompts_review():
     rows=[row()]
     assert assign(rows,{"Tech A"},"S2","2026-10-22")==([],[
         {"wo_number":"101","asset_id":"M1","closed_at":"",
-         "time_source":"Technician Start / In Service / Roster",
+         "time_source":"None", "completed_by":"",
          "technicians":"Tech A",
-         "reason":"Missing or conflicting work-start and in-service evidence"}])
+         "reason":"No verified technician completion timestamp. Administrative WO closure and a different Completed By person do not establish ownership"}])
 
 
 def test_s5_new_calendar_day_labor_is_owned_by_previous_evening():
@@ -100,21 +99,20 @@ def test_s5_new_calendar_day_labor_is_owned_by_previous_evening():
 
 
 def test_s5_new_day_uses_last_complete_when_start_and_service_missing():
-    rows=[{**row(wo="MIDNIGHT-PM"),"last_complete_at":"2026-10-25T01:15:00"}]
+    rows=[{**row(wo="MIDNIGHT-PM",completed_by="Tech A"),"last_complete_at":"2026-10-25T01:15:00"}]
     assert assign(rows,{"Tech A"},"S5","2026-10-24") == (rows,[])
 
 
-def test_s5_work_started_days_earlier_does_not_disappear_at_midnight():
+def test_older_work_completing_tech_is_automatically_credited_to_s5():
     # Older Cetaris Start Date and WO opened date must not mask the work
     # completed during Saturday S5 when In Service is blank.
     rows=[{**row(wo="OLDER-OPEN",start="2026-10-22T14:00:00",
-                 opened="2026-10-22T13:00:00"),
+                 opened="2026-10-22T13:00:00",completed_by="Tech A"),
            "last_complete_at":"2026-10-25T01:45:00"}]
     accepted,pending=assign(rows,{"Tech A"},"S5","2026-10-24")
-    assert accepted == []
-    assert len(pending)==1 and pending[0]["wo_number"]=="OLDER-OPEN"
-    assert "review" in pending[0]["reason"].lower()
-    assert assign(rows,{"Tech A"},"S5","2026-10-24",{"OLDER-OPEN":"S5"}) == (rows,[])
+    assert accepted == rows and pending == []
+    # A supplied manual shift override must never overrule the verified completer.
+    assert assign(rows,{"Tech A"},"S4","2026-10-24",{"OLDER-OPEN":"S4"}) == ([],[])
 
 
 def test_s5_record_after_midnight_does_not_count_for_prior_s4():
