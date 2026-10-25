@@ -298,7 +298,9 @@ def test_duplicate_completed_wo_cannot_credit_another_shift(app_client):
     response=client.post(f'/v3/import/{token}/confirm',
                          data={'shift_id':str(sid),'techs':['Tech S2']},
                          follow_redirects=False)
-    assert response.status_code==200
-    assert 'Import blocked to prevent double-credit' in response.text
+    assert response.status_code==303
+    screen=client.get(f"/v3?shift_id={sid}")
+    assert screen.status_code==200
+    assert "Already credited to another shift (not counted)" in screen.text
     assert db.get_pm_count(sid)==0
     assert db.get_pm_count(other)==1
