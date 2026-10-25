@@ -122,11 +122,19 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                                 httponly=True, samesite="lax", path="/")
             set_session_cookies(response, {"associate":"8972","profile":dev_manager,"elevated":True}, 0)
             return response
-        if associate == "8972":
-            # This public identifier opens the verification dialog; it does NOT
-            # authenticate management access without a configured secret.
-            return entry_page(request, "Verify your management credential to continue.",
-                              master_auth_prompt=True)
+        # Two explicitly designated override identifiers open shift selection
+        # directly. This is an operational override, not a second login form.
+        if associate in ("8972", "2759"):
+            roster = get_mst_roster()
+            profile = roster.get(associate)
+            if associate == "8972":
+                if not profile or not profile.get("is_manager"):
+                    return entry_page(request, "Override profile is unavailable.")
+            elif not profile:
+                return entry_page(request, "Personal override profile is unavailable.")
+            response = entry_page(request, master_verified=True)
+            set_session_cookies(response, {"associate": associate, "profile": {**profile, "is_manager": True}, "elevated": True}, 0)
+            return response
         profile=get_mst_roster().get(associate)
         if not profile:
             return entry_page(request,"Associate number not found in the current roster.")
@@ -187,32 +195,6 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             return entry_page(request,"The active-shift limit was reached. Try again.")
         response=RedirectResponse(f"/v3?shift_id={sid}",status_code=303)
         set_session_cookies(response,who,sid)
-        return response
-
-    @router.post("/master/verify", response_class=HTMLResponse)
-    async def verify_master(request:Request, master_code:str=Form(""), associate_id:str=Form("")):
-        # Both credentials must be explicitly configured on the workshop server.
-        # Neither associate number alone nor a hardcoded code grants access.
-        roster = get_mst_roster() if get_mst_roster else {}
-        associate = associate_id.strip()
-        shared = os.environ.get("IND3_V3_MASTER_CODE","")
-        personal_assoc = os.environ.get("IND3_V3_PERSONAL_MASTER_ASSOC","").strip()
-        personal_secret = os.environ.get("IND3_V3_PERSONAL_MASTER_SECRET","")
-        if associate:
-            valid = bool(personal_assoc and personal_secret and associate==personal_assoc
-                         and hmac.compare_digest(master_code.strip(),personal_secret))
-            profile = roster.get(associate) if valid else None
-            if not profile or profile.get("is_manager"):
-                return entry_page(request,"Management verification failed.")
-            profile = {**profile,"is_manager":True}
-        else:
-            valid = bool(shared and hmac.compare_digest(master_code.strip(),shared))
-            profile = roster.get("8972") if valid else None
-            if not profile or not profile.get("is_manager"):
-                return entry_page(request,"Management verification failed.")
-            associate = "8972"
-        response = entry_page(request, master_verified=True)
-        set_session_cookies(response, {"associate":associate,"profile":profile,"elevated":True}, 0)
         return response
 
     @router.post("/master/select")
