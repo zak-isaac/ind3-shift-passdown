@@ -392,9 +392,9 @@ async def lifespan(_: FastAPI):
 
     asyncio.create_task(_shift_reaper())
 
-    # 8. Verify local AI rewriter (Ollama + model) — run in background so server starts immediately
-    import threading
-    threading.Thread(target=ai_rewriter.check_ollama, daemon=True).start()
+    # 8. Legacy AI writer is dormant in V3. Do not probe or warm its obsolete
+    # phi4-mini dependency; V3 uses qwen2.5:3b via v3_ollama_background.
+    # The V3 worker connects to local Ollama only after a confirmed import.
 
     yield
 
