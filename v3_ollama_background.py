@@ -247,8 +247,13 @@ def _eligible_drafts(shift_id: int) -> tuple[list[dict], dict[str, str]]:
         """, (shift_id,))]
         entries = [dict(e) for e in c.execute(
             "SELECT * FROM entries WHERE shift_id=? AND excluded=0", (shift_id,))]
-        metadata = {m["entry_id"]: dict(m) for m in c.execute(
-            "SELECT * FROM v3_entry_meta WHERE shift_id=?", (shift_id,))}
+        try:
+            metadata = {m["entry_id"]: dict(m) for m in c.execute(
+                "SELECT * FROM v3_entry_meta WHERE shift_id=?", (shift_id,))}
+        except sqlite3.OperationalError as exc:
+            if "no such table" not in str(exc).casefold():
+                raise
+            metadata = {}
     current = {item["wo"]: item for item in _group_sources(entries, metadata)}
     edited = {str(entry.get("wo_number") or "") for entry in entries
               if metadata.get(entry["id"], {}).get("mst_edited")}
