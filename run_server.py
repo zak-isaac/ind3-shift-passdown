@@ -28,6 +28,13 @@ LOGGING_CONFIG["formatters"]["access"]["fmt"] = (
 LOGGING_CONFIG["formatters"]["access"]["datefmt"] = TIMESTAMP_FMT
 
 if __name__ == "__main__":
+    # LAN access is an explicit IT-approved deployment choice.
+    host = os.environ.get("IND3_V3_BIND_HOST", "127.0.0.1").strip() or "127.0.0.1"
+    lan_allowed = os.environ.get("IND3_V3_ENABLE_LAN", "") == "1"
+    if host not in ("127.0.0.1", "localhost", "::1") and not lan_allowed:
+        raise SystemExit("LAN binding requires IND3_V3_ENABLE_LAN=1 after IT approval.")
+    if lan_allowed and len(os.environ.get("IND3_V3_SESSION_SECRET", "").encode()) < 32:
+        raise SystemExit("LAN binding requires IND3_V3_SESSION_SECRET (32+ bytes).")
     uvicorn.run(
         "main:app",
         host=host,
