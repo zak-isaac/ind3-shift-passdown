@@ -49,11 +49,21 @@ def build_shift_happenings(entries: list[dict], meta_by_id: dict[int, dict]
                      _WO_PREFIX.sub("", str(entry.get("issue") or ""))).strip()
         cause = proofread(raw_cause)
         asset = str(entry.get("unit") or "").strip() or (f"WO #{wo}" if wo else "Unassigned asset")
+        # An MST-approved edit wins over the originally imported cause,
+        # regardless of which collaborating technician appears first.
+        cause_rank = (
+            3 if meta.get("mst_edited") and meta.get("cause_text")
+            else 2 if meta.get("cause_text")
+            else 1 if meta.get("reported_issue")
+            else 0
+        )
         group = groups.setdefault(key, {
-            "asset": asset, "cause": cause, "wo_number": wo, "remarks": [], "seen": set(),
+            "asset": asset, "cause": cause, "cause_rank": cause_rank,
+            "wo_number": wo, "remarks": [], "seen": set(),
         })
-        if not group["cause"] and cause:
+        if cause and (not group["cause"] or cause_rank > group["cause_rank"]):
             group["cause"] = cause
+            group["cause_rank"] = cause_rank
         for raw in _raw_remarks(entry):
             corrected = proofread(raw.strip())
             token = corrected.casefold()

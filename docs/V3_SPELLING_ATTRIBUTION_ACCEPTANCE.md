@@ -23,3 +23,17 @@ powershell -ExecutionPolicy Bypass -File scripts/verify_windows_v3.ps1 -CetarisF
 Then test the authenticated V3 UI with a real, approved Cetaris workbook: S3 running Thursday to Friday, S3/S4 shared WOs completed just before and after 07:00; S4/S5 WOs completed just before/after 18:00 and at midnight; missing timestamp reviews; returning a previously OOS asset to service; re-importing the identical workbook; editing remarks and verifying automatic dictionary correction without an approval popup; verifying no duplicate credit and counting Completed or Closed PM WOs exactly once, without a closure timestamp. Check generated PDF/Word/Outlook output, signed-login behavior, report end-shift lifecycle, approved second-laptop access, and restart/rollback.
 
 **Production gate:** retain the current working deployment unless this checklist, existing suite, real-file review, and Code Puppy comparison all pass.
+
+## Approved Shift Happenings report layout (review branch)
+
+All reportable work orders display a heading in the form **Asset ID: Cause** and
+one indented **•** technician-remarks bullet. Cause comes from Cetaris
+Service/Repair Description unless the MST has approved an edit; a multi-tech
+work order is consolidated once, with unique technician remarks joined by
+\`; \`. The formatting is shared by the V3 printable preview, generated plain
+text, Outlook HTML/EML, Word-compatible download, PDF and separate Word/PDF
+exporters. No generative rewriting or invented repair outcomes are permitted.
+
+The changes in this section are on PR #4, **not yet merged or installed**.
+CI checks confirm synthetic report tests; actual Windows host, Outlook client,
+printer and real work-order content must still be checked before deployment.

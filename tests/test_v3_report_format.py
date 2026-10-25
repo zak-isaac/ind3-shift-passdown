@@ -34,6 +34,25 @@ def test_one_heading_one_bullet_per_work_order():
     assert remark(h[0])=="Checked column tension; PLC RTS; Recalibrated side guide and verified operation. RTS"
     assert "HIDDEN0001" not in repr(data)
 
+def test_mst_edited_cause_overrides_original_technician_row():
+    rows=[
+        {"id":8,"unit":"VOIDFILL0201","wo_number":"28010055",
+         "source":"cmms","issue":"WO #28010055 — Old cause",
+         "raw_remarks":'["Inspected guide"]',"excluded":0},
+        {"id":9,"unit":"VOIDFILL0201","wo_number":"28010055",
+         "source":"cmms","issue":"WO #28010055 — Old cause",
+         "raw_remarks":'["Calibrated guide"]',"excluded":0},
+    ]
+    meta={
+        8: {"cause_text":"Old cause", "mst_edited":0},
+        9: {"cause_text":"Side guide slipping", "mst_edited":1},
+    }
+    report=build_shift_happenings(rows,meta)
+    assert len(report)==1
+    assert heading(report[0])=="VOIDFILL0201: Side guide slipping"
+    assert remark(report[0])=="Inspected guide; Calibrated guide"
+
+
 def test_manual_and_missing_remarks_preserved():
     records=[
         {"id":5,"unit":"SCRUB0004","wo_number":"","source":"","issue":"Brushes worn",
