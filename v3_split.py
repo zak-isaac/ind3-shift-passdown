@@ -183,6 +183,9 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
         ]
         final_times = [value for value in finish_times if value]
         final_work_time = max(final_times) if final_times else None
+        if owner is None and final_work_time and _windows(final_work_time):
+            reason = ("Recorded completion needs shift-owner review because "
+                      "the technician's work-start shift is ambiguous")
         participant_shifts = {pair for _, _, pair in starts}
         s3_pairs = [pair for pair in participant_shifts if pair[0] == "S3"]
         s3_priority = False
