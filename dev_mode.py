@@ -49,8 +49,13 @@ def is_dev_credential(entered: str, roster: dict) -> bool:
     return entered in roster
 
 
-def dev_now() -> datetime:
-    """Frozen date + real time-of-day, so shift windows still feel live."""
+def dev_now(clock: str = "") -> datetime:
+    """Use a sandbox-only simulated clock without changing production time."""
+    if clock:
+        try:
+            return datetime.strptime(clock, "%Y-%m-%dT%H:%M")
+        except (TypeError, ValueError):
+            pass
     return datetime.combine(DEV_DATE, datetime.now().time())
 
 
