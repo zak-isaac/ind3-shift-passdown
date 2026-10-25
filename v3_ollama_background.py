@@ -256,6 +256,12 @@ def review_draft(shift_id: int, wo_number: str, source_hash: str, *, accept: boo
         return False
     if _source_hash(current["asset"], current["cause"], current["notes"]) != source_hash:
         return False
+    if accept:
+        with _connect(path) as c:
+            row = c.execute("SELECT draft,status FROM v3_ollama_drafts WHERE shift_id=? AND wo_number=? AND source_hash=?",
+                            (shift_id, wo_number, source_hash)).fetchone()
+        if not row or row["status"] != "passed" or not _verify(current["notes"], row["draft"])[0]:
+            return False
     with _connect(path) as c:
         if accept:
             result = c.execute("""UPDATE v3_ollama_drafts SET approved=1,
