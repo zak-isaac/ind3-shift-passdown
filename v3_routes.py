@@ -94,6 +94,58 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                              if now.date().weekday() in days] or ["S1","S2","S3","S4","S5"],
         })
 
+    def require_dev(request):
+        import dev_mode
+        if request.cookies.get(dev_mode.DEV_COOKIE) != dev_mode.DEV_TOKEN:
+            raise HTTPException(403, "Developer workspace is not active")
+
+    @router.get("/dev/workspace", response_class=HTMLResponse)
+    async def sandbox_workspace(request:Request):
+        require_dev(request)
+        import dev_mode
+        active = db.get_active_shifts()
+        now = dev_mode.get_now()
+        # Sandbox control center is independent of shift login. A test shift is
+        # created or resumed only when requested in this control center.
+        return templates.TemplateResponse(request, "v3/dev_workspace.html", {
+            "simulated_now": now.strftime("%Y-%m-%dT%H:%M"),
+            "active_shifts": active, "test_mode": True,
+        })
+
+    @router.post("/dev/clock")
+    async def sandbox_set_clock(request:Request, simulated_at:str=Form(...)):
+        require_dev(request)
+        try:
+            value = datetime.strptime(simulated_at, "%Y-%m-%dT%H:%M").strftime("%Y-%m-%dT%H:%M")
+        except (TypeError, ValueError):
+            raise HTTPException(400, "Provide a valid simulated date and time")
+        response = RedirectResponse("/v3/dev/workspace", status_code=303)
+        response.set_cookie("dev_clock", value, httponly=True, samesite="lax", path="/")
+        return response
+
+    @router.post("/dev/shift")
+    async def sandbox_open_shift(request:Request, shift_type:str=Form(...)):
+        require_dev(request)
+        import dev_mode
+        if shift_type not in ("S1", "S2", "S3", "S4", "S5"):
+            raise HTTPException(400, "Invalid test shift")
+        simulated_day = dev_mode.get_today().isoformat()
+        active = db.get_active_shifts()
+        found = next((s for s in active if s["shift_type"] == shift_type and s["date"] == simulated_day), None)
+        if found:
+            sid=found["id"]
+        else:
+            # Test shifts must never prevent each other from being explored.
+            # End previous sandbox shifts when switching shift/date.
+            for sh in active:
+                db.close_shift(sh["id"])
+            sid=db.start_shift(simulated_day, shift_type, "Developer Test",
+                               opened_by_role="mst", is_ot=False, opened_by_assoc="8972")
+        manager=get_mst_roster().get("8972")
+        response=RedirectResponse(f"/v3?shift_id={sid}",status_code=303)
+        set_session_cookies(response, {"associate":"8972","profile":manager,"elevated":True}, sid)
+        return response
+
     @router.get("/login",response_class=HTMLResponse)
     async def v3_login_page(request:Request):
         return entry_page(request)
@@ -117,7 +169,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             dev_manager = get_mst_roster().get("8972")
             if not dev_manager or not dev_manager.get("is_manager"):
                 return entry_page(request, "Developer test profile is unavailable.")
-            response = RedirectResponse("/v3/login", status_code=303)
+            response = RedirectResponse("/v3/dev/workspace", status_code=303)
             response.set_cookie(dev_mode.DEV_COOKIE, dev_mode.DEV_TOKEN,
                                 httponly=True, samesite="lax", path="/")
             set_session_cookies(response, {"associate":"8972","profile":dev_manager,"elevated":True}, 0)
