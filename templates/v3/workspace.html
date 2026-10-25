@@ -123,6 +123,10 @@
      <span><strong>{{ import_audit.included_work_orders }}</strong> included</span>
      <span><strong>{{ import_audit.ignored_count }}</strong> not counted</span>
      <span><strong>{{ import_audit.oos_work_orders }}</strong> OOS separately</span>
+     {% if shift.shift_type == "S5" and import_audit.after_midnight_source_wos is defined %}
+     <span><strong>{{ import_audit.after_midnight_source_wos }}</strong> after-midnight WOs in file</span>
+     <span><strong>{{ import_audit.after_midnight_included_wos }}</strong> after-midnight included</span>
+     {% endif %}
    </div>
    {% if import_audit.ignored_count %}
    <details class="d2-audit-details">
