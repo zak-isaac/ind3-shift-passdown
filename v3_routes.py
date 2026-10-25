@@ -769,11 +769,13 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         # A Cetaris Completed WO is not officially Closed. Offer exactly
         # two MST choices before counting anything from this import.
         closure_candidates = {}
+        already_closed = {str(raw.get("wo_number","")).strip() for raw in attributed
+                          if str(raw.get("status","")).strip().casefold() == "closed"}
         for raw in attributed:
             if str(raw.get("status", "")).strip().casefold() != "completed":
                 continue
             wo = str(raw.get("wo_number", "")).strip()
-            if wo:
+            if wo and wo not in already_closed:
                 item = closure_candidates.setdefault(wo, {
                     "wo_number": wo, "asset_id": raw.get("asset_id") or "",
                     "technicians": set(), "rfr": raw.get("rfr") or ""})
@@ -823,37 +825,6 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                         "counts":technician_counts(rows),"total_rows":len(rows),
                         "checked_techs":sorted(selected),
                         "checked_split_techs":sorted(split_selected)})
-        # Retain a minimal WO-level audit trail of why a shift received
-        # work credit. Do not duplicate raw remarks or personally identifying
-        # fields beyond already-selected technician names.
-        audit_by_wo = {}
-        for raw in attributed:
-            wo = str(raw.get("wo_number", "")).strip()
-            if not wo:
-                continue
-            audit_by_wo.setdefault(wo, []).append(raw)
-        with db._conn() as c:
-            for wo, labor in audit_by_wo.items():
-                evidence = {
-                    "shift_type": shift["shift_type"], "shift_date": shift["date"],
-                    "asset_id": labor[0].get("asset_id", ""),
-                    "technicians": sorted({r.get("tech_name", "") for r in labor}),
-                    "recorded_statuses": sorted({r.get("status", "") for r in labor}),
-                    "work_starts": sorted({r.get("start_at", "") for r in labor if r.get("start_at")}),
-                    "in_service": sorted({r.get("in_service_at", "") for r in labor if r.get("in_service_at")}),
-                    "last_completed": sorted({r.get("last_complete_at", "") for r in labor if r.get("last_complete_at")}),
-                    "wo_closed": sorted({r.get("closed_at", "") for r in labor if r.get("closed_at")}),
-                    "roster_shifts": {r.get("tech_name", ""): roster_shifts.get(r.get("tech_name", ""), "")
-                                      for r in labor},
-                    "mst_shift_override": decisions.get(wo, ""),
-                    "mst_closure_choice": closure_decisions.get(wo, ""),
-                }
-                payload = json.dumps(evidence, sort_keys=True)
-                digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
-                c.execute("""INSERT OR IGNORE INTO
-                    v3_wo_attribution_audit(shift_id,wo_number,source_signature,evidence_json,recorded_at)
-                    VALUES (?,?,?,?,?)""",
-                    (shift_id, wo, digest, payload, datetime.now(timezone.utc).isoformat()))
         v3_breakdown.sync(db,rows,selected,shift_id,
                           allowed_new_wos={r["wo_number"] for r in attributed})
         added,unchanged,pending=0,0,0
@@ -984,6 +955,37 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                     c.execute("INSERT INTO v3_entry_meta(entry_id,shift_id,reported_issue,cause_text,original_remarks,imported_v3,source_snapshot,rfr_type) VALUES (?,?,?,?,?,1,?,?)",
                               (eid,shift_id,r["reported_issue"],r["reported_issue"],json.dumps(r["remarks_list"]),json.dumps(incoming),r["rfr"]))
                 added+=1
+        # Retain a minimal WO-level audit trail of why a shift received
+        # work credit. Do not duplicate raw remarks or personally identifying
+        # fields beyond already-selected technician names.
+        audit_by_wo = {}
+        for raw in attributed:
+            wo = str(raw.get("wo_number", "")).strip()
+            if not wo:
+                continue
+            audit_by_wo.setdefault(wo, []).append(raw)
+        with db._conn() as c:
+            for wo, labor in audit_by_wo.items():
+                evidence = {
+                    "shift_type": shift["shift_type"], "shift_date": shift["date"],
+                    "asset_id": labor[0].get("asset_id", ""),
+                    "technicians": sorted({r.get("tech_name", "") for r in labor}),
+                    "recorded_statuses": sorted({r.get("status", "") for r in labor}),
+                    "work_starts": sorted({r.get("start_at", "") for r in labor if r.get("start_at")}),
+                    "in_service": sorted({r.get("in_service_at", "") for r in labor if r.get("in_service_at")}),
+                    "last_completed": sorted({r.get("last_complete_at", "") for r in labor if r.get("last_complete_at")}),
+                    "wo_closed": sorted({r.get("closed_at", "") for r in labor if r.get("closed_at")}),
+                    "roster_shifts": {r.get("tech_name", ""): roster_shifts.get(r.get("tech_name", ""), "")
+                                      for r in labor},
+                    "mst_shift_override": decisions.get(wo, ""),
+                    "mst_closure_choice": closure_decisions.get(wo, ""),
+                }
+                payload = json.dumps(evidence, sort_keys=True)
+                digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+                c.execute("""INSERT OR IGNORE INTO
+                    v3_wo_attribution_audit(shift_id,wo_number,source_signature,evidence_json,recorded_at)
+                    VALUES (?,?,?,?,?)""",
+                    (shift_id, wo, digest, payload, datetime.now(timezone.utc).isoformat()))
         # Save explicit MST choices and clear reminders upon confirmed closure.
         with db._conn() as c:
             for wo, decision in closure_decisions.items():
