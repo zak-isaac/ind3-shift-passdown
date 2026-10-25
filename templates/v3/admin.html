@@ -1,10 +1,65 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>IND3 · Administration</title><link rel="stylesheet" href="/static/v3.css"><link rel="stylesheet" href="/static/v3_design2.css"><script src="/static/htmx.min.js"></script><style>body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.admin{max-width:900px;margin:35px auto;padding:0 20px}.admin h1{font-size:29px}.admin .card{padding:24px;margin:18px 0}.admin label{display:block;font-size:13px;font-weight:700;margin:14px 0}.admin input{width:100%;padding:12px;border:1px solid #c9d6e5;border-radius:8px;margin-top:6px}.admin p{color:#667891}.admin .notice{background:#e7f7ec;color:#176c39;padding:12px;border-radius:8px}</style></head><body>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>IND3 &middot; Administration</title><link rel="stylesheet" href="/static/v3.css"><link rel="stylesheet" href="/static/v3_design2.css"><script src="/static/htmx.min.js"></script></head><body>
 <div class="shell design2-shell">
 {% set active_page = 'admin' %}
 {% include 'v3/_sidebar.html' %}
 <div class="viewport">
 {% set crumb = 'Administration' %}
 {% include 'v3/_topbar.html' %}
-<main class="admin" id="main-content"><h1>Administration</h1><p>V3 system configuration. Restricted to the authorized management profile.</p>{% if notice %}<p class="notice">{{ notice }}</p>{% endif %}<section class="card"><h2>Facility settings</h2><form method="post" action="/v3/admin/settings"><label>Distribution Center<input name="dc_number" value="{{ dc_number }}" maxlength="20" required></label><label>Passdown recipients (comma-separated)<input name="email_to" value="{{ email_to }}" placeholder="recipient@company.com"></label><label>Sender display name<input name="email_from_name" value="{{ email_from_name }}" maxlength="160"></label><label>Microsoft Graph client ID (optional)<input name="ms_client_id" value="{{ ms_client_id }}"></label><button type="submit" class="button button-blue">Save configuration</button></form></section><section class="card"><h2>Roster</h2><p>{{ roster_count }} associate profiles loaded. Roster access follows the existing Drax import configuration.</p></section></main>
+<main class="d2-dashboard" id="main-content">
+
+<div class="d2-page-intro"><div><p class="eyebrow">SYSTEM</p><h1>Administration</h1><p>Facility roster and notification settings &mdash; shared with the V2 dashboard, one source of truth.</p></div></div>
+{% if notice %}<div class="v3-admin-notice">{{ notice }}</div>{% endif %}
+
+<div class="d2-kpis v3-admin-kpis">
+  <div class="card d2-kpi"><div class="d2-kpi-icon">R</div><div><small>Associates loaded</small><strong>{{ roster_count }}</strong></div></div>
+  <div class="card d2-kpi"><div class="d2-kpi-icon d2-green">M</div><div><small>Distribution center</small><strong>{{ dc_number }}</strong></div></div>
+  <div class="card d2-kpi"><div class="d2-kpi-icon {{ '' if teams_webhook_url else 'd2-green' }}" style="{{ 'background:#e5f8ef;color:#0c7739' if teams_webhook_url else '' }}">T</div><div><small>Teams alerts</small><strong>{{ 'Active' if teams_webhook_url else 'Off' }}</strong></div></div>
+</div>
+
+<section class="card v3-admin-card v3-accent-blue">
+  <div class="v3-admin-card-head"><h2>Associate Roster</h2><span class="v3-admin-card-tag">{{ roster_count }} loaded</span></div>
+  <p class="v3-admin-card-sub">Seeded from the Associates spreadsheet. Edits save straight to the facility database.</p>
+  <div class="v3-roster-toolbar">
+    <button type="button" class="button button-outline" hx-post="/v3/admin/roster/reload" hx-target="#v3-roster-reload-msg" hx-swap="innerHTML">Re-sync from Drax</button>
+    <span id="v3-roster-reload-msg" class="v3-roster-toolbar-hint">Imports all associates from the Drax file into the DB.</span>
+  </div>
+  <div id="v3-assoc-table" hx-get="/v3/admin/roster" hx-trigger="load" hx-swap="innerHTML"><p class="v3-roster-empty">Loading roster&hellip;</p></div>
+  <div class="v3-roster-add">
+    <h3>Add associate manually</h3>
+    <form class="v3-form-grid" hx-post="/v3/admin/roster/add" hx-target="#v3-assoc-table" hx-swap="innerHTML" hx-on::after-request="this.reset()">
+      <label>Associate #<input name="assoc_num" type="text" required placeholder="e.g. 12345"></label>
+      <label>Full name<input name="full_name" type="text" required placeholder="e.g. John Smith"></label>
+      <label>Shift<select name="shift"><option value="">&mdash; Any &mdash;</option><option value="S1">S1</option><option value="S2">S2</option><option value="S3">S3</option><option value="S4">S4</option><option value="S5">S5</option></select></label>
+      <label>Default ID<input name="default_id" type="text" placeholder="optional"></label>
+      <div class="v3-form-grid-footer"><label class="v3-roster-edit-check"><input type="checkbox" name="is_mst" value="1"> MST &mdash; can log into the lead dashboard</label><button type="submit" class="button button-blue">Add associate</button></div>
+    </form>
+  </div>
+</section>
+
+<section class="card v3-admin-card v3-accent-amber">
+  <div class="v3-admin-card-head"><h2>Teams Notifications</h2><span class="v3-admin-card-tag {{ 'v3-tag-on' if teams_webhook_url else '' }}">{{ 'Active' if teams_webhook_url else 'Off' }}</span></div>
+  <p class="v3-admin-card-sub">A card posts to this Teams channel whenever a tech logs a Down or Degraded unit.</p>
+  <form method="POST" action="/admin/teams-webhook" class="v3-webhook-form">
+    <input name="webhook_url" type="url" placeholder="https://walmart.webhook.office.com/..." value="{{ teams_webhook_url }}">
+    <div class="v3-webhook-actions">
+      <button type="submit" class="button button-blue">Save webhook</button>
+      {% if teams_webhook_url %}<button type="submit" name="webhook_url" value="" class="button button-outline">Clear</button>{% endif %}
+    </div>
+  </form>
+</section>
+
+<section class="card v3-admin-card v3-accent-green">
+  <div class="v3-admin-card-head"><h2>Facility &amp; Email Settings</h2></div>
+  <p class="v3-admin-card-sub">Controls the passdown report's sender name, recipients, and distribution-center tag.</p>
+  <form method="post" action="/v3/admin/settings" class="v3-form-grid v3-form-grid-stack">
+    <label>Distribution center<input name="dc_number" value="{{ dc_number }}" maxlength="20" required></label>
+    <label>Passdown recipients <span>(comma-separated)</span><input name="email_to" value="{{ email_to }}" placeholder="recipient@company.com"></label>
+    <label>Sender display name<input name="email_from_name" value="{{ email_from_name }}" maxlength="160"></label>
+    <label>Microsoft Graph client ID <span>(optional)</span><input name="ms_client_id" value="{{ ms_client_id }}"></label>
+    <div class="v3-form-grid-footer"><button type="submit" class="button button-blue">Save configuration</button></div>
+  </form>
+</section>
+
+</main>
 </div></div>
 </body></html>

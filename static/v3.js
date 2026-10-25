@@ -37,6 +37,24 @@ function d2FilterHappenings(){
 }
 for(const id of ['d2-search','d2-type','d2-asset'])document.getElementById(id)?.addEventListener('input',d2FilterHappenings);
 
+// LOTO missing-keys picker: Key 1-20 checkbox grid, mirrors V2's dropdown behavior.
+function v3ToggleLotoDropdown(btn){
+  const panel=btn.parentElement.querySelector('.d2-loto-panel');
+  if(panel)panel.hidden=!panel.hidden;
+}
+function v3UpdateLotoLabel(checkbox){
+  const form=checkbox.closest('form');
+  const checked=Array.from(form.querySelectorAll('.d2-loto-grid input:checked')).map(c=>c.value);
+  const joined=checked.join(', ');
+  form.querySelector('#v3-loto-label').textContent=joined||'Select missing keys...';
+  form.querySelector('#v3-loto-missing-hidden').value=joined;
+}
+document.addEventListener('click',(event)=>{
+  document.querySelectorAll('.d2-loto-panel').forEach(panel=>{
+    if(!panel.hidden&&!panel.parentElement.contains(event.target))panel.hidden=true;
+  });
+});
+
 /* The XLSX file is parsed server-side. Technician choices are returned from the uploaded file. */
 function v3OpenImport(){ document.getElementById('v3-import-dialog')?.showModal(); }
 function v3CloseImport(){ document.getElementById('v3-import-dialog')?.close(); }

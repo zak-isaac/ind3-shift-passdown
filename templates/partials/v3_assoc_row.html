@@ -1,0 +1,26 @@
+<!-- partials/v3_assoc_row.html — V3-native roster row (display mode), no emoji, clean badges -->
+<tr id="v3-assoc-row-{{ a.assoc_num }}" class="v3-roster-row{% if a.is_manager %} v3-roster-row-mgr{% endif %}">
+  <td class="v3-roster-who">
+    <span class="v3-roster-avatar {{ 'v3-avatar-mgr' if a.is_manager else 'v3-avatar-mst' if a.is_mst else 'v3-avatar-tech' }}">{{ (a.full_name or '?')[0]|upper }}</span>
+    <span class="v3-roster-who-text"><b>{{ a.full_name | title }}</b><small>#{{ a.assoc_num }}</small></span>
+  </td>
+  <td><span class="v3-roster-shift-pill">{{ a.shift or '&mdash;' }}</span></td>
+  <td><span class="v3-roster-status"><i class="{{ 'v3-dot-on' if a.status == 'Active' else 'v3-dot-off' }}"></i>{{ a.status }}</span></td>
+  <td>
+    {% if a.is_manager %}
+    <span class="v3-roster-role v3-role-mgr">Manager bypass</span>
+    {% else %}
+    <button type="button" class="v3-roster-role {{ 'v3-role-mst' if a.is_mst else 'v3-role-tech' }}"
+      hx-post="/v3/admin/roster/{{ a.assoc_num }}/toggle-mst" hx-target="#v3-assoc-table" hx-swap="innerHTML"
+      title="Toggle MST status">{{ 'MST' if a.is_mst else 'Tech' }}</button>
+    {% endif %}
+  </td>
+  <td class="v3-roster-actions">
+    {% if not a.is_manager %}
+    <button type="button" class="v3-roster-ghost" hx-get="/v3/admin/roster/{{ a.assoc_num }}/edit-form" hx-target="#v3-assoc-row-{{ a.assoc_num }}" hx-swap="outerHTML">Edit</button>
+    <button type="button" class="v3-roster-ghost v3-roster-ghost-danger" hx-delete="/v3/admin/roster/{{ a.assoc_num }}" hx-target="#v3-assoc-table" hx-swap="innerHTML" hx-confirm="Remove {{ a.full_name|title }} from the roster?">Remove</button>
+    {% else %}
+    <span class="v3-roster-muted">&mdash;</span>
+    {% endif %}
+  </td>
+</tr>

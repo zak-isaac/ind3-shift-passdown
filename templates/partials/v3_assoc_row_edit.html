@@ -1,0 +1,18 @@
+<!-- partials/v3_assoc_row_edit.html — V3-native roster row (inline edit mode) -->
+<tr id="v3-assoc-row-{{ a.assoc_num }}" class="v3-roster-row v3-roster-row-edit">
+  <td colspan="5">
+    <form class="v3-roster-edit-form" hx-post="/v3/admin/roster/{{ a.assoc_num }}/edit" hx-target="#v3-assoc-table" hx-swap="innerHTML">
+      <label>Associate #<input name="new_assoc_num" type="text" value="{{ a.assoc_num }}" required></label>
+      <label>Full name<input name="full_name" type="text" value="{{ a.full_name | title }}" required></label>
+      <label>Shift<select name="shift">
+        <option value="" {% if not a.shift %}selected{% endif %}>&mdash; Any &mdash;</option>
+        {% for s in ['S1','S2','S3','S4','S5'] %}<option value="{{ s }}" {% if a.shift == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+      </select></label>
+      <label class="v3-roster-edit-check"><input type="checkbox" name="is_mst" value="1" {% if a.is_mst %}checked{% endif %}> MST</label>
+      <div class="v3-roster-edit-actions">
+        <button type="submit" class="v3-roster-ghost v3-roster-ghost-save">Save</button>
+        <button type="button" class="v3-roster-ghost" hx-get="/v3/admin/roster/{{ a.assoc_num }}/edit-form/cancel" hx-target="#v3-assoc-row-{{ a.assoc_num }}" hx-swap="outerHTML">Cancel</button>
+      </div>
+    </form>
+  </td>
+</tr>

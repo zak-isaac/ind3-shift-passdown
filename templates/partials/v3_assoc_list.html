@@ -1,0 +1,14 @@
+<!-- partials/v3_assoc_list.html — V3-native roster table (HTMX-swappable) -->
+{% if not associates %}
+<p class="v3-roster-empty">No associates found. Add one below.</p>
+{% else %}
+<div class="v3-roster-table-wrap">
+  <table class="v3-roster-table">
+    <thead><tr><th>Associate</th><th>Shift</th><th>Status</th><th>Role</th><th></th></tr></thead>
+    <tbody id="v3-assoc-rows">
+      {% for a in associates %}{% include "partials/v3_assoc_row.html" %}{% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="v3-roster-footnote">{{ associates | length }} associate(s) &middot; click a role badge to flip MST/Tech, or Edit to fix a typo</p>
+{% endif %}
