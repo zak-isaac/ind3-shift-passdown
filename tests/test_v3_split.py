@@ -89,3 +89,36 @@ def test_no_timestamps_prompts_review():
          "time_source":"Technician Start / In Service / Roster",
          "technicians":"Tech A",
          "reason":"Missing or conflicting work-start and in-service evidence"}])
+
+
+def test_s5_new_calendar_day_labor_is_owned_by_previous_evening():
+    # Saturday S5 continues into Sunday. 00:45 is NOT a new Sunday S5.
+    rows=[row(wo="AFTER-MIDNIGHT",start="2026-10-25T00:45:00",
+              service="2026-10-25T01:10:00")]
+    assert assign(rows,{"Tech A"},"S5","2026-10-24") == (rows,[])
+    assert assign(rows,{"Tech A"},"S5","2026-10-25") == ([],[])
+
+
+def test_s5_new_day_uses_last_complete_when_start_and_service_missing():
+    rows=[{**row(wo="MIDNIGHT-PM"),"last_complete_at":"2026-10-25T01:15:00"}]
+    assert assign(rows,{"Tech A"},"S5","2026-10-24") == (rows,[])
+
+
+def test_s5_work_started_days_earlier_does_not_disappear_at_midnight():
+    # Older Cetaris Start Date and WO opened date must not mask the work
+    # completed during Saturday S5 when In Service is blank.
+    rows=[{**row(wo="OLDER-OPEN",start="2026-10-22T14:00:00",
+                 opened="2026-10-22T13:00:00"),
+           "last_complete_at":"2026-10-25T01:45:00"}]
+    accepted,pending=assign(rows,{"Tech A"},"S5","2026-10-24")
+    assert accepted == []
+    assert len(pending)==1 and pending[0]["wo_number"]=="OLDER-OPEN"
+    assert "review" in pending[0]["reason"].lower()
+    assert assign(rows,{"Tech A"},"S5","2026-10-24",{"OLDER-OPEN":"S5"}) == (rows,[])
+
+
+def test_s5_record_after_midnight_does_not_count_for_prior_s4():
+    rows=[{**row(wo="S5-ONLY",start="2026-10-25T03:00:00"),
+           "last_complete_at":"2026-10-25T03:15:00"}]
+    assert assign(rows,{"Tech A"},"S4","2026-10-24")==([],[])
+    assert assign(rows,{"Tech A"},"S5","2026-10-24")==(rows,[])
