@@ -29,6 +29,13 @@ def test_workshop_sidebar_restored_without_test_clock():
     assert 'hx-select-oob="#v3-sidebar"' in sidebar
     assert 'class="d2-sidebar-profile"' in sidebar
     assert 'href="/v3/logout"' in sidebar
+    assert 'data-v3-live-time' in sidebar
+    assert 'data-v3-live-date' in sidebar
+    assert sidebar.index('data-v3-live-date') < sidebar.index('<nav class="nav-block">')
+    assert 'data-v3-live-clock' not in (ROOT/"templates/v3/_topbar.html").read_text()
+    script = (ROOT/"static/v3_live_clock.js").read_text()
+    assert 'America/Indiana/Indianapolis' in script
+    assert 'document.querySelectorAll("[data-v3-live-time]")' in script
     assert "sidebar_clock_state" not in sidebar
     assert "TEST MODE" not in sidebar
     assert ".navy-sidebar .d2-sidebar-profile" in css
