@@ -3195,130 +3195,30 @@ async def lead_generate(
     # Remove any RTS'd units that are still in OOS (edge case: form-only entries)
     db.remove_rts_from_oos(rts_from_form)
 
-    # ── Pull FRESH entries and consolidate duplicate WOs ──────────────────
-    # Same WO from multiple techs → one merged block with all remarks + tech list.
-    # Raw rows are never deleted; consolidation is view-only.
-    from wo_consolidator import consolidate_entries, consolidated_to_happenings, ConsolidatedWO, has_real_remarks
-    db_entries  = db.get_entries(shift_id)
-    co_result   = consolidate_entries(db_entries)   # handles excluded filter internally
-    co_happenings = consolidated_to_happenings(
-        co_result, wo_prefix_re=_WO_PREFIX_RE,
-        cause_lookup=db.get_wo_causes(shift_id),
-    )
-
-    # Optional: upgrade merged summaries via Element LLM if key is configured
-    from summarizer import summarize_remarks as _summarize, _ELEMENT_API_KEY as _EL_KEY
-
-    # Build passdown notes using the rule-based cleaner (deterministic, instant,
-    # zero hallucinations). AI rewriting was removed -- phi4-mini was too small
-    # Build AI inputs and track per-tech remarks for multi-tech WOs
-    ai_inputs: list[str] = []          # flat list: one entry per remark needing AI
-    # (happening_idx, tech_name, is_sub) so we can reconstruct sub_points
-    input_meta: list[tuple[int, str]] = []
-    ai_positions: list[int] = []        # position in input_meta -> position in ai_inputs
-    no_ai_positions: dict[int, str] = {}  # position in input_meta -> final text (AI bypassed)
-
-    for h_idx, h in enumerate(co_happenings):
-        title    = h["title"]
-        fallback = h.get("paragraph") or h.get("raw_remark") or title
-        cwo_match: ConsolidatedWO | None = None
-        for cwo in co_result.consolidated:
-            if cwo.wo_number == h["wo_number"]:
-                cwo_match = cwo
-                break
-
-        # Always synthesize every remark for this WO into ONE continuous
-        # narrative, whether it's one technician or several. Multi-tech WOs
-        # used to get one isolated AI call per tech (separate sub-bullets),
-        # which produced redundant, repeated-fact sentences when two techs
-        # described the same work ("Replaced brush on motor 4... / Installed
-        # a new brush for the motor..."). Rule 13b in ai_rewriter.py now
-        # explicitly forbids inventing connective tissue/outcomes during
-        # synthesis, so the hallucination risk that justified the old split
-        # is covered -- merging is safe and reads far better.
-        # cwo_match.all_remarks is already a deduped union across all techs.
-        raw = []
-        if cwo_match:
-            raw = [r for r in cwo_match.all_remarks if r and r.strip()]
-
-        pos = len(input_meta)
-        input_meta.append((h_idx, h.get("tech_name", "")))
-
-        if not cwo_match or not has_real_remarks(cwo_match):
-            # No real technician remarks exist for this WO -- `fallback` is
-            # OUR OWN synthetic placeholder (wo_consolidator._build_wo's
-            # "WO #X worked on by Y. No remarks recorded."), not something a
-            # technician actually wrote. Feeding synthetic filler to the AI
-            # gives it nothing real to rewrite, so it fabricates a narrative
-            # to fill the gap -- proven live 2026-09-17: "No remarks
-            # recorded" for TRKGATE0002/WO#27815641 became an invented "gate
-            # was serviced... no further observations... following our
-            # engineer Isaac S.'s intervention", complete with the tech's
-            # real name folded into fabricated prose. The 10-word placeholder
-            # is long enough to sail past _MIN_WORDS_FOR_AI, so word-count
-            # alone doesn't catch this -- it must be skipped explicitly.
-            no_ai_positions[pos] = fallback
-        else:
-            ai_positions.append(pos)
-            ai_inputs.append(ai_rewriter.build_input(title, raw))
-
-    ai_results  = await asyncio.to_thread(ai_rewriter.rewrite_batch, ai_inputs)
-    rewritten_flat: list[str] = [""] * len(input_meta)
-    for pos, result in zip(ai_positions, ai_results):
-        rewritten_flat[pos] = result
-    for pos, text in no_ai_positions.items():
-        rewritten_flat[pos] = text
-
-    # Reconstruct per-happening with sub_points for multi-tech
-    from collections import defaultdict, OrderedDict
-    groups: dict[int, list[tuple[str, str]]] = defaultdict(list)
-    for (h_idx, t_name), para in zip(input_meta, rewritten_flat):
-        groups[h_idx].append((t_name, para))
-
-    raw_happenings: list[RewrittenHappening] = []
-    for h_idx, h in enumerate(co_happenings):
-        pts = groups[h_idx]
-        if not pts or not any(p.strip() for _, p in pts):
-            continue
-        clean = [(t, p) for t, p in pts if p.strip() and p.strip() not in ("-", "--")]
-        if not clean:
-            continue
-        if len(clean) == 1:
-            raw_happenings.append(RewrittenHappening(
-                title=h["title"], paragraph=clean[0][1],
-                wo_number=h["wo_number"], tech_name=clean[0][0], sub_points=[],
-            ))
-        else:
-            raw_happenings.append(RewrittenHappening(
-                title=h["title"], paragraph="",
-                wo_number=h["wo_number"], tech_name="", sub_points=clean,
-            ))
-
-    from collections import OrderedDict
-    asset_groups: OrderedDict = OrderedDict()
-    for rh in raw_happenings:
-        asset_groups.setdefault(rh.title, []).append(rh)
-
-    happenings: list[RewrittenHappening] = []
-    for asset_id, group in asset_groups.items():
-        if len(group) == 1:
-            happenings.append(group[0])
-        else:
-            sub_pts: list[tuple[str, str]] = []
-            for rh in group:
-                if rh.sub_points:
-                    for _, remark in rh.sub_points:
-                        sub_pts.append((rh.wo_number, remark))
-                else:
-                    sub_pts.append((rh.wo_number, rh.paragraph))
+    # V3 uses exactly the same deterministic source and text rules as the
+    # Command Center and report preview. Never send these remarks through the
+    # legacy AI rewrite/summarizer paths, which may invent work or drift from
+    # the MST's approved text.
+    from v3_report_layout import build_shift_happenings
+    from v3_proofread import proofread
+    db_entries = db.get_entries(shift_id)
+    with db._conn() as c:
+        # Older pre-V3 shifts may have no sidecar metadata yet.
+        try:
+            meta_rows = c.execute(
+                "SELECT * FROM v3_entry_meta WHERE shift_id=?", (shift_id,)
+            ).fetchall()
+        except Exception as exc:
+            if "no such table" not in str(exc).lower():
+                raise
+            meta_rows = []
+    meta_by_id = {m["entry_id"]: dict(m) for m in meta_rows}
+    happenings = build_shift_happenings(db_entries, meta_by_id)
+    for title, note in zip(extra_title, extra_note):
+        if title.strip() and note.strip():
             happenings.append(RewrittenHappening(
-                title=asset_id, paragraph="", wo_number="", tech_name="", sub_points=sub_pts,
+                title=title.strip(), paragraph=proofread(note.strip())
             ))
-
-
-    for t, n in zip(extra_title, extra_note):
-        if t.strip() and n.strip():
-            happenings.append(RewrittenHappening(title=t.strip(), paragraph=n.strip()))
 
     # OOS always comes from the persistent DB — not the form
     oos_units = db.get_oos_units()
