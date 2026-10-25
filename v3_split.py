@@ -177,6 +177,7 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
         final_work_time = max(final_times) if final_times else None
         participant_shifts = {pair for _, _, pair in starts}
         s3_pairs = [pair for pair in participant_shifts if pair[0] == "S3"]
+        s3_priority = False
         incoming_pairs = [pair for pair in participant_shifts if pair[0] in ("S1", "S4")]
         if s3_pairs and incoming_pairs:
             s3_pair = s3_pairs[0]
@@ -187,6 +188,7 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
                 reason = "Shared S3 work needs a recorded completion or In Service time"
             elif final_work_time < end_s3 and s3_pair in _windows(final_work_time):
                 owner = s3_pair
+                s3_priority = True
             # After 07:00 the later-shift attribution remains subject to
             # technician evidence and the normal conflict checks.
 
@@ -194,7 +196,7 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
         # even if its technician began the WO during S4. Finishing during
         # the S4 overlap before 18:00 remains S4 work.
         s4_pairs = [pair for pair in participant_shifts if pair[0] == "S4"]
-        if final_work_time and s4_pairs:
+        if final_work_time and s4_pairs and not s3_priority:
             candidates = _windows(final_work_time)
             s5_candidates = [pair for pair in candidates if pair[0] == "S5"]
             if s5_candidates and not any(pair in candidates for pair in s4_pairs):
