@@ -212,7 +212,30 @@ def _actual_completion(items):
         if service and (start is None or start <= service):
             returns.append((service,r.get("tech_name") or "", "In Service + technician labor"))
     if returns:
-        return max(returns,key=lambda p:p[0])
+        # When Completed By is a different administrative user, Cetaris's
+        # Last Technician is a better indication of the actual final worker
+        # than the order of labor rows in the export.
+        last_workers = {_person_key(r.get("last_technician")) for r in items
+                        if _person_key(r.get("last_technician")) in participant_by_key}
+        if len(last_workers) == 1:
+            finisher = next(iter(last_workers))
+            finisher_returns = [result for result in returns
+                                if _person_key(result[1]) == finisher]
+            if finisher_returns:
+                return max(finisher_returns,key=lambda p:p[0])
+        # Different technicians with the same equipment-return timestamp
+        # are not proof of which one finished it. Return one candidate only
+        # when it is the sole supported worker (the owning shift must still
+        # be independently verified).
+        workers = {_person_key(r[1]) for r in returns}
+        if len(workers)==1:
+            return max(returns,key=lambda p:p[0])
+        # If the finish is unambiguously inside one scheduled shift, credit
+        # the WO once without fabricating personal completion attribution.
+        shift_sets = {tuple(_windows(r[0])) for r in returns}
+        if len(shift_sets)==1 and len(next(iter(shift_sets)))==1:
+            return max(returns,key=lambda p:p[0])
+        return None
     return None
 
 
@@ -255,10 +278,16 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
         owner = None
         if evidence:
             when, completing_tech, source = evidence
-            owner = _choose_completion_owner(
-                when, completing_tech, items, history, roster_shifts, confirmed)
-            if owner is None:
-                reason = "Completion timestamp falls in overlapping shifts without reliable technician shift evidence"
+            if completing_tech not in selected:
+                reason = "Completing technician is not selected for this shift"
+                owner = None
+            else:
+                owner = _choose_completion_owner(
+                    when, completing_tech, items, history, roster_shifts, confirmed)
+                reason = ("Completion timestamp falls in overlapping shifts without reliable technician shift evidence"
+                          if owner is None else "")
+            if owner is None and not reason:
+                reason = "Completion timestamp lacks reliable technician shift evidence"
             elif _grace_requires_confirmation(when, owner, confirmed, completing_tech):
                 owner = None
                 reason = "S5 completion during grace requires confirmed S5 technician"
