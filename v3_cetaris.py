@@ -98,7 +98,7 @@ def technician_counts(rows: list[dict]) -> list[dict]:
 
 def select_records(rows: list[dict], selected: set[str], start: datetime, end: datetime,
                    closure_reviews: dict[str, str] | None = None):
-    """Count Closed WOs only. Include Completed WOs as closure reminders if MST opts in."""
+    """Count Completed or Closed PM WOs; other Completed WOs require MST choice."""
     closure_reviews = closure_reviews or {}
     # Cetaris sometimes repeats a WO across labor rows. A confirmed Closed
     # status for that WO takes precedence over a stale Completed labor row.
@@ -121,8 +121,15 @@ def select_records(rows: list[dict], selected: set[str], start: datetime, end: d
             summary["breakdown_in_process"] += 1
             eligible.append({**r, "kind": "oos"})
             continue
+        if status == "completed" and category in {"preventive maintenance", "preventative maintenance"}:
+            # Completing maintenance fulfills a PM. Cetaris administrative
+            # closure may occur later and must not delay the completed count.
+            summary["pm_rows"] += 1
+            summary["pm_completed_not_closed"] += 1
+            eligible.append({**r, "kind": "pm"})
+            continue
         if status == "completed":
-            # Completed is not Closed in Cetaris. MST may explicitly carry it
+            # Non-PM Completed rows can be included as closure reminders
             # into passdown as a closure reminder, never as a completed PM.
             summary["completed_unclosed"] += 1
             if closure_reviews.get(r["wo_number"]) == "add":
