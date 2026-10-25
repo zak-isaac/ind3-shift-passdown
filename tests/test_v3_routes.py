@@ -162,7 +162,8 @@ def test_unfamiliar_rfr_imports_and_reopened_wo_is_excluded(app_client):
     client.get('/v3')
     base={"wo_number":"98765","tech_name":"Ssaku, Isaac","asset_id":"ASSET987",
           "status":"Closed","rfr":"Safety Inspection","reported_issue":"Check guarding",
-          "cause":"","remarks":"Guard inspected","start_at":"2026-10-20T18:00:00"}
+          "cause":"","remarks":"Guard inspected","start_at":"2026-10-20T18:00:00",
+          "in_service_at":"2026-10-20T18:10:00"}
     def send(rows):
         token=uuid.uuid4().hex
         with db._conn() as c:
@@ -190,7 +191,8 @@ def test_cumulative_reimport_keeps_work_orders_absent_from_later_file(app_client
     client.get('/v3')
     base={"tech_name":"Tech A","asset_id":"M1","status":"Closed",
           "reported_issue":"Reported issue","cause":"WRONG COLUMN",
-          "remarks":"Fixed","start_at":"2026-10-20T18:00:00"}
+          "remarks":"Fixed","start_at":"2026-10-20T18:00:00",
+          "in_service_at":"2026-10-20T18:10:00"}
     def confirm(rows):
         token=uuid.uuid4().hex
         with db._conn() as c:
