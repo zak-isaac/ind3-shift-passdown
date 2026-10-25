@@ -5,6 +5,7 @@ import os
 import socket
 import uuid
 from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Form, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response, JSONResponse
@@ -371,7 +372,7 @@ async def lifespan(_: FastAPI):
             try:
                 for shift in db.get_active_shifts():
                     deadline = _shift_deadline(shift)
-                    if deadline and datetime.now() >= deadline:
+                    if deadline and _indianapolis_now() >= deadline:
                         print(
                             f"[reaper] Auto-terminating {shift['shift_type']} "
                             f"(id={shift['id']}) — deadline was {deadline:%Y-%m-%d %H:%M}",
@@ -414,6 +415,14 @@ templates = Jinja2Templates(directory="templates")
 # ── Site-wide config exposed to all templates ─────────────────────────────────
 DC_NUMBER = "US.08972"
 templates.env.globals["dc_number"] = DC_NUMBER
+
+def _indianapolis_now() -> datetime:
+    """Authoritative facility wall-clock for shift eligibility and expiration.
+
+    Return naive Indianapolis time because shift windows are stored as naive
+    facility-local datetimes; do not compare them to workstation-local clocks.
+    """
+    return datetime.now(ZoneInfo("America/Indiana/Indianapolis")).replace(tzinfo=None)
 
 # ── Shift schedule & auto-termination ──────────────────────────────────────────────
 # Each entry: shift_type → (scheduled_end_time, end_is_next_calendar_day)
@@ -3336,7 +3345,7 @@ _v3_router = create_v3_router(
     verify_mst_pin=lambda pin: bool(pin) and hashlib.sha256(pin.encode()).hexdigest() == _get_pin_hash(),
     start_eligibility=_check_shift_start_eligibility,
     allowed_shift_days=_WEEKDAY_SHIFTS,
-    now_func=datetime.now,
+    now_func=_indianapolis_now,
     get_v2_cookie_value=_get_pin_hash,
     legacy_lead_page=lead_page,
     generate_report=lead_generate,
