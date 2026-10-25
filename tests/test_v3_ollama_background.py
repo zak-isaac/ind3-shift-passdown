@@ -46,3 +46,37 @@ def test_valid_model_output_auto_pass(monkeypatch):
     monkeypatch.setattr(ai.json,'load',lambda _: {'message':{'content':'Replaced right wheel; braking 5 ft.'}})
     draft,status,_=ai._generate({'source_json':json.dumps(['Replaced right wheel; braking 5 ft.']),'asset':'X','cause':'Issue'})
     assert status=='passed' and draft.startswith('Replaced')
+
+
+def test_summary_instructions_are_never_passed():
+    ok, reason=ai._verify(["Replaced two boxes of wire"],
+                          "Consolidated maintenance actions: Replaced two boxes of wire.")
+    assert not ok and "instruction" in reason.lower()
+
+def test_cannot_drop_second_technician_observation():
+    ok, reason=ai._verify(
+        ["Replaced printer controller and tested power.",
+         "Reset the HMI; fault remained, bagger was locked out."],
+        "Replaced printer controller and tested power.")
+    assert not ok and "source remark" in reason
+
+def test_numeric_calibrations_cannot_be_truncated():
+    ok, reason=ai._verify(
+        ["Recalibrated fill head from 760 to 784"],
+        "Recalibrated the fill head.")
+    assert not ok and "technical" in reason.lower() or (not ok and "numeric" in reason.lower())
+
+def test_automated_pass_is_not_report_approval(tmp_path):
+    import db
+    db.set_db_path(tmp_path/"draft_only.db")
+    db.init_db()
+    ai.ensure_table(ai._db_path())
+    with ai._connect(ai._db_path()) as c:
+        c.execute("""INSERT INTO v3_ollama_drafts
+            (shift_id,wo_number,source_hash,asset,cause,source_json,draft,status,approved)
+            VALUES (42,'TEST-WO','snapshot','TEST-ASSET','Issue','["Replaced wire"]',
+                    'Replaced wire.','passed',0)""")
+    assert ai.approved_for_report(42)=={}
+    with ai._connect(ai._db_path()) as c:
+        c.execute("UPDATE v3_ollama_drafts SET approved=1 WHERE shift_id=42")
+    assert ai.approved_for_report(42)=={"TEST-WO":"Replaced wire."}
