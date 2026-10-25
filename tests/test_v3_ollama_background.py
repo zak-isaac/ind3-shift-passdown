@@ -114,3 +114,55 @@ def test_old_passed_ai_without_source_evidence_restores_original(tmp_path):
     assert ai.approved_for_report(sid)=={}
     assert ai.statuses(sid)[0]["status"]=="original"
     assert "instruction" in ai.statuses(sid)[0]["reason"].lower()
+
+
+def test_real_s5_prompt_echoes_fail_and_originals_survive():
+    """Exact bad AI fragments captured from the October 25 S5 screenshot."""
+    source=["Reset module and cleaned taper blade."]
+    polluted=[
+        "Consolidate duplicated actions even if described in different wording.",
+        "Consolidate duplicated actions even if described in different wording. Reset module and cleaned taper blade.",
+        "Consolidated maintenance: Reset module and cleaned taper blade.",
+        "Consolidated maintenance paragraph: Reset module and cleaned taper blade.",
+        "Motor Brush clean up is duplicated. Reset module and cleaned taper blade.",
+        "Reset module and cleaned taper blade. Duplicate remark removed.",
+        "Retain all distinct troubleshooting, repairs, measurements, codes, parts and statuses.",
+        "Return ONE concise professional paragraph using ONLY the technician SOURCE remarks.",
+    ]
+    for bad in polluted:
+        good,reason=ai._verify(source,bad)
+        assert not good,(bad,reason)
+        assert "instruction" in reason.casefold() or "duplicate" in reason.casefold(),(bad,reason)
+
+
+def test_real_s5_rejects_new_work_even_when_other_source_terms_match():
+    original=["Cleaned the taper blade and reset the module."]
+    good,reason=ai._verify(original,"Cleaned the taper blade, replaced the fuse, and reset the module.")
+    assert not good and "unsupported words" in reason.casefold()
+    good,reason=ai._verify(original,"Cleaned the taper blade and reset the module.")
+    assert good, reason
+
+
+def test_automatic_validation_falls_back_on_prompt_echo_in_existing_passed_draft(tmp_path):
+    import db
+    import json
+    db.set_db_path(tmp_path/"s5_leak.db")
+    db.init_db()
+    sid=db.start_shift("2026-10-25","S5","MST Test")
+    db.upsert_cmms_entry(sid,"28027109","BAG0009","Excessive regen or internal voltage",
+        json.dumps(["Checked battery plug connections and investigated regen alarm."]),
+        "Test Technician")
+    ai.ensure_table(ai._db_path())
+    with ai._connect(ai._db_path()) as c:
+        entries=[dict(e) for e in c.execute("SELECT * FROM entries WHERE shift_id=?", (sid,))]
+        item=ai._group_sources(entries,{})[0]
+        stamp=ai._source_hash(item["asset"],item["cause"],item["notes"])
+        c.execute("""INSERT INTO v3_ollama_drafts
+          (shift_id,wo_number,source_hash,asset,cause,source_json,draft,status,approved)
+          VALUES (?,?,?,?,?,?,?,'passed',1)""",
+          (sid,"28027109",stamp,item["asset"],item["cause"],json.dumps(item["notes"]),
+           "Consolidate duplicated actions even if described in different wording."))
+    assert ai.approved_for_report(sid)=={}
+    status=ai.statuses(sid)[0]
+    assert status["status"]=="original" and status["draft"]==""
+    assert "instruction" in status["reason"].casefold()
