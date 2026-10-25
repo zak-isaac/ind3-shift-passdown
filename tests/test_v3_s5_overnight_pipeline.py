@@ -19,7 +19,7 @@ HEADERS = [
     "WO Number", "Asset #", "WO Status", "Primary RFR",
     "Service/Repair Description", "Technician", "Technician Remarks",
     "Start Date", "WO Date / Time", "WO Last Complete Date / Time",
-    "WO Closed Date/Time", "In Service Date / Time", "Last Shift"
+    "WO Closed Date/Time", "In Service Date / Time", "Last Shift", "Completed By"
 ]
 
 def stamp(s):
@@ -30,7 +30,7 @@ def labor(wo, start, completed, service=None, category="Proactive Repair",
     return [
         wo, "M" + wo, status, category, "Maintenance work", tech,
         "Completed checks; RTS", stamp(start), stamp(opened or start),
-        stamp(completed), stamp(completed), stamp(service), "S5"
+        stamp(completed), stamp(completed), stamp(service), "S5", tech
     ]
 
 def test_s5_saturday_shift_credits_sunday_early_work_and_imports_nonduplicates(tmp_path):
@@ -64,11 +64,11 @@ def test_s5_saturday_shift_credits_sunday_early_work_and_imports_nonduplicates(t
     # Sunday 01:00 still belongs to Saturday S5.
     sheet.append(labor("S5-AM", "2026-10-25T01:10:00",
                        "2026-10-25T01:20:00", "2026-10-25T01:18:00"))
-    # No labor start or In Service: WO Last Complete is enough evidence.
+    # No labor start or In Service: WO Last Complete and matching Completed By prove finish.
     sheet.append(labor("S5-PM", None, "2026-10-25T02:00:00",
                        category="Preventive Maintenance",
                        opened="2026-10-24T12:00:00"))
-    # Older WO start + next-day completion must be shown for MST review.
+    # Older WO start + verified next-day completion is attributed automatically.
     sheet.append(labor("S5-REVIEW", "2026-10-22T14:00:00",
                        "2026-10-25T02:15:00", opened="2026-10-22T13:00:00"))
     # Previously credited WO: skip it, not the rest of the file.
@@ -86,14 +86,10 @@ def test_s5_saturday_shift_credits_sunday_early_work_and_imports_nonduplicates(t
         assert stage.status_code==200,stage.text[:700]
         assert "5 unique WOs" in stage.text
         token=re.search(r"/v3/import/([0-9a-f]{32})/confirm",stage.text).group(1)
-        review=client.post(f"/v3/import/{token}/confirm",
-             data={"shift_id":str(shift_id),"techs":["Tech S5"]},follow_redirects=False)
-        assert review.status_code==200,review.text[:700]
-        assert "S5-REVIEW" in review.text
         done=client.post(f"/v3/import/{token}/confirm",
-             data={"shift_id":str(shift_id),"techs":["Tech S5"],
-                   "split_wo_S5-REVIEW":"S5"},follow_redirects=False)
+             data={"shift_id":str(shift_id),"techs":["Tech S5"]},follow_redirects=False)
         assert done.status_code==303,done.text[:700]
+        assert "Choose the owning shift" not in done.text
         screen=client.get(f"/v3?shift_id={shift_id}")
         assert screen.status_code==200
         assert "Already credited to another shift (not counted)" in screen.text
