@@ -569,6 +569,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                              "counts":roster_technician_counts(extra["staged"]["counts"],shift)}
         context = {
             "shift":shift,
+            "is_dev_mode": __import__("dev_mode").is_active(),
             **info,
             "loto":db.get_loto(shift["id"]),
             "oos_units":db.get_oos_units(),

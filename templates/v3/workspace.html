@@ -13,6 +13,7 @@
  {% if notice %}<div class="banner success" role="status">{{ notice }}</div>{% endif %}
  {% if warning %}<div class="banner warn" role="alert">{{ warning }}</div>{% endif %}
 
+ {% if is_dev_mode %}<div class="banner warn" role="status">TEST MODE — isolated sandbox · <a href="/v3/dev/workspace">Test Clock &amp; Shift Controls</a> · <a href="/dev/exit">Exit Test Mode</a></div>{% endif %}
  <section class="d2-import-flow card" id="cetaris" aria-label="Cetaris extraction steps">
    <div class="d2-flow-step {{ 'is-complete' if imported_filename or staged else '' }}"><span class="d2-step-number">1</span><div><strong>Upload Cetaris File</strong><small>{{ staged.filename if staged else (imported_filename if imported_filename else 'One Cetaris Desktop XLSX') }}</small><span class="d2-step-status">{{ 'File ready' if staged else ('Uploaded' if imported_filename else 'Awaiting upload') }}</span></div></div>
    <span class="d2-flow-arrow">—</span>
