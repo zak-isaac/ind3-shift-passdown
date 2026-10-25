@@ -828,7 +828,6 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                         "checked_closure_decisions": closure_decisions})
         records,stats=select_records(attributed,selected,*window,
                                      closure_reviews=closure_decisions)
-        audit_result = build_audit(rows,selected,attributed,records)
         # Cross-shift completion credit must be unique across the database,
         # including older PM records. Never silently overwrite another shift.
         completed_wos={r["wo_number"] for r in records if r["kind"] in ("pm","happening")}
@@ -843,16 +842,22 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                     SELECT DISTINCT wo_number,shift_id FROM entries
                     WHERE shift_id<>? AND excluded=0 AND wo_number IN ({placeholders})
                 """,(shift_id,*sorted(completed_wos),shift_id,*sorted(completed_wos))).fetchall()
-        if cross_shift:
-            labels=", ".join(f"WO {r['wo_number']} (shift #{r['shift_id']})" for r in cross_shift[:8])
-            return render(request,shift,
-                warning="Import blocked to prevent double-credit across shifts: "+labels+
-                        (f" and {len(cross_shift)-8} more" if len(cross_shift)>8 else "")+
-                        ". Review the existing shift's WO before retrying.",
-                staged={"token":token,"filename":batch["filename"],
-                        "counts":technician_counts(rows),"total_rows":len(rows),
-                        "checked_techs":sorted(selected),
-                        "checked_split_techs":sorted(split_selected)})
+        # A single cross-shift duplicate must not reject all the unrelated
+        # valid WOs in this file. Never count the already-credited WO again.
+        # Preserve the conflict in the visible import audit so the MST can
+        # resolve incorrect prior ownership with the originating shift.
+        conflicting_wos = {str(r["wo_number"]) for r in cross_shift}
+        if conflicting_wos:
+            attributed = [r for r in attributed
+                          if str(r["wo_number"]) not in conflicting_wos]
+            records = [r for r in records
+                       if str(r["wo_number"]) not in conflicting_wos]
+            stats["unique_pm_wos"] = len({r["wo_number"] for r in records
+                                          if r["kind"] == "pm"})
+            stats["unique_happening_wos"] = len({r["wo_number"] for r in records
+                                                 if r["kind"] == "happening"})
+        audit_result = build_audit(rows, selected, attributed, records,
+                                   conflicting_wos=conflicting_wos)
         v3_breakdown.sync(db,rows,selected,shift_id,
                           allowed_new_wos={r["wo_number"] for r in attributed})
         added,unchanged,pending=0,0,0
@@ -1041,6 +1046,9 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         ollama_drafts.queue_shift(shift_id)
         notice=f"Imported {added} new technician/WO entries; {unchanged} unchanged; {pending} flagged for review. {stats.get('unique_pm_wos',0)} distinct Completed or Closed PM WOs in this import."
         notice += f" Audit: {audit_result['work_orders']} source WOs, {audit_result['included_work_orders']} included, {audit_result['ignored_count']} not counted. Review the audit below."
+        if conflicting_wos:
+            notice += (f" {len(conflicting_wos)} WO(s) already credited to another shift "
+                       "were excluded without blocking the remaining work. Review those WOs in the import audit.")
         skipped_parts=[]
         if stats.get("not_closed"):
             skipped_parts.append(f"{stats['not_closed']} not yet closed")
