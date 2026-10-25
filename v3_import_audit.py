@@ -28,10 +28,11 @@ def preview_status(rows):
     return summary
 
 
-def build_audit(rows, selected, attributed, records):
+def build_audit(rows, selected, attributed, records, conflicting_wos=None):
     """Preserve ignored WOs and explain why they do not count for this shift."""
     by_wo = defaultdict(list)
     selected = set(selected)
+    conflicting_wos = set(conflicting_wos or ())
     for row in rows:
         wo = str(row.get("wo_number") or "").strip()
         if wo:
@@ -50,7 +51,9 @@ def build_audit(rows, selected, attributed, records):
         selected_lines = [r for r in items if r.get("tech_name") in selected]
         selected_statuses = {str(r.get("status") or "").strip().casefold()
                              for r in selected_lines}
-        if not selected_lines:
+        if wo in conflicting_wos:
+            why = "Already credited to another shift (not counted)"
+        elif not selected_lines:
             why = "Technician not selected (other shift or vendor)"
         elif not selected_statuses.intersection({"closed", "completed"}):
             why = "Not Closed or Completed"
