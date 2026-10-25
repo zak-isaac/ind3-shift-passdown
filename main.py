@@ -3331,6 +3331,12 @@ async def download_report(report_id: int):
         headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
 
+def _refresh_v3_roster_from_db():
+    """Refresh signed V3 login eligibility after admin roster edits."""
+    global _ROSTER
+    _ROSTER = db.associates_to_roster()
+
+
 # ── V3-only MST workspace ─────────────────────────────────────────────────────
 # Legacy handlers remain internal for the V3 report/export engine only.
 from v3_routes import create_v3_router
@@ -3349,6 +3355,8 @@ _v3_router = create_v3_router(
     get_v2_cookie_value=_get_pin_hash,
     legacy_lead_page=lead_page,
     generate_report=lead_generate,
+    build_eml_response=_build_eml_response,
+    refresh_roster=_refresh_v3_roster_from_db,
 )
 app.include_router(_v3_router)
 
