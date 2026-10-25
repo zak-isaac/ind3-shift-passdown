@@ -158,7 +158,7 @@ def _verify(source: list[str], result: str) -> tuple[bool, str]:
     output_numbers = set(re.findall(r"(?<![a-z0-9])\d+(?:\.\d+)?(?![a-z0-9])", result, re.I))
     if source_numbers - output_numbers:
         return False, "Missing source measurements or numeric values"
-    return True, "AI draft ready for MST review; not approved"
+    return True, "Automatic source validation passed"
 
 
 def _generate(item: sqlite3.Row) -> tuple[str, str, str]:
@@ -184,7 +184,7 @@ def _generate(item: sqlite3.Row) -> tuple[str, str, str]:
             payload = json.load(response)
         draft = str(payload.get("message", {}).get("content", "")).strip()
         good, reason = _verify(notes, draft)
-        return (draft, "passed", "AI draft ready for MST review; not approved") if good else ("", "original", reason)
+        return (draft, "passed", "Automatic source validation passed") if good else ("", "original", reason)
     except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
         return "", "original", "Ollama unavailable or request failed: " + type(exc).__name__
 
@@ -220,60 +220,55 @@ def start_worker(path: Path) -> None:
         _WORKERS[k] = thread
         thread.start()
 
-def statuses(shift_id: int) -> list[dict]:
-    path = _db_path()
-    ensure_table(path)
-    with _connect(path) as c:
-        return [dict(r) for r in c.execute("""SELECT wo_number,asset,cause,status,reason,approved,draft,source_json,source_hash
-            FROM v3_ollama_drafts WHERE shift_id=? ORDER BY wo_number""",(shift_id,))]
+def _eligible_drafts(shift_id: int) -> tuple[list[dict], dict[str, str]]:
+    """Auto-accept verified drafts, never stale or unsupported AI text.
 
-def approved_for_report(shift_id: int) -> dict[str,str]:
-    path = _db_path()
-    ensure_table(path)
-    with _connect(path) as c:
-        return {r["wo_number"]:r["draft"] for r in c.execute(
-            "SELECT wo_number,draft FROM v3_ollama_drafts WHERE shift_id=? AND status='passed' AND approved=1",
-            (shift_id,))}
-
-
-def review_draft(shift_id: int, wo_number: str, source_hash: str, *, accept: bool) -> bool:
-    """Apply only the exact AI draft inspected by an MST.
-
-    Source remarks remain unchanged in entries; rejected results retain the
-    original. Excluded or manually edited WOs are never AI-approvable.
+    Every read checks the source hash against live grouped technician remarks.
+    A pre-patch 'passed' record is revalidated just like a fresh model draft.
+    This is automatic: there is no MST approval workflow.
     """
     path = _db_path()
     ensure_table(path)
     with _connect(path) as c:
-        entries = [dict(x) for x in c.execute(
+        drafts = [dict(r) for r in c.execute("""
+            SELECT wo_number,asset,cause,status,reason,approved,draft,source_json,source_hash
+            FROM v3_ollama_drafts WHERE shift_id=? ORDER BY wo_number
+        """, (shift_id,))]
+        entries = [dict(e) for e in c.execute(
             "SELECT * FROM entries WHERE shift_id=? AND excluded=0", (shift_id,))]
-        metadata = {x["entry_id"]: dict(x) for x in c.execute(
+        metadata = {m["entry_id"]: dict(m) for m in c.execute(
             "SELECT * FROM v3_entry_meta WHERE shift_id=?", (shift_id,))}
-    current = next((x for x in _group_sources(entries, metadata)
-                    if x["wo"] == wo_number), None)
-    if not current or any(metadata.get(x["id"], {}).get("mst_edited") for x in entries
-                          if str(x.get("wo_number") or "") == wo_number):
-        return False
-    if _source_hash(current["asset"], current["cause"], current["notes"]) != source_hash:
-        return False
-    if accept:
-        with _connect(path) as c:
-            row = c.execute("SELECT draft,status FROM v3_ollama_drafts WHERE shift_id=? AND wo_number=? AND source_hash=?",
-                            (shift_id, wo_number, source_hash)).fetchone()
-        if not row or row["status"] != "passed" or not _verify(current["notes"], row["draft"])[0]:
-            return False
-    with _connect(path) as c:
-        if accept:
-            result = c.execute("""UPDATE v3_ollama_drafts SET approved=1,
-                reason='Reviewed and accepted by MST'
-                WHERE shift_id=? AND wo_number=? AND source_hash=?
-                AND status='passed' AND length(trim(draft))>0""",
-                (shift_id, wo_number, source_hash))
-        else:
-            result = c.execute("""UPDATE v3_ollama_drafts SET approved=0,
-                status='original', draft='',
-                reason='MST chose original technician remarks'
-                WHERE shift_id=? AND wo_number=? AND source_hash=?
-                AND status IN ('passed','original')""",
-                (shift_id, wo_number, source_hash))
-        return result.rowcount == 1
+    current = {item["wo"]: item for item in _group_sources(entries, metadata)}
+    edited = {str(entry.get("wo_number") or "") for entry in entries
+              if metadata.get(entry["id"], {}).get("mst_edited")}
+    validated = {}
+    for record in drafts:
+        wo = str(record["wo_number"])
+        item = current.get(wo)
+        if not item or wo in edited:
+            record.update(status="original", draft="", reason="MST edit or excluded work order; original remarks used", approved=0)
+            continue
+        if record["source_hash"] != _source_hash(item["asset"], item["cause"], item["notes"]):
+            record.update(status="original", draft="", reason="Remarks changed since AI rewrite; original remarks used", approved=0)
+            continue
+        if record["status"] != "passed":
+            continue
+        safe, reason = _verify(item["notes"], record["draft"])
+        if not safe:
+            record.update(status="original", draft="", reason=reason, approved=0)
+            continue
+        validated[wo] = record["draft"]
+        record["approved"] = 1  # indicates automatic validation, not human approval
+        record["reason"] = "AI validated against technician remarks; original source retained"
+    return drafts, validated
+
+
+def statuses(shift_id: int) -> list[dict]:
+    drafts, _ = _eligible_drafts(shift_id)
+    return drafts
+
+
+def approved_for_report(shift_id: int) -> dict[str, str]:
+    """Compatibility name: auto-validated paragraphs only; else original text."""
+    _, validated = _eligible_drafts(shift_id)
+    return validated
