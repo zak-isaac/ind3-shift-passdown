@@ -127,3 +127,13 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
 .v3-test-clock-banner{display:flex;align-items:center;flex-wrap:wrap;gap:9px;font-size:12px}
 .v3-test-clock-banner time{font-weight:750}
 @media(max-width:790px){.d2-real-clock{min-width:0}.d2-real-clock time{white-space:normal}}
+
+/* Additional WO audit inside the existing production V3 command center. */
+.d2-import-audit{margin:14px 0;padding:18px 22px}
+.d2-audit-kpis{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 16px}
+.d2-audit-kpis span{font-size:12px;background:#f5f8fd;padding:7px 10px;border-radius:8px;border:1px solid #dbe5f0;color:#2b4664}
+.d2-audit-kpis strong{font-weight:800;color:#003d77;font-size:16px;margin-right:4px}
+.d2-audit-details{border-top:1px solid #dfe8f4;padding-top:12px}
+.d2-audit-details summary{font-weight:750;font-size:13px;color:#0053a5;cursor:pointer}
+.d2-audit-scroll{margin-top:10px;max-height:380px;overflow:auto}
+.d2-audit-scroll .d2-wo-table{min-width:850px}

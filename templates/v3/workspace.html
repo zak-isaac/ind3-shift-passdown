@@ -56,6 +56,11 @@
    {% if staged %}<form method="post" action="/v3/import/{{ staged.token }}/confirm" class="d2-dialog-body">
      <input type="hidden" name="shift_id" value="{{ shift.id }}">
      <p>Detected <strong>{{ staged.counts|length }} technicians</strong> and <strong>{{ staged.total_rows }} labor rows</strong> in <strong>{{ staged.filename }}</strong>. Select only the technicians who worked your shift.</p>
+     {% if staged.preview is defined %}
+     <p><strong>File preview:</strong> {{ staged.preview.work_orders }} unique WOs ·
+        {{ staged.preview.closed }} Closed · {{ staged.preview.completed }} Completed · {{ staged.preview.other }} other status.
+        Counts are from the file before shift filtering.</p>
+     {% endif %}
      <div class="d2-tech-toolbar"><input type="search" id="v3-tech-search" placeholder="Search technicians by name" aria-label="Search technicians"><button type="button" class="button button-outline" onclick="v3ToggleAllTechs(true)">Select all</button><button type="button" class="button button-outline" onclick="v3ToggleAllTechs(false)">Clear all</button></div>
      <div class="d2-tech-grid">{% for t in staged.counts %}<label class="d2-tech-choice"><input type="checkbox" name="techs" value="{{ t.name }}" {% if (staged.checked_techs is defined and t.name in staged.checked_techs) or (staged.checked_techs is not defined and (t.name in selected_techs or (not imported_filename and t.assigned))) %}checked{% endif %}><span>{{ t.name }}{% if is_dev_mode %} · {{ t.shift_label }}{% elif t.assigned %} · Assigned{% else %} · Other shift / OT{% endif %}</span><small>{{ t.count }} record{{ 's' if t.count != 1 else '' }}</small></label>{% endfor %}</div>
      {% if staged.split_review is defined and staged.split_review %}
@@ -107,6 +112,37 @@
  </section>
  {% endif %}
 
+
+ {% if import_audit %}
+ <section class="card d2-import-audit" aria-label="Imported WO audit">
+   <div class="section-head"><div><h2>Imported WO audit</h2>
+     <p>Review all source work orders excluded from this shift; these records never count toward Shift Happenings or PMs.</p></div></div>
+   <div class="d2-audit-kpis">
+     <span><strong>{{ import_audit.work_orders }}</strong> source WOs</span>
+     <span><strong>{{ import_audit.technicians }}</strong> file technicians</span>
+     <span><strong>{{ import_audit.selected_technicians }}</strong> selected</span>
+     <span><strong>{{ import_audit.included_work_orders }}</strong> included</span>
+     <span><strong>{{ import_audit.ignored_count }}</strong> not counted</span>
+     <span><strong>{{ import_audit.oos_work_orders }}</strong> OOS separately</span>
+   </div>
+   {% if import_audit.ignored_count %}
+   <details class="d2-audit-details">
+     <summary>Show {{ import_audit.ignored_count }} ignored / other-shift WOs and reasons</summary>
+     <div class="d2-audit-scroll"><table class="d2-wo-table"><thead>
+       <tr><th>WO #</th><th>Asset</th><th>Status</th><th>Technicians</th><th>Labor start</th><th>Why not counted</th></tr></thead><tbody>
+       {% for item in import_audit.ignored %}
+       <tr><td>{{ item.wo_number }}</td><td>{{ item.asset_id }}</td><td>{{ item.status }}</td>
+         <td>{{ item.technicians }}</td><td>{{ item.start_at or 'Not recorded' }}</td><td>{{ item.reason }}</td></tr>
+       {% endfor %}
+       </tbody></table></div>
+   </details>
+   {% else %}<p>All source WOs were counted or tracked as OOS.</p>{% endif %}
+ </section>
+ {% elif imported_filename %}
+ <section class="card d2-import-audit"><h2>Imported WO audit</h2>
+   <p>This report was imported before the audit feature. Re-upload the Cetaris Excel file to see excluded WOs and reasons.</p>
+ </section>
+ {% endif %}
  <div class="workspace-grid d2-workspace-grid">
  <section class="card happenings d2-happenings" id="happenings">
    <div class="section-head d2-happenings-head"><div><h2>Shift happenings <span class="count-label">{{ happenings|length }}</span></h2><p>Closed non-PM work orders and MST-approved Completed reminders.</p></div><button class="button button-outline" onclick="v3OpenManual()" type="button">Manual entry</button></div>

@@ -16,6 +16,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 import db
 import v3_breakdown
 import v3_split
+from v3_import_audit import build_audit, preview_status
 from v3_cetaris import parse_excel, select_records, technician_counts, MAX_SIZE
 from v3_proofread import proofread
 from v3_report_layout import build_shift_happenings
@@ -351,6 +352,11 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                   filename TEXT NOT NULL DEFAULT '',
                   imported_at TEXT NOT NULL DEFAULT ''
                 );
+                CREATE TABLE IF NOT EXISTS v3_import_audit (
+                  shift_id INTEGER PRIMARY KEY,
+                  filename TEXT NOT NULL DEFAULT '',
+                  audit_json TEXT NOT NULL DEFAULT '{}'
+                );
                 CREATE TABLE IF NOT EXISTS v3_shift_source (
                   shift_id INTEGER PRIMARY KEY, filename TEXT NOT NULL, rows_json TEXT NOT NULL
                 );
@@ -403,6 +409,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             meta_rows = c.execute("SELECT * FROM v3_entry_meta WHERE shift_id=?", (shift_id,)).fetchall()
             pm_rows = c.execute("SELECT * FROM pm_wos WHERE shift_id=? ORDER BY wo_number", (shift_id,)).fetchall()
             selection = c.execute("SELECT * FROM v3_shift_selection WHERE shift_id=?", (shift_id,)).fetchone()
+            audit_row = c.execute("SELECT audit_json FROM v3_import_audit WHERE shift_id=?", (shift_id,)).fetchone()
             reminders = {r[0] for r in c.execute(
                 "SELECT wo_number FROM v3_pending_closure WHERE shift_id=? AND decision='add'",
                 (shift_id,)).fetchall()}
@@ -441,6 +448,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             "selected_techs": json.loads(selection["technicians_json"]) if selection else [],
             "selected_split_techs": json.loads(selection["split_techs_json"]) if selection else [],
             "imported_filename": selection["filename"] if selection else "",
+            "import_audit": json.loads(audit_row["audit_json"]) if audit_row else None,
             "imported_at": selection["imported_at"] if selection else "",
             "pending_breakdowns": v3_breakdown.pending(db),
         }
@@ -588,6 +596,11 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         if extra.get("staged"):
             extra["staged"]={**extra["staged"],
                              "counts":roster_technician_counts(extra["staged"]["counts"],shift)}
+            with db._conn() as c:
+                batch_preview = c.execute("SELECT rows_json FROM v3_import_batches WHERE token=?",
+                                          (extra["staged"]["token"],)).fetchone()
+            if batch_preview:
+                extra["staged"]["preview"] = preview_status(json.loads(batch_preview["rows_json"]))
         context = {
             "shift":shift,
             "is_dev_mode": __import__("dev_mode").is_active(),
@@ -889,6 +902,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                         "checked_closure_decisions": closure_decisions})
         records,stats=select_records(attributed,selected,*window,
                                      closure_reviews=closure_decisions)
+        audit_result = build_audit(rows,selected,attributed,records)
         # Cross-shift completion credit must be unique across the database,
         # including older PM records. Never silently overwrite another shift.
         completed_wos={r["wo_number"] for r in records if r["kind"] in ("pm","happening")}
@@ -1088,6 +1102,9 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                 c.execute("DELETE FROM v3_pending_closure WHERE shift_id=? AND wo_number=?",
                           (shift_id,wo))
         with db._conn() as c:
+            c.execute("INSERT INTO v3_import_audit(shift_id,filename,audit_json) VALUES (?,?,?) "
+                      "ON CONFLICT(shift_id) DO UPDATE SET filename=excluded.filename,audit_json=excluded.audit_json",
+                      (shift_id,batch["filename"],json.dumps(audit_result)))
             c.execute("INSERT INTO v3_shift_source(shift_id,filename,rows_json) VALUES (?,?,?) "
                       "ON CONFLICT(shift_id) DO UPDATE SET filename=excluded.filename,rows_json=excluded.rows_json",
                       (shift_id,batch["filename"],batch["rows_json"]))
@@ -1097,6 +1114,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             c.execute("DELETE FROM v3_import_batches WHERE token=?",(token,))
         ollama_drafts.queue_shift(shift_id)
         notice=f"Imported {added} new technician/WO entries; {unchanged} unchanged; {pending} flagged for review. {stats.get('unique_pm_wos',0)} distinct Completed or Closed PM WOs in this import."
+        notice += f" Audit: {audit_result['work_orders']} source WOs, {audit_result['included_work_orders']} included, {audit_result['ignored_count']} not counted. Review the audit below."
         skipped_parts=[]
         if stats.get("not_closed"):
             skipped_parts.append(f"{stats['not_closed']} not yet closed")
