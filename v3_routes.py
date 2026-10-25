@@ -802,7 +802,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         # Every shift (including Thursday S3 carried into Friday morning)
         # uses the same WO ownership engine. Roster home shifts resolve
         # overlapping handovers; explicit selected OT still remains selectable.
-        split_selected=set(split_techs) & selected if shift["shift_type"]=="S5" else set()
+        split_selected=set(selected) if shift["shift_type"]=="S5" else set()
         roster_shifts={}
         if get_mst_roster is not None:
             import re
