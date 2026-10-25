@@ -56,6 +56,16 @@ def rewrite_wo(remarks: list[str]) -> Draft:
                "braking" in n.casefold() and "plugging" in n.casefold()]
     if len(notes) == 2 and len(wheels) == 1 and len(metrics) == 1:
         m = metrics[0]
+        # Only accept precisely three known measurement clauses. If an extra
+        # action or observation appears, preserve it rather than dropping it.
+        exact_metrics = re.fullmatch(
+            r"\s*blue\s+light\s*:?\s*\d+(?:\.\d+)?\s*(?:ft|feet)"
+            r"[\s,;]*braking\s*:?\s*\d+(?:\.\d+)?\s*(?:ft|feet)"
+            r"[\s,;]*plugging\s*:?\s*\d+(?:\.\d+)?\s*(?:ft|feet)[.!]?\s*",
+            m, flags=re.I,
+        )
+        if not exact_metrics:
+            return _preserved(notes, "Additional text beyond verified measurements")
         found = []
         for label in ("blue light", "braking", "plugging"):
             match = re.search(r"\b"+label+r"\s*:?\s*(\d+(?:\.\d+)?)\s*(ft|feet)\b",
