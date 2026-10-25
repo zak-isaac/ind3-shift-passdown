@@ -364,7 +364,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         rewritten = {h.wo_number: h.paragraph for h in build_shift_happenings(
             entries, meta, approved_remarks=ollama_drafts.approved_for_report(shift_id)
         ) if h.wo_number}
-        ai_states = {str(item["wo_number"]): item["status"] for item in ollama_drafts.statuses(shift_id)}
+        ai_states = {str(item["wo_number"]): item for item in ollama_drafts.statuses(shift_id)}
         for group in groups.values():
             wo = str(group["wo_number"] or "")
             group["ai_eligible"] = bool(wo and not group["excluded"] and
@@ -372,7 +372,8 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             fallback = "; ".join(value for line in group["rows"] for value in line["remarks_list"])
             group["original_remarks"] = originals.get(wo) or fallback or "No technician remarks recorded."
             group["display_remarks"] = (rewritten.get(wo) if group["ai_eligible"] else None) or group["original_remarks"]
-            group["ai_status"] = ai_states.get(wo, "")
+            group["ai_status"] = ai_states.get(wo, {}).get("status", "")
+            group["ai_approved"] = bool(ai_states.get(wo, {}).get("approved"))
         return {
             "happenings": list(groups.values()),
             "pm_wos": [dict(p) for p in pm_rows],
@@ -1168,6 +1169,19 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
     async def ai_draft_status(request: Request, shift_id:int):
         secure(request, shift_id)
         return {"drafts": ollama_drafts.statuses(shift_id)}
+
+    @router.post("/ai/drafts/review")
+    async def ai_review(request: Request, shift_id:int=Form(...),
+                        wo_number:str=Form(...),source_hash:str=Form(...),
+                        decision:str=Form(...)):
+        secure(request, shift_id)
+        if decision not in ("accept", "original"):
+            raise HTTPException(400,"Invalid AI draft decision")
+        if not ollama_drafts.review_draft(shift_id, wo_number, source_hash,
+                                           accept=decision=="accept"):
+            raise HTTPException(409,"AI draft is stale or no longer eligible; refresh before reviewing")
+        return return_workspace(shift_id, "AI draft accepted for this WO" if decision=="accept"
+                                 else "Original technician remarks retained")
 
     @router.get("/preview",response_class=HTMLResponse)
     async def preview(request:Request,shift_id:int):
