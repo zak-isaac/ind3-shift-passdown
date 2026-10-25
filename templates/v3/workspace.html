@@ -75,6 +75,22 @@
        {% endfor %}
      </div>
      {% endif %}
+     {% if staged.closure_review is defined and staged.closure_review %}
+     <section class="d2-dialog-note" aria-label="Completed WO closure review">
+       <strong>Completed work orders need Cetaris closure</strong>
+       <p>These work orders are marked Completed but not Closed. Choose what goes into this shift's passdown. Items added here are reminders only and are not counted as completed PMs.</p>
+       {% for wo, code in staged.confirmed_split_decisions.items() %}
+       <input type="hidden" name="split_wo_{{ wo }}" value="{{ code }}">
+       {% endfor %}
+       {% for item in staged.closure_review %}
+       <fieldset class="v3-closure-choice">
+         <legend>WO #{{ item.wo_number }} · {{ item.asset_id }} · {{ item.rfr }} · {{ item.technicians }}</legend>
+         <label><input type="radio" name="completed_wo_{{ item.wo_number }}" value="add" required {% if staged.checked_closure_decisions.get(item.wo_number) == 'add' %}checked{% endif %}> Add to Passdown and remind technicians to close the WO before shift end</label>
+         <label><input type="radio" name="completed_wo_{{ item.wo_number }}" value="ignore" {% if staged.checked_closure_decisions.get(item.wo_number) == 'ignore' %}checked{% endif %}> Ignore</label>
+       </fieldset>
+       {% endfor %}
+     </section>
+     {% endif %}
      <div class="d2-tech-total" id="v3-tech-total" aria-live="polite">Select the technicians for this shift</div>
      <div class="d2-dialog-actions"><button type="button" class="button button-outline" onclick="v3CloseTechs()">Cancel</button><button type="submit" class="button button-blue">Confirm Technicians &amp; Extract</button></div>
    </form>{% else %}<div class="d2-dialog-body"><p>Upload a Cetaris file first to retrieve the technician list.</p></div>{% endif %}
