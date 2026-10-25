@@ -616,7 +616,7 @@ async def dev_exit():
     # Exit test mode and clear the sandbox's V3 manager session together.
     # Redirect to V3 login, never the retired V2 home.
     resp = RedirectResponse("/v3/login", status_code=303)
-    for cookie in (dev_mode.DEV_COOKIE, "v3_session", "lead_auth",
+    for cookie in (dev_mode.DEV_COOKIE, "ind3_v3_mst_session", "lead_auth",
                    "lead_shift_id", "mgr_session", "tech_assoc",
                    "tech_shift", "tech_name"):
         resp.delete_cookie(cookie, path="/")
