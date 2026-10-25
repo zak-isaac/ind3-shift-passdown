@@ -16,7 +16,7 @@ def test_bag0002_semantic_duplicate():
 
 def test_two_tech_identical_notes_not_repeated():
     d = rewrite_wo(["Motor Brush clean up", "Motor Brush clean up"])
-    assert d.text == "Motor Brush clean up"
+    assert d.text == "Cleaned the motor brush."
 
 def test_complex_wo_preserves_distinct_details():
     remarks = ["Code 222 overheat. Reflashed software.",
