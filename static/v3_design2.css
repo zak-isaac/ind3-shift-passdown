@@ -137,3 +137,31 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
 .d2-audit-details summary{font-weight:750;font-size:13px;color:#0053a5;cursor:pointer}
 .d2-audit-scroll{margin-top:10px;max-height:380px;overflow:auto}
 .d2-audit-scroll .d2-wo-table{min-width:850px}
+
+
+/* Restored production sidebar controls from the original Workshop UI.
+   Keep styles scoped to the sidebar so the current live-clock topbar is untouched. */
+.design2-shell .navy-sidebar .d2-sidebar-profile {
+  display:flex;align-items:center;gap:9px;padding:12px 13px;margin:2px 5px;
+  border-top:1px solid #1d3c70;border-bottom:1px solid #1d3c70;
+}
+.design2-shell .navy-sidebar .d2-profile-info { min-width:0; }
+.design2-shell .navy-sidebar .d2-profile-info b {
+  display:block;color:#fff;font-size:12px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;
+}
+.design2-shell .navy-sidebar .d2-profile-info small {
+  display:block;color:#c5d6ef;font-size:10px;
+}
+.design2-shell .navy-sidebar .d2-avatar {
+  width:29px;height:29px;flex:none;display:grid;place-items:center;border-radius:50%;
+  background:#d9e7ff;color:#0b57bc;font-size:10px;font-weight:900;
+}
+.design2-shell .navy-sidebar .d2-signout {
+  display:block;text-align:center;margin:10px 13px 16px;padding:9px 11px;
+  border:1px solid #3a567f;border-radius:7px;color:#ffd0d0;
+  font-size:12px;font-weight:700;text-decoration:none;
+}
+.design2-shell .navy-sidebar .d2-signout:hover {
+  background:#2a4d80;border-color:#4a6da0;
+}
