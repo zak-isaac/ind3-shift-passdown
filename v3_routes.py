@@ -774,6 +774,8 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         for raw in attributed:
             if str(raw.get("status", "")).strip().casefold() != "completed":
                 continue
+            if str(raw.get("rfr", "")).strip().casefold() in ("preventive maintenance", "preventative maintenance"):
+                continue  # Completed PMs are automatically counted, no popup.
             wo = str(raw.get("wo_number", "")).strip()
             if wo and wo not in already_closed:
                 item = closure_candidates.setdefault(wo, {
@@ -1007,7 +1009,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                       "ON CONFLICT(shift_id) DO UPDATE SET technicians_json=excluded.technicians_json,filename=excluded.filename,imported_at=excluded.imported_at,split_techs_json=excluded.split_techs_json",
                       (shift_id,json.dumps(sorted(selected)),batch["filename"],datetime.now().strftime("%Y-%m-%d %H:%M"),json.dumps(sorted(split_selected))))
             c.execute("DELETE FROM v3_import_batches WHERE token=?",(token,))
-        notice=f"Imported {added} new technician/WO entries; {unchanged} unchanged; {pending} flagged for review. {stats.get('unique_pm_wos',0)} distinct closed PM WOs in this import."
+        notice=f"Imported {added} new technician/WO entries; {unchanged} unchanged; {pending} flagged for review. {stats.get('unique_pm_wos',0)} distinct Completed or Closed PM WOs in this import."
         skipped_parts=[]
         if stats.get("not_closed"):
             skipped_parts.append(f"{stats['not_closed']} not yet closed")
