@@ -86,7 +86,10 @@ def build_shift_happenings(entries: list[dict], meta_by_id: dict[int, dict]
         RewrittenHappening(
             title=g["asset"],
             cause=g["cause"],
-            paragraph=(None if g["mst_edited"] else approved_remarks.get(g["wo_number"])) or ("; ".join(g["remarks"]) if g["remarks"] else "No technician remarks recorded."),
+            paragraph=proofread(
+                (None if g["mst_edited"] else approved_remarks.get(g["wo_number"]))
+                or ("; ".join(g["remarks"]) if g["remarks"] else "No technician remarks recorded.")
+            ),
             wo_number=g["wo_number"],
         )
         for g in groups.values()
