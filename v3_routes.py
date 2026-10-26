@@ -492,6 +492,9 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         secure(request,shift_id)
         if unit not in db.get_rts_events(shift_id): raise HTTPException(404,"RTS record not found")
         db.delete_rts_event(shift_id,unit)
+        # An explicit MST removal must remain removed when the same Cetaris
+        # export is imported again; do not let legacy RTS repair undo it.
+        v3_breakdown.suppress_rts_reimport(db,shift_id,unit)
         return return_workspace(shift_id,"RTS log entry removed")
 
     @router.post("/breakdown/confirm")
