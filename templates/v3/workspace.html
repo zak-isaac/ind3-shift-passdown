@@ -90,6 +90,28 @@
  </section>
  {% endif %}
 
+ {% if pending_import_review %}
+ <section class="card" aria-label="Needs Review: excluded work orders">
+   <h2>Needs Review — Excluded Work Orders</h2>
+   <p>These work orders were excluded from this shift's import because the evidence was ambiguous (shown below). If you know this work genuinely belongs to this shift, Include it; otherwise Dismiss to acknowledge and clear it.</p>
+   {% for item in pending_import_review %}
+   <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid #dde5ee">
+     <strong>{{ item.asset_id }} · WO #{{ item.wo_number }}</strong>
+     <span style="color:#6b7280;font-size:13px;">{{ item.reason }}</span>
+     <span style="margin-left:auto;display:flex;gap:8px;">
+       <form method="post" action="/v3/import-review/{{ item.id }}/include" style="display:inline;">
+         <input type="hidden" name="shift_id" value="{{ shift.id }}">
+         <button class="button button-outline" type="submit">Include</button>
+       </form>
+       <form method="post" action="/v3/import-review/{{ item.id }}/dismiss" style="display:inline;">
+         <input type="hidden" name="shift_id" value="{{ shift.id }}">
+         <button class="button button-outline" type="submit">Dismiss</button>
+       </form>
+     </span>
+   </div>
+   {% endfor %}
+ </section>
+ {% endif %}
 
  {% if import_audit %}
  <section class="d2-import-check" aria-label="Cetaris import summary">

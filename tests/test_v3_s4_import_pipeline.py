@@ -77,8 +77,12 @@ def test_s4_three_closed_wos_and_older_ignored_wo_are_visible(tmp_path):
         screen=client.get(f"/v3?shift_id={shift_id}")
         assert screen.status_code==200,screen.text[:800]
         assert "Cetaris import summary" in screen.text
-        assert "28025555" not in screen.text
-        assert "Outside this shift" not in screen.text
+        # 2026-10-26: this WO has genuinely ambiguous evidence (old September
+        # labor date), so it now legitimately appears in the actionable
+        # Needs Review panel -- but must never be counted as a real entry.
+        assert "28025555" not in {x["wo_number"] for x in db.get_entries(shift_id)}
+        assert "Needs Review" in screen.text and "28025555" in screen.text
+        assert "Outside this shift" in screen.text
         with db._conn() as c:
             audit=c.execute("SELECT audit_json FROM v3_import_audit WHERE shift_id=?",(shift_id,)).fetchone()
         assert audit and "28025555" in audit["audit_json"]
@@ -86,3 +90,40 @@ def test_s4_three_closed_wos_and_older_ignored_wo_are_visible(tmp_path):
         assert "28025965" in screen.text
         assert "28025970" in screen.text
         assert len({e["wo_number"] for e in db.get_entries(shift_id)})==3
+
+
+def test_import_rejects_by_content_not_filename_extension(tmp_path):
+    db.set_db_path(tmp_path / "content_validation.db")
+    db.init_db()
+    shift_id = db.start_shift("2026-10-25", "S4", "Test MST")
+    app = FastAPI()
+    app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
+    app.include_router(create_v3_router(
+        Jinja2Templates(directory=str(ROOT / "templates")),
+        is_lead_authed=lambda request: request.cookies.get("lead_auth") == "test",
+        can_manage_shift=lambda request, sid: sid == shift_id,
+        resolve_my_shift=lambda request: db.get_shift(shift_id),
+        shift_window=lambda st, day: (
+            datetime.combine(day, time(5, 30)), datetime.combine(day, time(18, 0))
+        ),
+        lead_redirect=lambda dest: RedirectResponse("/v3/login", status_code=303),
+        now_func=lambda: datetime(2026, 10, 25, 15, 0)
+    ))
+    book = Workbook()
+    sheet = book.active
+    sheet.append(HEADERS)
+    sheet.append(labor("28025869", "Carr, Alexander", "2026-10-25T08:30:00"))
+    buf = BytesIO()
+    book.save(buf)
+    with TestClient(app) as client:
+        client.cookies.set("lead_auth", "test")
+        accepted = client.post("/v3/import", data={"shift_id": str(shift_id)},
+            files={"file": ("export_from_kiosk_no_ext", buf.getvalue(), "application/octet-stream")})
+        assert accepted.status_code == 200, accepted.text[:500]
+        assert "1 unique WOs" in accepted.text
+        rejected = client.post("/v3/import", data={"shift_id": str(shift_id)},
+            files={"file": ("not_actually_cetaris.xlsx", b"just some random bytes", "application/octet-stream")})
+        assert rejected.status_code == 200
+        empty = client.post("/v3/import", data={"shift_id": str(shift_id)})
+        assert empty.status_code == 200
+        assert "No file was selected" in empty.text

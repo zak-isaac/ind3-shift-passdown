@@ -71,12 +71,18 @@ def build_audit(rows, selected, attributed, records, conflicting_wos=None,
         else:
             why = "Not eligible for this passdown"
         sample = selected_lines[0] if selected_lines else items[0]
+        # Only genuinely evidence-ambiguous reasons are offered for manual
+        # MST inclusion (see v3_import_review.py) -- never a WO that's
+        # already credited elsewhere, not from a selected technician, or
+        # not yet Closed/Completed. Those are clear-cut exclusions, not
+        # judgment calls, and must never be silently overridden.
+        includable = why.startswith("No automatic ownership") or why.startswith("Outside this shift")
         ignored.append({
             "wo_number":wo, "asset_id":sample.get("asset_id") or "",
             "status":", ".join(sorted({str(r.get("status") or "Unknown") for r in items})),
             "technicians":", ".join(sorted({str(r.get("tech_name") or "") for r in items})),
             "start_at":sample.get("start_at") or "",
-            "reason":why
+            "reason":why, "includable":includable, "raw_row":sample,
         })
     ignored.sort(key=lambda r:(r["start_at"],r["wo_number"]),reverse=True)
     # Sunday-morning labor still belongs to Saturday S5. Show distinct

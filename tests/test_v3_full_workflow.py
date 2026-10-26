@@ -115,7 +115,11 @@ def test_full_login_import_ai_preview_and_eml(tmp_path,monkeypatch):
         assert state.get("28030001",{}).get("status")=="passed",state
         page=browser.get("/v3",params={"shift_id":sid})
         assert page.status_code==200
-        assert "28030003" not in page.text  # Ignored WOs stay in the backend audit, not the dashboard
+        # 2026-10-26: ignored WOs with genuinely ambiguous evidence now
+        # appear in an actionable Needs Review panel (Include/Dismiss) --
+        # but must never be counted as a real Shift Happening or PM entry.
+        assert "28030003" not in {x["wo_number"] for x in db.get_entries(sid)}
+        assert "Needs Review" in page.text and "28030003" in page.text
         rewritten="Checked column tension and recalibrated the side guide. RTS."
         assert rewritten in page.text
         assert 'data-ai-remark-wo="28030001"' in page.text

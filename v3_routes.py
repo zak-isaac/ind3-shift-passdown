@@ -15,6 +15,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 import db
 import v3_breakdown
+import v3_import_review
 from v3_cetaris_analytics import get_cetaris_analytics
 import v3_split
 from v3_import_audit import build_audit, preview_status
@@ -450,6 +451,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             "imported_at": selection["imported_at"] if selection else "",
             "ai_enabled": ollama_drafts.enabled(),
             "pending_breakdowns": v3_breakdown.pending(db),
+            "pending_import_review": v3_import_review.pending(db, shift_id),
         }
 
     def _remarks(e):
@@ -528,6 +530,20 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                     decisions[wo]=value
         v3_breakdown.decide(db,shift_id,decisions)
         return return_workspace(shift_id,"Breakdown RTS decisions saved")
+
+    @router.post("/import-review/{review_id}/include")
+    async def v3_import_review_include(request:Request,review_id:int,shift_id:int=Form(...)):
+        secure(request,shift_id)
+        if not v3_import_review.include(db,shift_id,review_id):
+            raise HTTPException(404,"Review item not found, already resolved, or not includable")
+        return return_workspace(shift_id,"Work order included in this shift")
+
+    @router.post("/import-review/{review_id}/dismiss")
+    async def v3_import_review_dismiss(request:Request,review_id:int,shift_id:int=Form(...)):
+        secure(request,shift_id)
+        if not v3_import_review.dismiss(db,shift_id,review_id):
+            raise HTTPException(404,"Review item not found or already resolved")
+        return return_workspace(shift_id,"Work order dismissed from review")
 
     @router.post("/vendor/add")
     async def v3_vendor_add(request:Request,shift_id:int=Form(...),name:str=Form(...),notes:str=Form("")):
@@ -901,10 +917,17 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                                            "counts":technician_counts(records),"total_rows":len(records)})
 
     @router.post("/import",response_class=HTMLResponse)
-    async def stage_import(request:Request,shift_id:int=Form(...),file:UploadFile=File(...)):
+    async def stage_import(request:Request,shift_id:int=Form(...),file:UploadFile|None=File(default=None)):
         shift=secure(request,shift_id)
-        if not file.filename or not file.filename.lower().endswith(".xlsx"):
-            return render(request,shift,warning="Please upload a Cetaris Desktop .xlsx report.")
+        if file is None or not file.filename or not file.filename.strip():
+            return render(request,shift,warning="No file was selected. Choose your Cetaris work order export and try again.")
+        # No filename/extension gate here on purpose (2026-10-26, ported idea):
+        # the exact device/browser a tech exports from can produce odd
+        # filenames (missing or duplicated extensions, re-saved copies).
+        # parse_excel() below validates by actual CONTENT -- it opens the
+        # file as a real workbook and checks for the expected columns -- so
+        # rejection is based on whether the data IS a real Cetaris export,
+        # never on what the filename happens to look like.
         data=await file.read(MAX_SIZE + 1)
         try:
             parse_stats={}
@@ -1040,6 +1063,10 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
                                    conflicting_wos=conflicting_wos,
                                    shift_type=shift["shift_type"],shift_day=shift["date"],
                                    unresolved_wos=unresolved)
+        # Persist which excluded WOs are genuinely evidence-ambiguous (not
+        # just a read-only audit line) so the MST can review and, for the
+        # specific includable ones, manually pull a single WO back in.
+        v3_import_review.record(db,shift_id,audit_result.get("ignored",[]))
         v3_breakdown.sync(db,rows,selected,shift_id,
                           allowed_new_wos={r["wo_number"] for r in attributed})
         added,unchanged,pending=0,0,0
