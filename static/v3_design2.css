@@ -267,3 +267,7 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
 .d2-work-time time { display:block;font-variant-numeric:tabular-nums;white-space:nowrap; }
 .d2-work-time small {color:#62758c;font-weight:400;font-size:11px; }
 .d2-next-day {display:inline-block;border-radius:4px;margin-top:5px;padding:3px 5px;background:#e2efff;color:#1256b9;font-size:10px;font-weight:750;line-height:1.25; }
+
+/* Compact, visible explanation when Ollama safely restores source remarks. */
+.v3-ai-fallback-reason { display:block;max-width:190px;margin-top:3px;color:#73541c;font-size:10px;line-height:1.3;overflow-wrap:anywhere; }
+.v3-ai-fallback-reason[hidden] { display:none; }
