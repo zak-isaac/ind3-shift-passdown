@@ -138,7 +138,8 @@ def test_real_s5_prompt_echoes_fail_and_originals_survive():
 def test_real_s5_rejects_new_work_even_when_other_source_terms_match():
     original=["Cleaned the taper blade and reset the module."]
     good,reason=ai._verify(original,"Cleaned the taper blade, replaced the fuse, and reset the module.")
-    assert not good and "unsupported words" in reason.casefold()
+    assert not good and "unsupported" in reason.casefold()
+    assert "replace" in reason.casefold() or "fuse" in reason.casefold()
     good,reason=ai._verify(original,"Cleaned the taper blade and reset the module.")
     assert good, reason
 
