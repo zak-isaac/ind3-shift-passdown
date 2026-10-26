@@ -17,6 +17,9 @@ def proofread(value: str) -> str:
     if not value or not isinstance(value, str):
         return value
     text = correct_spelling(value)
+    # Standalone first-person "i" is ordinary English, but never rewrite an
+    # identifier (MDR0016, VFD, O-Ring), model number or part code.
+    text = re.sub(r"(?<![A-Za-z0-9])i(?![A-Za-z0-9])", "I", text)
     text = fix_punctuation_spacing(text)
     text = fix_sentence_capitalization(text)
     text = _START_RE.sub(lambda match: match.group(1) + match.group(2).upper(), text)
