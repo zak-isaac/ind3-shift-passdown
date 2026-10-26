@@ -237,14 +237,27 @@ def _generate(item: sqlite3.Row) -> tuple[str, str, str]:
     }).encode()
     req = urllib.request.Request("http://127.0.0.1:11434/api/chat", data=data,
                                  headers={"Content-Type": "application/json"}, method="POST")
+    # Large Cetaris imports can contain dozens of grouped WOs. Use a
+    # bounded per-WO timeout, so an unresponsive local model cannot block the
+    # entire queue indefinitely. Never call a remote model with Cetaris data.
     try:
-        with urllib.request.urlopen(req, timeout=90) as response:
+        timeout = max(5, min(180, int(os.environ.get("IND3_OLLAMA_TIMEOUT_SEC", "45"))))
+    except (TypeError, ValueError):
+        timeout = 45
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
             payload = json.load(response)
         draft = str(payload.get("message", {}).get("content", "")).strip()
         good, reason = _verify(notes, draft)
         return (draft, "passed", "Automatic source validation passed") if good else ("", "original", reason)
-    except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
-        return "", "original", "Ollama unavailable or request failed: " + type(exc).__name__
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            message = "Local Ollama model or endpoint not found (HTTP 404). Check ollama list."
+        else:
+            message = f"Local Ollama rejected the request (HTTP {exc.code})."
+        return "", "original", message
+    except (TimeoutError, OSError, urllib.error.URLError, ValueError) as exc:
+        return "", "original", f"Local Ollama request failed or exceeded {timeout}s: {type(exc).__name__}"
 
 def _worker(path: Path) -> None:
     try:
@@ -257,7 +270,14 @@ def _worker(path: Path) -> None:
                     break
                 c.execute("UPDATE v3_ollama_drafts SET status='writing' WHERE shift_id=? AND wo_number=? AND source_hash=?",
                           (row["shift_id"],row["wo_number"],row["source_hash"]))
-            draft, status, reason = _generate(row)
+            try:
+                draft, status, reason = _generate(row)
+            except Exception as exc:
+                # Unexpected backend errors must never kill the queue worker
+                # and strand every remaining work order as AI Processing.
+                # Do not log the original technician text or error payload.
+                draft, status = "", "original"
+                reason = "Local AI processing error (" + type(exc).__name__ + "); original remarks retained"
             with _connect(path) as c:
                 # CAS ensures re-import/approval is never overwritten by an old AI result.
                 c.execute("""UPDATE v3_ollama_drafts SET draft=?,status=?,reason=?,approved=0
@@ -327,7 +347,30 @@ def _eligible_drafts(shift_id: int) -> tuple[list[dict], dict[str, str]]:
 
 
 def statuses(shift_id: int) -> list[dict]:
+    """Return truthful progress and repair orphaned queue/writing states.
+
+    The worker may disappear when Mac Terminal/server restarts while Ollama
+    is still generating a WO. A status poll restarts only pending work;
+    never marks a draft Passed until its source is verified.
+    """
     drafts, _ = _eligible_drafts(shift_id)
+    if enabled() and any(r["status"] in ("queued", "writing") for r in drafts):
+        start_worker(_db_path())
+        drafts, _ = _eligible_drafts(shift_id)
+    pending = [r for r in drafts if r["status"] in ("queued", "writing")]
+    queued = [r for r in drafts if r["status"] == "queued"]
+    for r in drafts:
+        r["queue_total"] = len(pending)
+        if r["status"] == "queued":
+            r["queue_position"] = next(
+                (i + 1 for i, item in enumerate(queued)
+                 if item["wo_number"] == r["wo_number"]), 0)
+            r["reason"] = "Queued for local Ollama; " + str(len(pending)) + " remaining"
+        elif r["status"] == "writing":
+            r["queue_position"] = 0
+            r["reason"] = "Local Ollama is rewriting this work order"
+        else:
+            r["queue_position"] = 0
     return drafts
 
 
