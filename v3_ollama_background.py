@@ -138,19 +138,106 @@ def _technical_tokens(text: str) -> set[str]:
         r"\b\d+(?:\.\d+)?\s*(?:psi|ft|feet|mm|v|vac|a|amps|rpm|°f|°c)\b"
         r"|\b(?:[A-Z]{2,}[-.]?\d{2,}|[A-Z]\d{3,})\b", text, re.I))
 
+# Action and component guardrails are intentionally restricted to claims that
+# can materially change a maintenance report. Free word-by-word equality is
+# not valid for human paraphrases ("changed" -> "replaced", "ran fine" ->
+# "operated normally"). Hard data is independently checked below.
+_ACTION_GROUPS = {
+    "replace": r"\b(?:replac\w*|chang(?:e|ed|ing)|swapp\w*|install\w*)\b",
+    "remove": r"\b(?:remov\w*|extract\w*|took\s+(?:out|off))\b",
+    "adjust": r"\b(?:adjust\w*|recalibrat\w*|calibrat\w*|align\w*|realign\w*)\b",
+    "clean": r"\b(?:clean\w*|wip\w*|clear\w*|wash\w*)\b",
+    "reconnect": r"\b(?:reconnect\w*|reattach\w*|reseat\w*|plugged\s+(?:in|back))\b",
+    "reset": r"\b(?:reset|reflash\w*|reboot\w*|power.?cycl\w*)\b",
+    "tighten": r"\b(?:tighten\w*|retighten\w*|secur\w*)\b",
+    "lubricate": r"\b(?:lubricat\w*|greas\w*|wd40)\b",
+    "inspect": r"\b(?:inspect\w*|check\w*|diagnos\w*|troubleshoot\w*|test\w*|monitor\w*|watch\w*|observ\w*|ran\s+\d+\s+(?:cases|boxes))\b",
+    "order": r"\b(?:order\w*|purchas\w*|request\w*)\b",
+    "lockout": r"\b(?:lock(?:ed)?\s*out|loto)\b",
+}
+# Some action families describe equivalent shop work. This is deliberately
+# not a general synonym generator; it is a guard against invented tasks.
+_ACTION_ALIASES = {
+    "replace": {"replace"}, "remove": {"remove"},
+    "adjust": {"adjust"}, "clean": {"clean"},
+    "reconnect": {"reconnect"}, "reset": {"reset"},
+    "tighten": {"tighten","reconnect"},
+    "lubricate": {"lubricate"}, "inspect": {"inspect"},
+    "order": {"order"}, "lockout": {"lockout"}
+}
+_PART_GROUPS = {
+    "fuse":r"\bfuses?\b", "valve":r"\bvalves?\b",
+    "filter":r"\bfilters?\b", "hose":r"\bhoses?\b",
+    "bearing":r"\bbearings?\b", "belt":r"\bbelts?\b",
+    "motor":r"\bmotors?\b", "sensor":r"\bsensors?\b",
+    "controller":r"\bcontrollers?\b", "roller":r"\brollers?\b",
+    "blade":r"\bblades?\b", "screw":r"\bscrews?\b",
+    "bolt":r"\bbolts?\b", "brake":r"\bbrakes?\b",
+    "battery":r"\bbatter(?:y|ies)\b", "wire":r"\bwires?\b",
+    "light":r"\blights?\b", "printer":r"\bprinters?\b",
+    "paper":r"\bpaper\b", "tape":r"\btape\b",
+    "head":r"\bheads?\b", "pad":r"\bpads?\b",
+    "pulley":r"\bpulleys?\b", "cable":r"\bcables?\b",
+    "reservoir":r"\breservoirs?\b", "coolant":r"\bcoolant\b",
+    "thermostat":r"\bthermostats?\b",
+    "box_or_case":r"\b(?:boxes|box|cases|case)\b",
+    "air_line":r"\b(?:air\s+lines?|airlines?)\b",
+}
+_SUCCESS_CUE = re.compile(
+    r"\b(?:rts|return(?:ed)?\s+to\s+service|resolved|fixed|repair(?:ed)?\s+completed|"
+    r"(?:back|returned)\s+to\s+normal|working\s+(?:good|fine|properly|normally)|"
+    r"(?:ran|running|operat(?:ing|ed)|function(?:ing|ed)?)\s+(?:good|fine|smoothly|normally|properly|well)|"
+    r"(?:no|without)\s+(?:further\s+)?(?:issues|faults|problems)|"
+    r"seams?\s+(?:ok|okay|good)|(?:ran|tested|watched)\s+\d+\s+(?:cases|boxes)\s+"
+    r"(?:without|with\s+no)\s+(?:issues|faults|problems))\b", re.I)
+_TERMS_STOPWORDS = {
+    "the","a","an","in","on","at","and","or","to","of","for","by","from",
+    "with","we","i","it","is","was","were","be","been","then","that",
+    "this","as","after","before","had","have","has","there","are",
+    "not","so","but","when","into","per","their","they","he","she",
+    "got","get","some","more","did","all","were","what","them","while",
+    "and","but","does","would","our","now","still",
+}
+
+
+def _factual_terms(value: str) -> set[str]:
+    value = proofread(value).casefold()
+    words = re.findall(r"[a-z0-9]+", value)
+    def stem(w):
+        if len(w)>6 and w.endswith("ing"):
+            w=w[:-3]
+        elif len(w)>5 and w.endswith("ed"):
+            w=w[:-2]
+        elif len(w)>5 and w.endswith("es"):
+            w=w[:-2]
+        elif len(w)>4 and w.endswith("s") and not w.endswith("ss"):
+            w=w[:-1]
+        return w
+    return {stem(w) for w in words if len(w)>2 and w not in _TERMS_STOPWORDS}
+
+
+def _ensure_short_contributions(notes: list[str], paragraph: str) -> str:
+    """Preserve simple second-technician notes without inventing their work.
+
+    Cetaris frequently has a second labor row containing only 'Assist'.
+    AI tends to drop it despite being a distinct documented contribution.
+    Preserve it in the accepted paragraph, without claiming an extra repair.
+    """
+    if any(note.strip().casefold().strip(".!") in
+           ("assist","assisted","assisting","helped","assistance")
+           for note in notes):
+        if not re.search(r"\bassist\w*|\bhelp(?:ed|ing)?\b", paragraph, re.I):
+            return paragraph.rstrip(" ;.") + "; Assisted."
+    return paragraph
+
+
 def _verify(source: list[str], result: str) -> tuple[bool, str]:
-    if not result.strip() or len(result) > 3000:
-        return False, "Empty or oversized draft"
-    src = " ".join(source)
-    # A small model can echo its SYSTEM prompt or produce meta-commentary.
-    # This is NEVER a maintenance action, even when other technical words
-    # appear in the same draft. Do not trim the phrase and guess what remains.
-    # Reject the *entire* AI draft and use the technician source instead.
-    _instruction_leaks = (
+    if not result.strip() or len(result)>3000:
+        return False,"Empty or oversized draft"
+    src=" ".join(source)
+    _instruction_leaks=(
         r"\bconsolidat(?:e|ed|ing|ion)\b",
         r"\bduplicat(?:e|ed|es|ing|ion)\b.{0,45}\b(?:action|remark|note|entr|line|word|statement|task|work)\b",
-        r"\b(?:action|remark|note|entr|line|word|statement|task|work)\b.{0,45}\bduplicat(?:e|ed|es|ing|ion)\b",
-        r"\bis\s+duplicat(?:e|ed)\b",
         r"\b(?:maintenance|technical|rewritten|consolidated)\s+(?:paragraph|summary|rewrite|note)\b",
         r"\b(?:source|original|technician)\s+remarks?\b",
         r"\b(?:remark|note)\s+\d+\s*:",
@@ -160,77 +247,69 @@ def _verify(source: list[str], result: str) -> tuple[bool, str]:
         r"\b(?:even if described in different wording|retain all distinct troubleshooting|reported issue .{0,15}context only)\b",
         r"\b(?:as an? ai|as (?:a|an) (?:technical|maintenance) editor|according to (?:the|your) instructions)\b",
     )
-    if any(re.search(pattern, result, re.I) for pattern in _instruction_leaks):
-        return False, "AI instruction or duplicate-analysis text leaked into technician remarks"
-    missing = _technical_tokens(src) - _technical_tokens(result)
-    if missing:
-        return False, "Missing technical tokens: " + ", ".join(sorted(missing))
-    if re.search(r"\bRTS\b|returned to service", result, re.I) and not re.search(
-        r"\bRTS\b|returned to service", src, re.I):
-        return False, "Unverified RTS"
-    if re.search(r"\b(?:technician|tech)\s*[A-Z0-9]\b", result, re.I):
-        return False, "Technician labels in draft"
-    for pattern in (r"\b(?:resolved|fully operational|fixed)\b",
-                    r"\b(?:ordered|received|delivered)\b"):
-        if re.search(pattern, result, re.I) and not re.search(pattern, src, re.I):
-            return False, "Potential unsupported outcome"
-    source_numbers = set(re.findall(r"(?<![a-z0-9])\d+(?:\.\d+)?(?![a-z0-9])", src, re.I))
-    output_numbers = set(re.findall(r"(?<![a-z0-9])\d+(?:\.\d+)?(?![a-z0-9])", result, re.I))
-    if source_numbers - output_numbers:
-        return False, "Missing source measurements or numeric values"
-    # Unsupported completion/clean bill-of-health filler must not be invented.
-    if re.search(r"\b(?:no (?:further )?(?:issues|faults|problems)(?: (?:observed|remain))?|"
-                r"running smoothly|fully functional|all systems operational)\b",result,re.I) and not re.search(
-                r"\b(?:no (?:further )?(?:issues|faults|problems)|"
-                r"running smoothly|fully functional|all systems operational)\b",src,re.I):
-        return False, "Unsupported all-clear claim"
-    # Conservative note-by-note coverage: reject dropped collaborator details.
-    # Good paraphrases may be rejected; original remarks are always available.
-    stopwords = {"the","a","an","in","on","at","and","or","to","of","for","by",
-                 "from","with","we","i","it","is","was","were","be","been",
-                 "then","that","this","as","after","before","had","have","has",
-                 "there","are","not","so","but","when","into","per"}
-    def facts(value):
-        value = proofread(value).casefold()
-        return {w for w in re.findall(r"[a-z0-9]+", value)
-                if len(w) > 2 and w not in stopwords}
-    out_facts = facts(result)
+    if any(re.search(pattern,result,re.I) for pattern in _instruction_leaks):
+        return False,"AI instruction or duplicate-analysis text leaked into technician remarks"
+
+    # Measurements, work order identifiers and numeric counts are hard
+    # evidence. Preserve every source value and reject any invented values.
+    source_technical=_technical_tokens(src)
+    draft_technical=_technical_tokens(result)
+    if source_technical-draft_technical:
+        return False,"Missing technical tokens: "+", ".join(sorted(source_technical-draft_technical))
+    if draft_technical-source_technical:
+        return False,"Invented technical tokens: "+", ".join(sorted(draft_technical-source_technical))
+    source_numbers=set(re.findall(r"(?<![a-z0-9])\d+(?:\.\d+)?(?![a-z0-9])",src,re.I))
+    draft_numbers=set(re.findall(r"(?<![a-z0-9])\d+(?:\.\d+)?(?![a-z0-9])",result,re.I))
+    if source_numbers-draft_numbers:
+        return False,"Missing source measurements or numeric values"
+    if draft_numbers-source_numbers:
+        return False,"Invented numeric values"
+
+    if re.search(r"\bRTS\b|returned to service",result,re.I) and not re.search(
+        r"\bRTS\b|returned to service",src,re.I):
+        return False,"Unverified RTS"
+    if re.search(r"\b(?:technician|tech)\s*[A-Z0-9]\b",result,re.I):
+        return False,"Technician labels in draft"
+
+    if re.search(r"\b(?:ordered|received|delivered)\b",result,re.I) and not re.search(
+        r"\b(?:ordered|received|delivered)\b",src,re.I):
+        return False,"Potential unsupported outcome"
+    if re.search(r"\b(?:resolved|fully operational|fixed|no (?:further )?(?:issues|faults|problems)|"
+                 r"running smoothly|operating smoothly|back to normal)\b",result,re.I):
+        if not _SUCCESS_CUE.search(src):
+            return False,"Unsupported all-clear claim"
+
+    # Material maintenance actions/components require evidence. Do not reject
+    # neutral grammar or an ordinary paraphrase merely for using new words.
+    src_clean=proofread(src).casefold()
+    draft_clean=proofread(result).casefold()
+    src_actions={key for key,pat in _ACTION_GROUPS.items()
+                 if re.search(pat,src_clean,re.I)}
+    out_actions={key for key,pat in _ACTION_GROUPS.items()
+                 if re.search(pat,draft_clean,re.I)}
+    for action in out_actions:
+        if not (_ACTION_ALIASES[action] & src_actions):
+            return False,"AI introduced unsupported action: "+action
+    src_parts={key for key,pat in _PART_GROUPS.items()
+               if re.search(pat,src_clean,re.I)}
+    out_parts={key for key,pat in _PART_GROUPS.items()
+               if re.search(pat,draft_clean,re.I)}
+    if out_parts-src_parts:
+        return False,"AI introduced unsupported words: "+", ".join(sorted(out_parts-src_parts))
+
+    # Check every distinct labor remark. A 75% *exact word overlap* rejected
+    # sound paraphrases and even valid notes containing "Assist"; use a lower
+    # fact overlap threshold while retaining hard actions/parts/numbers above.
+    output_facts=_factual_terms(result)
     for note in source:
-        note_facts = facts(note)
-        if note_facts and len(note_facts & out_facts) < max(1, (len(note_facts)*3+3)//4):
-            return False, "Distinct technician source remark may be missing"
-    # Besides missing source details, reject *new* substantial words. Allow
-    # grammatical connectors, spelling corrections and minor tense shifts,
-    # but never add unrecorded operations, components, faults or outcomes.
-    def _normalized_words(value: str) -> set[str]:
-        value = proofread(value).casefold()
-        words = re.findall(r"[a-z]{3,}", value)
-        def stem(word: str) -> str:
-            if len(word) > 5 and word.endswith("ing"):
-                word = word[:-3]
-            elif len(word) > 4 and word.endswith("ed"):
-                word = word[:-2]
-            elif len(word) > 4 and word.endswith("es"):
-                word = word[:-2]
-            elif len(word) > 4 and word.endswith("s"):
-                word = word[:-1]
-            return word
-        return {stem(w) for w in words}
-    source_terms = _normalized_words(src)
-    result_terms = _normalized_words(result)
-    _grammar = {
-        "the","and","are","was","were","its","has","had","have","with",
-        "for","from","that","this","then","into","onto","each","both",
-        "after","before","also","when","while","using","used","which",
-        "where","over","under","upon","been","being","their","there",
-    }
-    extra_terms = result_terms - source_terms - _normalized_words(" ".join(_grammar))
-    # "remains active" is an allowable rewording of source "active".
-    if "active" in source_terms:
-        extra_terms.discard("remain")
-    if extra_terms:
-        return False, "AI introduced unsupported words: " + ", ".join(sorted(extra_terms)[:12])
-    return True, "Automatic source validation passed"
+        facts=_factual_terms(note)
+        if not facts:
+            continue
+        overlap=len(facts & output_facts)
+        min_overlap=(1 if len(facts)<=3 else max(2,(len(facts)*2+4)//5))
+        if overlap<min_overlap:
+            return False,"Distinct technician source remark may be missing"
+    return True,"Automatic source validation passed"
 
 
 def _generate(item: sqlite3.Row) -> tuple[str, str, str]:
@@ -273,8 +352,9 @@ def _generate(item: sqlite3.Row) -> tuple[str, str, str]:
             draft = raw_reply
         else:
             draft = str(structured.get("work_log", "")).strip() if isinstance(structured, dict) else ""
+        draft = _ensure_short_contributions(notes, draft)
         good, reason = _verify(notes, draft)
-        return (draft, "passed", "Automatic source validation passed") if good else ("", "original", reason)
+        return (proofread(draft), "passed", "Automatic source validation passed") if good else ("", "original", reason)
     except urllib.error.HTTPError as exc:
         if exc.code == 404:
             message = "Local Ollama model or endpoint not found (HTTP 404). Check ollama list."
