@@ -24,7 +24,8 @@ def test_native_oos_rts_vendors_carryovers_and_shift_isolation(tmp_path):
         Jinja2Templates(directory=str(ROOT/'templates')),
         lambda request:False,lambda request,shift:False,lambda request:None,
         lambda shift,d:(datetime.combine(d,time(0)),datetime.combine(d+timedelta(days=1),time(0))),
-        lambda url:None,get_mst_roster=lambda:roster))
+        lambda url:None,get_mst_roster=lambda:roster,
+        now_func=lambda:datetime(2026,10,20,12,0)))
     with TestClient(app) as c:
         assert c.post('/v3/login',data={'associate_id':'1001','mode':'resume','shift_id':sid},follow_redirects=False).status_code==303
         page=c.get(f'/v3?shift_id={sid}');assert page.status_code==200
