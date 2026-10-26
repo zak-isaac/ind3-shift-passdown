@@ -32,15 +32,24 @@ def _maybe_rts(db, c, wo, asset, shift_id):
         return False
     state=c.execute("SELECT rts_logged FROM v3_breakdown_state WHERE wo_number=?", (wo,)).fetchone()
     if not state or state[0]: return False
-    # Only create RTS event if the unit is currently OOS; avoid fabricating
-    # returns-to-service for old WOs that were never tracked as OOS.
+    # A first-seen CLOSED Breakdown also represents a completed repair.
+    # The earlier In Process export may not be available in this shift's
+    # Cetaris file. Such a WO is allowed here only after actual technician
+    # completion/shift attribution (or if it was already tracked as OOS).
+    # Do not invent RTS when any other Breakdown remains unresolved or the
+    # MST explicitly holds the asset Out of Service (checked above).
     present=c.execute("SELECT 1 FROM oos_units WHERE unit=?", (asset,)).fetchone()
     if present:
         c.execute("DELETE FROM oos_units WHERE unit=?", (asset,))
+    # Multiple Closed Breakdown WOs for the same unit in one shift should
+    # produce one RTS display entry, not inflated duplicate unit counts.
+    already=c.execute("SELECT 1 FROM rts_log WHERE shift_id=? AND unit=? LIMIT 1",
+                      (shift_id,asset)).fetchone()
+    if not already:
         c.execute("INSERT INTO rts_log(shift_id,unit,removed_at) VALUES (?,?,?)",
                   (shift_id,asset,datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")))
     c.execute("UPDATE v3_breakdown_state SET rts_logged=1 WHERE wo_number=?", (wo,))
-    return bool(present)
+    return bool(present) or not bool(already)
 
 def sync(db, rows, selected, shift_id, allowed_new_wos=None):
     """Apply tracked-WO status updates from later exports without leaking new WOs from other shifts."""
@@ -66,6 +75,10 @@ def sync(db, rows, selected, shift_id, allowed_new_wos=None):
     with db._conn() as c:
         for wo,(status,asset) in selected_wos.items():
             old=c.execute("SELECT * FROM v3_breakdown_state WHERE wo_number=?", (wo,)).fetchone()
+            # Do not reopen completed/closed repairs because a later XLSX
+            # contains an older labor line for the same WO number.
+            if old and priority[status] < priority.get(old["status"],0):
+                continue
             if old and old["status"]==status and old["asset_id"]==asset:
                 continue
             decision = (old["rts_decision"] if old and old["status"]==status else "")
