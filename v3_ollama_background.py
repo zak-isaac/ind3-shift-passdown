@@ -24,16 +24,27 @@ MODEL = "qwen2.5:3b"
 _LOCK = threading.Lock()
 _WORKERS: dict[str, threading.Thread] = {}
 
-INSTRUCTIONS = """You are an industrial maintenance technical editor.
-Return ONE concise professional paragraph using ONLY the technician SOURCE remarks.
-Consolidate duplicated actions even if described in different wording.
-Retain all distinct troubleshooting, repairs, measurements, codes, parts and statuses.
-NEVER invent work, orders, tests, outcomes, parts, root causes or RTS.
-NEVER turn intended, needed, planned or requested work into completed work.
-If a fault remains, preserve it. Closed or Completed does not imply RTS.
-Avoid technician names and references. No heading, bullet, label or explanation.
-Do not copy the reported issue as a technician-performed action.
-"""
+# Ollama's local /api/chat supports JSON-schema constrained replies.
+# This avoids the 3B model echoing instructions ("Consolidate...", "Remark 1").
+# Every actual paragraph still passes the original technician-source verifier.
+WORK_LOG_SCHEMA = {
+    "type": "object",
+    "properties": {"work_log": {"type": "string"}},
+    "required": ["work_log"],
+    "additionalProperties": False,
+}
+
+INSTRUCTIONS = """Edit industrial maintenance technician notes into one readable work log.
+Use the technician notes as your ONLY factual source.
+Correct spelling and grammar; combine exact repetitions.
+Preserve EVERY distinct repair, troubleshooting action, observation, part,
+measurement, fault code, and unresolved issue. If multiple people contributed,
+preserve each person's distinct work without adding names.
+Never invent repairs, results, tests, orders, parts, or returned-to-service claims.
+A reported problem is not proof that anyone fixed it.
+Do not add headings, technician-note labels, introductions, or instructions.
+Put only the completed work-log text into the JSON field work_log."""
+
 
 def enabled() -> bool:
     return os.environ.get("IND3_OLLAMA_REWRITE", "").strip() == "1"
@@ -228,14 +239,16 @@ def _generate(item: sqlite3.Row) -> tuple[str, str, str]:
     data = json.dumps({
         "model": os.environ.get("IND3_OLLAMA_MODEL", MODEL),
         "stream": False, "keep_alive": "30m",
-        "options": {"temperature": 0, "num_predict": 240},
+        "format": WORK_LOG_SCHEMA,
+        "options": {"temperature": 0, "num_predict": 480},
         "messages": [
             {"role": "system", "content": INSTRUCTIONS},
-            {"role": "user", "content": "Reported asset: " + item["asset"] +
-             "\nReported issue (context only): " + item["cause"] +
-             "\nSOURCE REMARKS:\n" + "\n".join(
-                f"Remark {i + 1}: {v}" for i, v in enumerate(notes)) +
-             "\nReturn only the consolidated maintenance paragraph."}
+            # The previous prompt's labels and closing "Return only the
+            # consolidated paragraph" instruction were echoed back into
+            # work orders. Send only actual technician source notes as data.
+            # Do not include the WO's reported issue as if it were work done.
+            {"role": "user", "content": json.dumps(
+                {"technician_notes": notes}, ensure_ascii=False)}
         ]
     }).encode()
     req = urllib.request.Request("http://127.0.0.1:11434/api/chat", data=data,
@@ -250,7 +263,16 @@ def _generate(item: sqlite3.Row) -> tuple[str, str, str]:
     try:
         with urllib.request.urlopen(req, timeout=timeout) as response:
             payload = json.load(response)
-        draft = str(payload.get("message", {}).get("content", "")).strip()
+        raw_reply = str(payload.get("message", {}).get("content", "")).strip()
+        # Modern Ollama returns a JSON object matching WORK_LOG_SCHEMA.
+        # Plain text is accepted only as a backward-compatible fallback;
+        # both forms must pass exactly the same source-accuracy validation.
+        try:
+            structured = json.loads(raw_reply)
+        except (ValueError, TypeError):
+            draft = raw_reply
+        else:
+            draft = str(structured.get("work_log", "")).strip() if isinstance(structured, dict) else ""
         good, reason = _verify(notes, draft)
         return (draft, "passed", "Automatic source validation passed") if good else ("", "original", reason)
     except urllib.error.HTTPError as exc:
