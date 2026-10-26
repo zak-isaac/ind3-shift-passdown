@@ -374,12 +374,17 @@ async def lifespan(_: FastAPI):
     # 7. Shift reaper — auto-terminates shifts that overstay their welcome
     async def _shift_reaper() -> None:
         """Check every 60 s; close any active shift that has passed its
-        scheduled end time + 1-hour grace period."""
+        scheduled end time + 1-hour grace period. Test/sandbox shifts
+        (is_test_shift=1, e.g. a manual-testing shift kept open indefinitely)
+        are never physical shifts with a real deadline -- skip them, same
+        exemption as v3_routes._v3_live_shifts()."""
         # Check immediately on boot — catches shifts left open across restarts
         await asyncio.sleep(10)
         while True:
             try:
                 for shift in db.get_active_shifts():
+                    if shift.get("is_test_shift"):
+                        continue
                     deadline = _shift_deadline(shift)
                     if deadline and datetime.now() >= deadline:
                         print(
@@ -692,9 +697,11 @@ async def shift_start(
     ot_code:     str = Form(""),
     confirm_dup: str = Form("0"),
 ):
-    active_shifts = db.get_active_shifts()
+    active_shifts = [s for s in db.get_active_shifts() if not s.get("is_test_shift")]
 
-    # Two-shift cap -- reject if already 2 running simultaneously
+    # Two-shift cap -- reject if already 2 running simultaneously. Test/
+    # sandbox shifts never count toward this (see v3_routes._v3_real_shifts()
+    # for the V3-side equivalent).
     if len(active_shifts) >= 2:
         return RedirectResponse(
             "/?error=Two+shifts+are+already+running.+End+one+before+starting+another.",
