@@ -103,11 +103,14 @@ def queue_shift(shift_id: int, retry_original: bool = False) -> int:
             if not x["notes"] or all(not t.strip() for t in x["notes"]):
                 continue
             stamp = _source_hash(x["asset"], x["cause"], x["notes"])
-            old = c.execute("SELECT source_hash,status FROM v3_ollama_drafts WHERE shift_id=? AND wo_number=?",
+            old = c.execute("SELECT source_hash,status,draft FROM v3_ollama_drafts WHERE shift_id=? AND wo_number=?",
                             (shift_id, x["wo"])).fetchone()
-            if old and old["source_hash"] == stamp and not (
-                    retry_original and old["status"] == "original"):
-                continue
+            if old and old["source_hash"] == stamp:
+                rejected_stored_pass = (old["status"] == "passed" and
+                    not _verify(x["notes"],old["draft"])[0])
+                if not (retry_original and (
+                        old["status"] == "original" or rejected_stored_pass)):
+                    continue
             c.execute("""INSERT INTO v3_ollama_drafts
                 (shift_id,wo_number,source_hash,asset,cause,source_json,draft,status,reason,approved)
                 VALUES(?,?,?,?,?,?,'','queued','',0)
