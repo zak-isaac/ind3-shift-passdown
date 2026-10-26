@@ -17,7 +17,6 @@ bare "\\n\\n" stop sequence -- plus unconditional _strip_think_block() on
 raw output before any guard runs (safe no-op for non-thinking models).
 """
 import sys
-import types
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -27,16 +26,10 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 
-def _make_httpx_mock():
-    mod = types.ModuleType("httpx")
-    mod.Client = MagicMock
-    mod.Timeout = MagicMock(return_value=MagicMock())
-    mod.TimeoutException = type("TimeoutException", (Exception,), {})
-    mod.ConnectError    = type("ConnectError",    (Exception,), {})
-    return mod
-
-
-sys.modules.setdefault("httpx", _make_httpx_mock())
+# Import the installed httpx package normally. A previous test helper
+# placed a small fake in sys.modules, globally breaking FastAPI/TestClient
+# when all tests were collected together. Test methods mock the HTTP client
+# per call instead, keeping the real module import intact.
 import ai_rewriter  # noqa: E402
 
 
