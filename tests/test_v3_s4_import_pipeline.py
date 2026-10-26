@@ -127,3 +127,40 @@ def test_import_rejects_by_content_not_filename_extension(tmp_path):
         empty = client.post("/v3/import", data={"shift_id": str(shift_id)})
         assert empty.status_code == 200
         assert "No file was selected" in empty.text
+
+
+def test_import_accepts_csv_export_same_as_xlsx(tmp_path):
+    db.set_db_path(tmp_path / "csv_import.db")
+    db.init_db()
+    shift_id = db.start_shift("2026-10-25", "S4", "Test MST")
+    app = FastAPI()
+    app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
+    app.include_router(create_v3_router(
+        Jinja2Templates(directory=str(ROOT / "templates")),
+        is_lead_authed=lambda request: request.cookies.get("lead_auth") == "test",
+        can_manage_shift=lambda request, sid: sid == shift_id,
+        resolve_my_shift=lambda request: db.get_shift(shift_id),
+        shift_window=lambda st, day: (
+            datetime.combine(day, time(5, 30)), datetime.combine(day, time(18, 0))
+        ),
+        lead_redirect=lambda dest: RedirectResponse("/v3/login", status_code=303),
+        now_func=lambda: datetime(2026, 10, 25, 15, 0)
+    ))
+    import csv, io
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(HEADERS)
+    writer.writerow(labor("28025869", "Carr, Alexander", "2026-10-25T08:30:00"))
+    csv_bytes = buf.getvalue().encode("utf-8-sig")
+    with TestClient(app) as client:
+        client.cookies.set("lead_auth", "test")
+        staged = client.post("/v3/import", data={"shift_id": str(shift_id)},
+            files={"file": ("cetaris_export.csv", csv_bytes, "text/csv")})
+        assert staged.status_code == 200, staged.text[:500]
+        assert "1 unique WOs" in staged.text
+        token = re.search(r"/v3/import/([0-9a-f]{32})/confirm", staged.text).group(1)
+        confirm = client.post(f"/v3/import/{token}/confirm", data={
+            "shift_id": str(shift_id), "techs": ["Carr, Alexander"],
+        }, follow_redirects=False)
+        assert confirm.status_code == 303, confirm.text[:500]
+        assert {e["wo_number"] for e in db.get_entries(shift_id)} == {"28025869"}

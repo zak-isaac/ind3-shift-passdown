@@ -17,8 +17,9 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import datetime
-from io import BytesIO
+from io import BytesIO, StringIO
 from typing import Any
+import csv
 
 from openpyxl import load_workbook
 
@@ -50,8 +51,39 @@ def _parse_dt(value: Any) -> datetime | None:
     return None
 
 
+def _open_xlsx_grid(data: bytes):
+    """Return (headers, row_iterator, workbook) for a real .xlsx workbook.
+    Raises ValueError if this isn't a readable xlsx -- caller falls back to
+    CSV, this specific error is never shown to the user directly.
+    """
+    try:
+        workbook = load_workbook(BytesIO(data), read_only=True, data_only=True)
+    except Exception as exc:
+        raise ValueError("not an xlsx workbook") from exc
+    sheet = workbook.active
+    source = sheet.iter_rows(values_only=True)
+    return next(source, None), source, workbook
+
+
+def _open_csv_grid(data: bytes):
+    """Return (headers, row_iterator, None) for a CSV export. Raises
+    ValueError if the bytes aren't readable text -- caller surfaces its own
+    final combined error, never this one directly.
+    """
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise ValueError("not a readable CSV") from exc
+    rows = csv.reader(StringIO(text))
+    headers = next(rows, None)
+    return headers, rows, None
+
+
 def parse_excel(data: bytes, stats: dict | None = None) -> list[dict]:
-    """Parse a bounded, validated workbook into JSON-serializable normalized rows.
+    """Parse a bounded, validated Cetaris work order export (.xlsx or .csv)
+    into JSON-serializable normalized rows. Format is detected by actual
+    content -- tries xlsx first, falls back to CSV -- never by filename
+    (see v3_routes.py's stage_import(), which accepts any filename).
 
     `stats`, if given, is populated in-place with import-diagnostics counts
     (source_rows, skipped_no_wo, skipped_no_tech, parsed_rows) so an MST can
@@ -61,21 +93,24 @@ def parse_excel(data: bytes, stats: dict | None = None) -> list[dict]:
     if stats is None:
         stats = {}
     if len(data) > MAX_SIZE:
-        raise ValueError("This Excel file exceeds the 12 MB import limit.")
+        raise ValueError("This file exceeds the 12 MB import limit.")
     try:
-        workbook = load_workbook(BytesIO(data), read_only=True, data_only=True)
-    except Exception as exc:
-        raise ValueError("Unable to read this XLSX export.") from exc
+        headers, source, workbook = _open_xlsx_grid(data)
+    except ValueError:
+        try:
+            headers, source, workbook = _open_csv_grid(data)
+        except ValueError:
+            raise ValueError(
+                "Unable to read this file as an Excel (.xlsx) or CSV work order export. "
+                "Make sure you selected the actual exported report file."
+            )
     try:
-        sheet = workbook.active
-        source = sheet.iter_rows(values_only=True)
-        headers = next(source, None)
         if not headers:
-            raise ValueError("Excel file has no headings.")
-        mapping = {str(name).strip().casefold(): pos for pos, name in enumerate(headers) if name is not None}
+            raise ValueError("File has no headings.")
+        mapping = {str(name).strip().casefold(): pos for pos, name in enumerate(headers) if name is not None and str(name).strip()}
         missing = [name for name in REQUIRED if name.casefold() not in mapping]
         if missing:
-            raise ValueError("This isn't the supported Cetaris Desktop report. Missing columns: " + ", ".join(missing))
+            raise ValueError("This file doesn't match the expected Cetaris work order export. Missing columns: " + ", ".join(missing))
         def get(row, label):
             pos = mapping.get(label.casefold())
             return row[pos] if pos is not None and pos < len(row) else None
@@ -136,7 +171,8 @@ def parse_excel(data: bytes, stats: dict | None = None) -> list[dict]:
         stats["parsed_rows"] = len(results)
         return results
     finally:
-        workbook.close()
+        if workbook is not None:
+            workbook.close()
 
 
 def technician_counts(rows: list[dict]) -> list[dict]:
