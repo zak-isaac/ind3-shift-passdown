@@ -2,6 +2,16 @@
 
 Only the selected technicians' *individual labor rows* are used; Cetaris's
 Correction column deliberately is NOT read as it can combine other techs.
+
+PM/breakdown categorization here is Primary-RFR-based (validated by this
+file's own test suite, see tests/test_v3_operational_patch.py and others).
+A parallel production branch independently validated SJ / PM Code as a
+PM signal against a real export (10-22.xlsx, 153 rows / 9 PM rows) --
+that field is now ALSO captured below (pm_code, repair_class) as an
+optional, best-effort provenance field for future corroboration, but
+the existing RFR-based select_records() categorization is intentionally
+left unchanged pending a real side-by-side data comparison (2026-10-26
+integration decision -- see integration report).
 """
 from __future__ import annotations
 
@@ -37,8 +47,16 @@ def _parse_dt(value: Any) -> datetime | None:
     return None
 
 
-def parse_excel(data: bytes) -> list[dict]:
-    """Parse a bounded, validated workbook into JSON-serializable normalized rows."""
+def parse_excel(data: bytes, stats: dict | None = None) -> list[dict]:
+    """Parse a bounded, validated workbook into JSON-serializable normalized rows.
+
+    `stats`, if given, is populated in-place with import-diagnostics counts
+    (source_rows, skipped_no_wo, skipped_no_tech, parsed_rows) so an MST can
+    see why a smaller-than-expected row count came through, instead of just
+    inferring it. Optional and additive -- existing callers unaffected.
+    """
+    if stats is None:
+        stats = {}
     if len(data) > MAX_SIZE:
         raise ValueError("This Excel file exceeds the 12 MB import limit.")
     try:
@@ -59,18 +77,34 @@ def parse_excel(data: bytes) -> list[dict]:
             pos = mapping.get(label.casefold())
             return row[pos] if pos is not None and pos < len(row) else None
         results = []
+        source_rows = skipped_no_wo = skipped_no_tech = 0
         for i, row in enumerate(source):
             if i >= MAX_ROWS:
                 raise ValueError("Import limited to 30,000 labor rows. Narrow your Cetaris export dates.")
+            if all(cell is None for cell in row):
+                continue  # a genuinely blank trailing row, not real data
+            source_rows += 1
             wo = _text(get(row, "WO Number"))
             tech = _text(get(row, "Technician"))
-            if not wo or not tech:
+            if not wo:
+                skipped_no_wo += 1
+                continue
+            if not tech:
+                skipped_no_tech += 1
                 continue
             started = _parse_dt(get(row, "Start Date"))
+            # Real exports leave 'Asset ID' blank for most rows -- 'Asset #'
+            # is the common case, not the fallback -- but prefer Asset ID
+            # when a given export does populate it.
+            asset_id = _text(get(row, "Asset ID")) or _text(get(row, "Asset #"))
             results.append({
-                "wo_number": wo, "asset_id": _text(get(row,"Asset #")),
+                "wo_number": wo, "asset_id": asset_id,
                 "status": _text(get(row,"WO Status")),
                 "rfr": _text(get(row,"Primary RFR")),
+                # Optional provenance fields, not used by select_records()'s
+                # RFR-based categorization -- see module docstring.
+                "pm_code": _text(get(row, "SJ / PM Code")),
+                "repair_class": _text(get(row, "Repair Class")),
                 "reported_issue": _text(get(row,"Service/Repair Description")),
                 "tech_name": tech,
                 # A WO's administrative closer can be a different person.
@@ -79,6 +113,11 @@ def parse_excel(data: bytes) -> list[dict]:
                 "last_technician": _text(get(row, "Last Technician")),
                 "remarks": _text(get(row,"Technician Remarks")),
                 "start_at": started.isoformat(timespec="seconds") if started else "",
+                # 'Update Date / Time' reflects when the record was actually
+                # last touched -- more reliable than WO Closed Date/Time per
+                # 2026-10-23 facility feedback. Optional; absent on older
+                # exports.
+                "updated_at": _parse_dt(get(row, "Update Date / Time")).isoformat(timespec="seconds") if _parse_dt(get(row, "Update Date / Time")) else "",
                 "opened_at": _parse_dt(get(row, "WO Date / Time")).isoformat(timespec="seconds") if _parse_dt(get(row, "WO Date / Time")) else "",
                 "last_complete_at": _parse_dt(get(row, "WO Last Complete Date / Time")).isoformat(timespec="seconds") if _parse_dt(get(row, "WO Last Complete Date / Time")) else "",
                 "last_shift": _text(get(row, "Last Shift")),
@@ -88,6 +127,10 @@ def parse_excel(data: bytes) -> list[dict]:
                 "cause": _text(get(row,"Cause")),
                 "work_accomplished": _text(get(row,"Work Accomplished")),
             })
+        stats["source_rows"] = source_rows
+        stats["skipped_no_wo"] = skipped_no_wo
+        stats["skipped_no_tech"] = skipped_no_tech
+        stats["parsed_rows"] = len(results)
         return results
     finally:
         workbook.close()

@@ -319,6 +319,12 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             pm_cols={row[1] for row in c.execute("PRAGMA table_info(v3_pm_tracking)")}
             if "techs_json" not in pm_cols:
                 c.execute("ALTER TABLE v3_pm_tracking ADD COLUMN techs_json TEXT NOT NULL DEFAULT '[]'")
+            batch_cols={row[1] for row in c.execute("PRAGMA table_info(v3_import_batches)")}
+            if "parse_stats_json" not in batch_cols:
+                # Import-diagnostics counts (source_rows/skipped_no_wo/
+                # skipped_no_tech/parsed_rows) so an MST can see why a
+                # smaller-than-expected row count came through.
+                c.execute("ALTER TABLE v3_import_batches ADD COLUMN parse_stats_json TEXT NOT NULL DEFAULT '{}'")
 
     def secure(request, shift_id=None):
         if get_mst_roster is not None:
@@ -901,7 +907,8 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             return render(request,shift,warning="Please upload a Cetaris Desktop .xlsx report.")
         data=await file.read(MAX_SIZE + 1)
         try:
-            records=parse_excel(data)
+            parse_stats={}
+            records=parse_excel(data,stats=parse_stats)
         except ValueError as exc:
             return render(request,shift,warning=str(exc))
         if not records:
@@ -911,8 +918,8 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             # Old unconfirmed imports are staging data, not shift history.
             c.execute("DELETE FROM v3_import_batches WHERE created_at < ?", ((datetime.now()-timedelta(days=1)).isoformat(timespec="seconds"),))
         with db._conn() as c:
-            c.execute("INSERT INTO v3_import_batches (token,shift_id,filename,created_at,rows_json) VALUES (?,?,?,?,?)",
-                    (token,shift_id,file.filename[:240],datetime.now().isoformat(timespec="seconds"),json.dumps(records)))
+            c.execute("INSERT INTO v3_import_batches (token,shift_id,filename,created_at,rows_json,parse_stats_json) VALUES (?,?,?,?,?,?)",
+                    (token,shift_id,file.filename[:240],datetime.now().isoformat(timespec="seconds"),json.dumps(records),json.dumps(parse_stats)))
         return render(request,shift,staged={
             "token":token,"filename":file.filename,"counts":technician_counts(records),
             "total_rows":len(records),
