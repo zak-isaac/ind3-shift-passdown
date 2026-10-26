@@ -155,3 +155,52 @@ def test_several_closed_breakdown_wos_same_asset_do_not_double_rts(tmp_path):
              sample(wo="BD-2",status="Closed",rfr="Breakdown")]
     v3_breakdown.sync(db,records,{"Tech A"},35,allowed_new_wos={"BD-1","BD-2"})
     assert db.get_rts_events(35)==["VOIDFILL0501"]
+
+
+def test_repeat_import_heals_legacy_closed_breakdown_processed_without_rts(tmp_path):
+    """Old V3 set rts_logged=1 even with no rts_log row.
+    Reimport must repair it in the *same* shift, without double counting."""
+    db.set_db_path(tmp_path/"old_closed_missing_rts.db");db.init_db()
+    closed=[sample(wo="28026143",status="Closed",rfr="Breakdown")]
+    v3_breakdown.sync(db,closed,{"Tech A"},23,allowed_new_wos={"28026143"})
+    assert db.get_rts_events(23)==["VOIDFILL0501"]
+    # Simulate old database corruption: Closed and marked processed, but
+    # the RTS event was never created by the historical implementation.
+    with db._conn() as c:
+        c.execute("DELETE FROM rts_log WHERE shift_id=23")
+        state=c.execute("SELECT status,rts_logged FROM v3_breakdown_state WHERE wo_number=?",
+                        ("28026143",)).fetchone()
+        assert state["status"]=="closed" and state["rts_logged"]==1
+    assert db.get_rts_events(23)==[]
+    v3_breakdown.sync(db,closed,{"Tech A"},23,allowed_new_wos={"28026143"})
+    assert db.get_rts_events(23)==["VOIDFILL0501"]
+    v3_breakdown.sync(db,closed,{"Tech A"},23,allowed_new_wos={"28026143"})
+    assert db.get_rts_events(23)==["VOIDFILL0501"]
+    # Repeated old WOs must not be re-credited on another shift.
+    v3_breakdown.sync(db,closed,{"Tech A"},24,allowed_new_wos=set())
+    assert db.get_rts_events(24)==[]
+
+
+def test_mst_removed_rts_does_not_reappear_on_repeat_import(tmp_path):
+    db.set_db_path(tmp_path/"manual_rts_removal.db");db.init_db()
+    closed=[sample(wo="MANUAL-REMOVE",status="Closed",rfr="Breakdown")]
+    v3_breakdown.sync(db,closed,{"Tech A"},5,allowed_new_wos={"MANUAL-REMOVE"})
+    assert db.get_rts_events(5)==["VOIDFILL0501"]
+    db.delete_rts_event(5,"VOIDFILL0501")
+    v3_breakdown.suppress_rts_reimport(db,5,"VOIDFILL0501")
+    v3_breakdown.sync(db,closed,{"Tech A"},5,allowed_new_wos={"MANUAL-REMOVE"})
+    assert db.get_rts_events(5)==[]
+
+
+def test_workshop_manager_review_required_routes_to_completed_pending_rts(tmp_path):
+    """Restore real-workflow status alias from Code Puppy workshop branch."""
+    db.set_db_path(tmp_path/"review_breakdown.db");db.init_db()
+    v3_breakdown.sync(db,[sample(wo="REVIEW",status="In Process",rfr="Breakdown")],
+                      {"Tech A"},1,allowed_new_wos={"REVIEW"})
+    v3_breakdown.sync(db,[sample(wo="REVIEW",status="Manager Review Required",rfr="Breakdown")],
+                      {"Tech A"},1,allowed_new_wos={"REVIEW"})
+    assert db.get_oos_units()==["VOIDFILL0501"]
+    assert [p["wo_number"] for p in v3_breakdown.pending(db)]==["REVIEW"]
+    v3_breakdown.decide(db,1,{"REVIEW":"rts"})
+    assert db.get_oos_units()==[]
+    assert db.get_rts_events(1)==["VOIDFILL0501"]
