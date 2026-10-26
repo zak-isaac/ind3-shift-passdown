@@ -7,6 +7,19 @@ Runs against the LIVE Ollama + phi4-mini instance on localhost:11434.
 Usage:
     .venv\Scripts\python.exe tests\test_pipeline_e2e.py
 """
+# This is a LEGACY live Phi-4 acceptance script, not an ordinary pytest test.
+# The production V3 rewriter uses v3_ollama_background (qwen2.5:3b),
+# and requiring phi4-mini at pytest import time aborts unrelated tests.
+# Preserve direct command-line execution for an intentionally configured
+# Phi-4 machine, but skip this optional live-model script during collection.
+if __name__ != "__main__":
+    import pytest
+    pytest.skip(
+        "Legacy live phi4-mini test is optional. "
+        "Run python tests/test_pipeline_e2e.py manually on a configured host.",
+        allow_module_level=True,
+    )
+
 import sys, os, time
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
