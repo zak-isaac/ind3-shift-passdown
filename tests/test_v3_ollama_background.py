@@ -185,3 +185,83 @@ def test_failed_local_ai_can_be_retried_without_reimport(tmp_path,monkeypatch):
     assert ai.queue_shift(sid)==0
     assert ai.queue_shift(sid,retry_original=True)==1
     assert ai.statuses(sid)[0]["status"]=="queued"
+
+
+def test_ollama_worker_error_restores_original_and_processes_next_wo(tmp_path, monkeypatch):
+    """An unexpected model error must never strand the rest as AI Processing."""
+    import json
+    import time
+    import db
+    db.set_db_path(tmp_path/"worker_errors.db");db.init_db()
+    ai.ensure_table(ai._db_path())
+    with ai._connect(ai._db_path()) as c:
+        for wo in ("WO-ERROR","WO-NEXT"):
+            c.execute("""INSERT INTO v3_ollama_drafts
+                (shift_id,wo_number,source_hash,asset,cause,source_json,draft,status,approved)
+                VALUES (1,?,?,?,'Issue',?,'','queued',0)""",
+                (wo,wo,"M"+wo,json.dumps(["Replaced belt."])))
+    def generate(item):
+        if item["wo_number"]=="WO-ERROR":
+            raise RuntimeError("simulated backend failure")
+        return "Replaced belt.","passed","Automatic source validation passed"
+    monkeypatch.setattr(ai,"_generate",generate)
+    ai.start_worker(ai._db_path())
+    end=time.monotonic()+5
+    while time.monotonic()<end:
+        with ai._connect(ai._db_path()) as c:
+            states={r["wo_number"]:dict(r) for r in c.execute(
+                "SELECT wo_number,status,reason FROM v3_ollama_drafts")}
+        if all(item["status"] in ("original","passed") for item in states.values()):
+            break
+        time.sleep(.02)
+    assert states["WO-ERROR"]["status"]=="original",states
+    assert "RuntimeError" in states["WO-ERROR"]["reason"]
+    assert states["WO-NEXT"]["status"]=="passed",states
+
+
+def test_ai_poll_restarts_orphaned_writing_after_server_restart(tmp_path,monkeypatch):
+    """A prior server crash can leave status='writing' forever without recovery."""
+    import time
+    import json
+    import db
+    monkeypatch.setenv("IND3_OLLAMA_REWRITE","1")
+    db.set_db_path(tmp_path/"recovery.db");db.init_db()
+    sid=db.start_shift("2026-10-25","S4","MST Test")
+    db.upsert_cmms_entry(sid,"RESTART-1","MDR0001","Belt damaged",
+                        json.dumps(["Replaced belt."]),"Tech A")
+    ai.ensure_table(ai._db_path())
+    with ai._connect(ai._db_path()) as c:
+        entries=[dict(r) for r in c.execute("SELECT * FROM entries WHERE shift_id=?",(sid,))]
+        group=ai._group_sources(entries,{})[0]
+        c.execute("""INSERT INTO v3_ollama_drafts
+            (shift_id,wo_number,source_hash,asset,cause,source_json,draft,status,approved)
+            VALUES (?,?,?,?,?,?,'','writing',0)""",
+            (sid,"RESTART-1",ai._source_hash(group["asset"],group["cause"],group["notes"]),
+             group["asset"],group["cause"],json.dumps(group["notes"])))
+    monkeypatch.setattr(ai,"_generate",lambda item:(
+        "Replaced belt.","passed","Automatic source validation passed"))
+    ai.statuses(sid)  # GET /v3/ai/drafts triggers pending-work recovery.
+    end=time.monotonic()+5
+    while time.monotonic()<end:
+        progress=ai.statuses(sid)[0]
+        if progress["status"]=="passed":
+            break
+        time.sleep(.03)
+    assert progress["status"]=="passed", progress
+    assert progress["approved"]==1
+    assert ai.approved_for_report(sid)=={"RESTART-1":"Replaced belt."}
+
+
+def test_missing_local_model_returns_explanatory_original(monkeypatch):
+    import io
+    import json
+    import urllib.error
+    def unavailable(*args,**kwargs):
+        raise urllib.error.HTTPError("http://127.0.0.1:11434/api/chat",404,
+                                    "Not Found",{},io.BytesIO(b""))
+    monkeypatch.setattr(ai.urllib.request,"urlopen",unavailable)
+    draft,status,reason=ai._generate({
+        "source_json":json.dumps(["Replaced belt."]),
+        "asset":"MDR0001","cause":"Belt damaged"})
+    assert draft=="" and status=="original"
+    assert "ollama list" in reason.lower()
