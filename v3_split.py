@@ -212,6 +212,22 @@ def _actual_completion(items):
         if service and (start is None or start <= service):
             returns.append((service,r.get("tech_name") or "", "In Service + technician labor"))
     if returns:
+        # Cetaris may name an actual participating "Completed By" technician
+        # without supplying a WO Last Complete timestamp. If their labor row
+        # has a valid In Service time, that is stronger evidence of the
+        # finisher than a generic shared asset-return timestamp. Otherwise a
+        # selected S4 worker could incorrectly receive S5's completed WO.
+        identified_finishers = {
+            _person_key(r.get("completed_by"))
+            for r in items
+            if _person_key(r.get("completed_by")) in participant_by_key
+        }
+        if len(identified_finishers) == 1:
+            finisher_key = next(iter(identified_finishers))
+            matched_returns = [r for r in returns
+                               if _person_key(r[1]) == finisher_key]
+            if matched_returns:
+                return max(matched_returns, key=lambda p: p[0])
         # When Completed By is a different administrative user, Cetaris's
         # Last Technician is a better indication of the actual final worker
         # than the order of labor rows in the export.
