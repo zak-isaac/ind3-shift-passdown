@@ -63,3 +63,9 @@ Thumbs.db
 
 # Note: assets.json, screenshots, branding files, source code and
 # Git history still require a confidentiality/permission review.
+  
+# Local scratch/review artifacts -- never part of the integration history  
+_review_*.eml  
+_review_*.html  
+_generate_review_*.py  
+_debug_*.py 
