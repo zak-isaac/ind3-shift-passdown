@@ -265,3 +265,32 @@ def test_missing_local_model_returns_explanatory_original(monkeypatch):
         "asset":"MDR0001","cause":"Belt damaged"})
     assert draft=="" and status=="original"
     assert "ollama list" in reason.lower()
+
+
+def test_ai_retry_requeues_older_passed_draft_rejected_by_new_checks(tmp_path,monkeypatch):
+    """Avoid a hidden permanent no-op if legacy AI Passed text is unsafe."""
+    import json
+    import db
+    monkeypatch.setenv("IND3_OLLAMA_REWRITE","1")
+    monkeypatch.setattr(ai,"start_worker",lambda path: None)
+    db.set_db_path(tmp_path/"retry_rejected.db");db.init_db()
+    sid=db.start_shift("2026-10-25","S4","MST Test")
+    db.upsert_cmms_entry(sid,"OLD-AI","BALER0005","Wire",
+                         json.dumps(["Replaced two boxes of wire."]),"Tech A")
+    ai.ensure_table(ai._db_path())
+    with ai._connect(ai._db_path()) as c:
+        entries=[dict(r) for r in c.execute("SELECT * FROM entries WHERE shift_id=?",(sid,))]
+        item=ai._group_sources(entries,{})[0]
+        stamp=ai._source_hash(item["asset"],item["cause"],item["notes"])
+        c.execute("""INSERT INTO v3_ollama_drafts
+            (shift_id,wo_number,source_hash,asset,cause,source_json,draft,status,approved)
+            VALUES (?,?,?,?,?,?,?,'passed',1)""",
+            (sid,"OLD-AI",stamp,item["asset"],item["cause"],json.dumps(item["notes"]),
+             "Consolidated maintenance paragraph: Replaced two boxes of wire."))
+    assert ai.approved_for_report(sid)=={}
+    assert ai.queue_shift(sid,retry_original=False)==0
+    assert ai.queue_shift(sid,retry_original=True)==1
+    with ai._connect(ai._db_path()) as c:
+        row=c.execute("SELECT draft,status FROM v3_ollama_drafts WHERE shift_id=?",
+                      (sid,)).fetchone()
+    assert row["status"]=="queued" and row["draft"]==""
