@@ -109,3 +109,49 @@ def test_breakdown_tracked_wo_closes_on_later_shift_even_with_unselected_tech(tm
     assert db.get_rts_events(2)==["VOIDFILL0501"]
     with db._conn() as c:
         assert c.execute("SELECT 1 FROM v3_breakdown_state WHERE wo_number='OTHER'").fetchone() is None
+
+
+def test_first_seen_closed_breakdown_appears_in_rts_without_prior_oos(tmp_path):
+    """Newly imported, verified CLOSED Breakdown must count as RTS even if
+    its earlier In Process file was never exported for this shift."""
+    db.set_db_path(tmp_path/"first_closed_breakdown.db");db.init_db()
+    rows=[sample(wo="BD-NEW-CLOSED",status="Closed",rfr="Breakdown")]
+    v3_breakdown.sync(db,rows,{"Tech A"},11,allowed_new_wos={"BD-NEW-CLOSED"})
+    assert db.get_oos_units()==[]
+    assert db.get_rts_events(11)==["VOIDFILL0501"]
+    # Re-import cannot duplicate the event.
+    v3_breakdown.sync(db,rows,{"Tech A"},11,allowed_new_wos={"BD-NEW-CLOSED"})
+    assert db.get_rts_events(11)==["VOIDFILL0501"]
+
+
+def test_first_seen_closed_breakdown_never_bypasses_manual_oos_hold(tmp_path):
+    db.set_db_path(tmp_path/"closed_hold.db");db.init_db()
+    db.add_oos_unit("VOIDFILL0501")
+    v3_breakdown.hold(db,"VOIDFILL0501",True)
+    v3_breakdown.sync(db,[sample(wo="BD-HELD",status="Closed",rfr="Breakdown")],
+                      {"Tech A"},12,allowed_new_wos={"BD-HELD"})
+    assert db.get_oos_units()==["VOIDFILL0501"]
+    assert db.get_rts_events(12)==[]
+
+
+def test_in_process_to_closed_rts_is_not_reversed_by_stale_export(tmp_path):
+    db.set_db_path(tmp_path/"lifecycle.db");db.init_db()
+    start=[sample(wo="BD-LIVE",status="In Process",rfr="Breakdown")]
+    closed=[sample(wo="BD-LIVE",status="Closed",rfr="Breakdown")]
+    v3_breakdown.sync(db,start,{"Tech A"},20,allowed_new_wos={"BD-LIVE"})
+    assert db.get_oos_units()==["VOIDFILL0501"]
+    assert db.get_rts_events(20)==[]
+    v3_breakdown.sync(db,closed,{"Tech A"},20,allowed_new_wos={"BD-LIVE"})
+    assert db.get_oos_units()==[]
+    assert db.get_rts_events(20)==["VOIDFILL0501"]
+    v3_breakdown.sync(db,start,{"Tech A"},20,allowed_new_wos={"BD-LIVE"})
+    assert db.get_oos_units()==[]
+    assert db.get_rts_events(20)==["VOIDFILL0501"]
+
+
+def test_several_closed_breakdown_wos_same_asset_do_not_double_rts(tmp_path):
+    db.set_db_path(tmp_path/"several_closed.db");db.init_db()
+    records=[sample(wo="BD-1",status="Closed",rfr="Breakdown"),
+             sample(wo="BD-2",status="Closed",rfr="Breakdown")]
+    v3_breakdown.sync(db,records,{"Tech A"},35,allowed_new_wos={"BD-1","BD-2"})
+    assert db.get_rts_events(35)==["VOIDFILL0501"]
