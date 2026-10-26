@@ -187,8 +187,8 @@ _SUCCESS_CUE = re.compile(
     r"\b(?:rts|return(?:ed)?\s+to\s+service|resolved|fixed|repair(?:ed)?\s+completed|"
     r"(?:back|returned)\s+to\s+normal|working\s+(?:good|fine|properly|normally)|"
     r"(?:ran|running|operat(?:ing|ed)|function(?:ing|ed)?)\s+(?:good|fine|smoothly|normally|properly|well)|"
-    r"(?:no|without)\s+(?:further\s+)?(?:issues|faults|problems)|"
-    r"seams?\s+(?:ok|okay|good)|ran\s+(?:bags|cases|boxes|machine|unit)\s+(?:good|fine|well|smoothly)|(?:ran|tested|watched)\s+\d+\s+(?:cases|boxes)\s+"
+    r"(?:no|without)\s+(?:further\s+)?(?:issues?|faults?|problems?)|"
+    r"seams?\s+(?:ok|okay|good)|ran\s+(?:bags|cases|boxes|machine|unit)\s+(?:good|fine|well|smoothly)|(?:ran|tested|watched?)\s+\d+\s+(?:cases|boxes)\s+(?:run\s+)?"
     r"(?:without|with\s+no)\s+(?:issues|faults|problems))\b", re.I)
 _TERMS_STOPWORDS = {
     "the","a","an","in","on","at","and","or","to","of","for","by","from",
