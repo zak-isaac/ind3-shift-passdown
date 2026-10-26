@@ -150,7 +150,7 @@
         {% if g.next_day_work %}<span class="d2-next-day">Next day · after midnight</span>{% endif %}
       {% else %}<small>Completion time unavailable</small>{% endif %}
     </td>
-    <td class="d2-wo">{{ g.wo_number or 'Manual' }}{% if g.wo_number %}<small class="v3-ai-result" data-ai-wo="{{ g.wo_number|e }}" style="display:block;font-size:11px" aria-live="polite" title="{{ g.ai_reason|e }}">{{ 'AI Passed' if g.ai_eligible and g.ai_status == 'passed' and g.ai_approved else 'AI Processing' if g.ai_eligible and g.ai_status in ('queued', 'writing') else 'Original Restored' if g.ai_eligible and g.ai_status in ('original','passed') else 'AI Disabled' if g.ai_eligible and not ai_enabled else 'MST Edited' if not g.ai_eligible and g.ai_status == 'passed' else '' }}</small>{% endif %}</td>
+    <td class="d2-wo">{{ g.wo_number or 'Manual' }}{% if g.wo_number %}<small class="v3-ai-result" data-ai-wo="{{ g.wo_number|e }}" style="display:block;font-size:11px" aria-live="polite" title="{{ g.ai_reason|e }}">{{ 'AI Passed' if g.ai_eligible and g.ai_status == 'passed' and g.ai_approved else 'AI Processing' if g.ai_eligible and g.ai_status in ('queued', 'writing') else 'Original Restored' if g.ai_eligible and g.ai_status in ('original','passed') else 'AI Disabled' if g.ai_eligible and not ai_enabled else 'MST Edited' if not g.ai_eligible and g.ai_status == 'passed' else '' }}</small><small class="v3-ai-fallback-reason" data-ai-reason-wo="{{ g.wo_number|e }}" {% if not (g.ai_eligible and g.ai_status=='original') %}hidden{% endif %}>{{ g.ai_reason|e if g.ai_status=='original' else '' }}</small>{% endif %}</td>
     <td class="d2-row-actions"><button type="button" class="d2-icon-button" title="View work order" aria-label="View or edit {{ g.unit }}" onclick="v3OpenHappening({{ g.main_id }}, {{ shift.id }})">View</button><form method="post" action="/v3/happening/{{ g.main_id }}/exclude"><input type="hidden" name="shift_id" value="{{ shift.id }}"><input type="hidden" name="excluded" value="{{ 0 if g.excluded else 1 }}"><button type="submit" class="d2-icon-button" title="{{ 'Restore' if g.excluded else 'Exclude' }}" aria-label="{{ 'Restore' if g.excluded else 'Exclude' }} {{ g.unit }}">{{ 'Restore' if g.excluded else 'Exclude' }}</button></form></td>
    </tr>
    {% else %}<tr class="d2-empty"><td colspan="7">No Shift Happenings yet. Import a Cetaris XLSX file or add a manual entry.</td></tr>{% endfor %}
@@ -194,8 +194,15 @@
       continue;
     }
     const safe=eligible && r.status==='passed' && Number(r.approved)===1 && Boolean(r.draft);
-    label.textContent=!eligible?'MST Edited':safe?'AI Passed':r.status==='queued'||r.status==='writing'?'AI Processing':'Original Restored';
+    label.textContent=!eligible?'MST Edited':!aiEnabled?'AI Disabled':safe?'AI Passed':
+      r.status==='queued'?'AI Queued'+(r.queue_position?' · '+r.queue_position+' in queue':''):
+      r.status==='writing'?'AI Processing (Ollama running)':'Original Restored';
     label.title=r.reason||'';
+    const reason=document.querySelector('[data-ai-reason-wo="'+CSS.escape(label.dataset.aiWo)+'"]');
+    if(reason){
+      reason.textContent=eligible && r.status==='original' ? (r.reason||'AI rewrite did not pass verification') : '';
+      reason.hidden=!(eligible && r.status==='original');
+    }
     if(summary && eligible){
       if(safe)summary.textContent=r.draft;
       else summary.textContent=summary.dataset.aiOriginal||'No technician remarks recorded.';
