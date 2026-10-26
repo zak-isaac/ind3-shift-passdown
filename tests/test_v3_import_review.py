@@ -113,3 +113,16 @@ def test_build_audit_marks_clear_cut_exclusions_not_includable():
     item = audit["ignored"][0]
     assert item["reason"] == "Technician not selected (other shift or vendor)"
     assert item["includable"] is False
+
+
+def test_updated_at_is_display_only_never_a_decision_input(tmp_path):
+    """2026-10-26: Update Date/Time is surfaced for a human reviewer's
+    context, but v3_split.py's completion-evidence engine deliberately
+    never consults it (or WO Closed Date/Time) for ownership -- this test
+    only asserts it round-trips through persistence/pending() unchanged."""
+    db.set_db_path(tmp_path / "updated_at.db"); db.init_db()
+    item = _ignored_item("300")
+    item["updated_at"] = "2026-10-20T15:30:00"
+    review.record(db, 1, [item])
+    pending = review.pending(db, 1)
+    assert pending[0]["updated_at"] == "2026-10-20T15:30:00"

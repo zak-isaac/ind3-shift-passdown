@@ -97,7 +97,7 @@
    {% for item in pending_import_review %}
    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid #dde5ee">
      <strong>{{ item.asset_id }} · WO #{{ item.wo_number }}</strong>
-     <span style="color:#6b7280;font-size:13px;">{{ item.reason }}</span>
+     <span style="color:#6b7280;font-size:13px;">{{ item.reason }}{% if item.updated_at %} — last updated {{ item.updated_at }}{% endif %}</span>
      <span style="margin-left:auto;display:flex;gap:8px;">
        <form method="post" action="/v3/import-review/{{ item.id }}/include" style="display:inline;">
          <input type="hidden" name="shift_id" value="{{ shift.id }}">

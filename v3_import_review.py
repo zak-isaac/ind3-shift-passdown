@@ -38,6 +38,7 @@ def ensure_tables(db):
           shift_id INTEGER NOT NULL, wo_number TEXT NOT NULL,
           asset_id TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT '',
           technicians TEXT NOT NULL DEFAULT '', start_at TEXT NOT NULL DEFAULT '',
+          updated_at TEXT NOT NULL DEFAULT '',
           reason TEXT NOT NULL DEFAULT '', row_json TEXT NOT NULL,
           resolved INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL
         );
@@ -71,11 +72,11 @@ def record(db, shift_id, ignored_items: list[dict]) -> None:
             )
             c.execute(
                 """INSERT INTO v3_import_review
-                   (shift_id,wo_number,asset_id,status,technicians,start_at,
+                   (shift_id,wo_number,asset_id,status,technicians,start_at,updated_at,
                     reason,row_json,resolved,created_at)
-                   VALUES (?,?,?,?,?,?,?,?,0,?)""",
+                   VALUES (?,?,?,?,?,?,?,?,?,0,?)""",
                 (shift_id, wo, item.get("asset_id", ""), item.get("status", ""),
-                 item.get("technicians", ""), item.get("start_at", ""),
+                 item.get("technicians", ""), item.get("start_at", ""), item.get("updated_at", ""),
                  item.get("reason", ""), json.dumps(item.get("raw_row") or {}), now),
             )
 

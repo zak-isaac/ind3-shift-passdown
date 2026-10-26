@@ -82,6 +82,12 @@ def build_audit(rows, selected, attributed, records, conflicting_wos=None,
             "status":", ".join(sorted({str(r.get("status") or "Unknown") for r in items})),
             "technicians":", ".join(sorted({str(r.get("tech_name") or "") for r in items})),
             "start_at":sample.get("start_at") or "",
+            # Display-only provenance, never a decision input (2026-10-26):
+            # v3_split.py's completion-evidence engine deliberately never
+            # consults WO Closed Date/Time OR Update Date/Time for ownership
+            # -- but showing the real last-touched time gives a human
+            # reviewer honest context an administrative close date can lack.
+            "updated_at":sample.get("updated_at") or "",
             "reason":why, "includable":includable, "raw_row":sample,
         })
     ignored.sort(key=lambda r:(r["start_at"],r["wo_number"]),reverse=True)
