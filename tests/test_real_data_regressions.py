@@ -45,6 +45,16 @@ class TestJargonNoLongerMangled(unittest.TestCase):
         self.assertIn("RanPak", out)
         self.assertNotIn("Rank", out)
 
+    def test_tensioner_untouched(self):
+        """Found 2026-10-26 live-testing the integration branch's actual
+        Ollama round-trip: 'held tensioner while installing' came back as
+        'held pensioner while installing' -- pyspellchecker's distance=1
+        correction had no whitelisted maintenance term to prefer over the
+        real-English word 'pensioner', a 1-letter edit away."""
+        out = sf.correct_spelling("held the tensioner while installing the belt")
+        self.assertIn("tensioner", out)
+        self.assertNotIn("pensioner", out)
+
 
 class TestKnownTypoOverridesFixed(unittest.TestCase):
     def test_tention_fixed(self):

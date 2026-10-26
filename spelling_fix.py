@@ -30,7 +30,7 @@ JARGON_WHITELIST = {
     "roller","rollers","rts","rtu","scada","sensor","sensors",
     "servo","servos","solenoid","solenoids","spurs","squeegee",
     "squeegees","tampad","taper","tapers","tapehead","tapeheads",
-    "tapper","trkgate","vfd","voidfill","voidfills","vrc",
+    "tapper","tensioner","tensioners","trkgate","vfd","voidfill","voidfills","vrc",
     "wcs","wo","wos","comm","tsp","mhe","rfid","autobaggers",
 }
 _spell.word_frequency.load_words(JARGON_WHITELIST)
