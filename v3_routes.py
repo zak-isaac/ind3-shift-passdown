@@ -1349,7 +1349,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         secure(request,shift_id)
         if not ollama_drafts.enabled():
             return return_workspace(shift_id,
-                "Local AI is disabled; set IND3_OLLAMA_REWRITE=1 in .env and restart")
+                "Local AI is disabled; launch V3 with IND3_OLLAMA_REWRITE=1 in the same terminal")
         count=ollama_drafts.queue_shift(shift_id,retry_original=True)
         return return_workspace(shift_id,
             f"Queued {count} technician work orders for local AI validation; original remarks remain protected")
