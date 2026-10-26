@@ -161,20 +161,20 @@ def test_repeat_import_heals_legacy_closed_breakdown_processed_without_rts(tmp_p
     """Old V3 set rts_logged=1 even with no rts_log row.
     Reimport must repair it in the *same* shift, without double counting."""
     db.set_db_path(tmp_path/"old_closed_missing_rts.db");db.init_db()
-    closed=[sample(wo="28026143",status="Closed",rfr="Breakdown")]
-    v3_breakdown.sync(db,closed,{"Tech A"},23,allowed_new_wos={"28026143"})
+    closed=[sample(wo="BD-LEGACY",status="Closed",rfr="Breakdown")]
+    v3_breakdown.sync(db,closed,{"Tech A"},23,allowed_new_wos={"BD-LEGACY"})
     assert db.get_rts_events(23)==["VOIDFILL0501"]
     # Simulate old database corruption: Closed and marked processed, but
     # the RTS event was never created by the historical implementation.
     with db._conn() as c:
         c.execute("DELETE FROM rts_log WHERE shift_id=23")
         state=c.execute("SELECT status,rts_logged FROM v3_breakdown_state WHERE wo_number=?",
-                        ("28026143",)).fetchone()
+                        ("BD-LEGACY",)).fetchone()
         assert state["status"]=="closed" and state["rts_logged"]==1
     assert db.get_rts_events(23)==[]
-    v3_breakdown.sync(db,closed,{"Tech A"},23,allowed_new_wos={"28026143"})
+    v3_breakdown.sync(db,closed,{"Tech A"},23,allowed_new_wos={"BD-LEGACY"})
     assert db.get_rts_events(23)==["VOIDFILL0501"]
-    v3_breakdown.sync(db,closed,{"Tech A"},23,allowed_new_wos={"28026143"})
+    v3_breakdown.sync(db,closed,{"Tech A"},23,allowed_new_wos={"BD-LEGACY"})
     assert db.get_rts_events(23)==["VOIDFILL0501"]
     # Repeated old WOs must not be re-credited on another shift.
     v3_breakdown.sync(db,closed,{"Tech A"},24,allowed_new_wos=set())
