@@ -15,6 +15,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 import db
 import v3_breakdown
+from v3_cetaris_analytics import get_cetaris_analytics
 import v3_split
 from v3_import_audit import build_audit, preview_status
 from v3_cetaris import parse_excel, select_records, technician_counts, MAX_SIZE
@@ -661,7 +662,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             return lead_redirect("/v3/analytics")
         return templates.TemplateResponse(request,"v3/analytics.html",{
             "shift_id":shift_id,
-            "data":db.get_analytics(),
+            "data":get_cetaris_analytics(),
         })
 
     def require_v3_manager(request:Request):
