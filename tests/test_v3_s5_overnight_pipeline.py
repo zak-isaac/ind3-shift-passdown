@@ -132,3 +132,62 @@ def test_s5_saturday_shift_credits_sunday_early_work_and_imports_nonduplicates(t
         assert "Oct 25, 1:18 AM" in after.text
         assert "S5-LATER" in after.text
 
+
+
+def test_s5_breakdown_in_process_is_oos_and_later_closed_becomes_rts(tmp_path,monkeypatch):
+    """Full upload-to-sidebar lifecycle across Sunday -> Monday midnight."""
+    monkeypatch.delenv("IND3_OLLAMA_REWRITE",raising=False)
+    db.set_db_path(tmp_path/"breakdown_overnight.db"); db.init_db()
+    sid=db.start_shift("2026-10-25","S5","Weekend MST")
+    app=FastAPI()
+    app.mount("/static",StaticFiles(directory=str(ROOT/"static")),name="static")
+    app.include_router(create_v3_router(
+        Jinja2Templates(directory=str(ROOT/"templates")),
+        is_lead_authed=lambda req: req.cookies.get("lead_auth")=="test",
+        can_manage_shift=lambda req,id:id==sid,
+        resolve_my_shift=lambda req: db.get_shift(sid),
+        shift_window=lambda code,day:(
+            datetime.combine(day,time(17,30)),
+            datetime.combine(day+timedelta(days=1),time(7))),
+        lead_redirect=lambda _: RedirectResponse("/v3/login",status_code=303),
+        now_func=lambda: datetime(2026,10,26,4,30)))
+    def make_book(rows):
+        book=Workbook(); ws=book.active;ws.append(HEADERS)
+        for r in rows:ws.append(r)
+        buf=BytesIO();book.save(buf)
+        return buf.getvalue()
+    in_process=labor("IP-400","2026-10-25T20:00:00",None,
+                     status="In Process",category="Breakdown")
+    # WO closing is an administrative event; actual tech return is earlier.
+    first_closed=labor("CLOSED-401","2026-10-25T23:25:00",
+                       "2026-10-26T01:45:00",service="2026-10-26T01:40:00",
+                       status="Closed",category="Breakdown")
+    with TestClient(app) as client:
+        client.cookies.set("lead_auth","test")
+        def import_rows(rows):
+            stage=client.post("/v3/import",data={"shift_id":str(sid)},files={
+                "file":("S5_Breakdown.xlsx",make_book(rows),
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+            assert stage.status_code==200, stage.text[:700]
+            token=re.search(r"/v3/import/([0-9a-f]{32})/confirm",stage.text).group(1)
+            confirmed=client.post(f"/v3/import/{token}/confirm",
+                data={"shift_id":str(sid),"techs":["Tech S5"]},follow_redirects=False)
+            assert confirmed.status_code==303,confirmed.text[:700]
+        import_rows([in_process,first_closed])
+        assert "MIP-400" in db.get_oos_units()
+        assert "MCLOSED-401" in db.get_rts_events(sid)
+        display=client.get("/v3",params={"shift_id":sid})
+        assert display.status_code==200
+        assert "Out of Service (OOS)" in display.text
+        assert "MIP-400" in display.text
+        assert "MCLOSED-401" in display.text
+        complete=labor("IP-400","2026-10-25T20:00:00",
+                       "2026-10-26T04:30:00",service="2026-10-26T04:28:00",
+                       status="Closed",category="Breakdown")
+        import_rows([complete])
+        assert "MIP-400" not in db.get_oos_units()
+        assert set(db.get_rts_events(sid))=={"MIP-400","MCLOSED-401"}
+        assert db.get_rts_events(sid).count("MIP-400")==1
+        again=client.get("/v3",params={"shift_id":sid})
+        assert "Oct 26, 4:28 AM" in again.text
+        assert "Next day" in again.text
