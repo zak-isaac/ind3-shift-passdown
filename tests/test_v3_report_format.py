@@ -41,7 +41,7 @@ def test_multi_tech_duplicates_not_repeated_but_unique_details_survive():
     ]
     h=build_shift_happenings(rows)
     assert len(h)==1
-    assert heading(h[0])=="FLEX0009: Motor brush maintenance"
+    assert heading(h[0])=="FLEX0009: Motor brush maintenance (WO#900101)"
     assert remark(h[0])=="Motor brush cleanup; Inspected both motor brushes"
     assert "replaced" not in remark(h[0]).casefold()
 
@@ -79,9 +79,22 @@ def test_different_components_or_directions_are_never_lost():
 def test_one_heading_one_bullet_per_work_order():
     h,data=example()
     assert len(h)==2
-    assert heading(h[0])=="VOIDFILL0501: Side guide not gripping boxes"
+    assert heading(h[0])=="VOIDFILL0501: Side guide not gripping boxes (WO#28010011)"
     assert remark(h[0])=="Checked column tension; PLC RTS; Recalibrated side guide and verified operation. RTS"
     assert "HIDDEN0001" not in repr(data)
+
+def test_heading_omits_wo_tag_for_manual_entries_without_a_wo():
+    """2026-10-26: Isaac's integration brief explicitly requires WO numbers
+    visible in the generated report/EML, matching the production branch
+    (formatter.py's '(WO#...)' span). Manual (non-Cetaris) entries never
+    carry a WO number and must never fabricate one."""
+    rows=[{"id":50,"unit":"MANUAL0001","wo_number":"","source":"manual",
+           "issue":"Reported by operator","raw_remarks":'[]',
+           "action":"Checked and cleared","excluded":0}]
+    h=build_shift_happenings(rows)
+    assert len(h)==1
+    assert heading(h[0])=="MANUAL0001: Reported by operator"
+    assert "WO#" not in heading(h[0])
 
 def test_mst_edited_cause_overrides_original_technician_row():
     rows=[
@@ -98,7 +111,7 @@ def test_mst_edited_cause_overrides_original_technician_row():
     }
     report=build_shift_happenings(rows,meta)
     assert len(report)==1
-    assert heading(report[0])=="VOIDFILL0201: Side guide slipping"
+    assert heading(report[0])=="VOIDFILL0201: Side guide slipping (WO#28010055)"
     assert remark(report[0])=="Inspected guide; Calibrated guide"
 
 

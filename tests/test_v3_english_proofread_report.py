@@ -40,7 +40,7 @@ def test_fallback_report_corrects_both_cause_and_remarks():
     happenings=build_shift_happenings([e],{1:{"cause_text":e["issue"]}})
     assert len(happenings)==1
     h=happenings[0]
-    assert heading(h)=="BAG0002: Gripper not gripping while boxes move"
+    assert heading(h)=="BAG0002: Gripper not gripping while boxes move (WO#TEST-ENGLISH)"
     assert remark(h)=="Paper was torn, I checked the gripper and replaced servo"
 
 
@@ -49,7 +49,7 @@ def test_ai_passed_paragraph_is_also_english_proofread():
     h=build_shift_happenings([e],{},approved_remarks={
         "TEST-ENGLISH":"Changed servor after paper toren."})[0]
     assert remark(h)=="Changed servo after paper torn."
-    assert heading(h)=="BAG0002: Gripper not gripping"
+    assert heading(h)=="BAG0002: Gripper not gripping (WO#TEST-ENGLISH)"
 
 
 def test_general_dictionary_engine_handles_unlisted_english_typos(monkeypatch):

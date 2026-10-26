@@ -97,10 +97,15 @@ def build_shift_happenings(entries: list[dict], meta_by_id: dict[int, dict]
 
 
 def heading(h: RewrittenHappening) -> str:
-    """Asset ID: Cause, with no fabricated cause if source was blank."""
+    """Asset ID: Cause (WO#...), with no fabricated cause if source was blank.
+
+    The WO number is appended only when present -- manual (non-Cetaris)
+    entries never carry one, and nothing is fabricated for them."""
     asset = (h.title or "").strip()
     cause = (h.cause or "").strip()
-    return f"{asset}: {cause}" if cause else asset
+    base = f"{asset}: {cause}" if cause else asset
+    wo = (h.wo_number or "").strip()
+    return f"{base} (WO#{wo})" if wo else base
 
 
 def remark(h: RewrittenHappening) -> str:
