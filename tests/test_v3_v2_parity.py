@@ -1,75 +1,104 @@
-"""V3 keeps V2 features working while changing only the Cetaris work-order import."""
-from datetime import datetime, date, time, timedelta
+"""Current V3 retains operational shift tools while enforcing MST-only access.
+
+This replaces older tests expecting a V2 logo and non-MST technicians to
+start shifts. The live product uses V3-only login and role boundaries.
+"""
+from datetime import datetime, time, timedelta
 from pathlib import Path
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+
+from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.testclient import TestClient
+
 import db
 from v3_routes import create_v3_router
 
 ROOT=Path(__file__).resolve().parents[1]
 
-def test_mst_and_technician_both_start_and_resume_independent_shifts(tmp_path):
-    db.set_db_path(tmp_path/'isolated.db');db.init_db()
+
+def test_v3_mst_only_login_shift_isolation_and_manager_selection(tmp_path):
+    db.set_db_path(tmp_path/"isolated.db");db.init_db()
     roster={
-       '1001':{'display_name':'First MST','is_mst':True,'is_manager':False,'shift':'S2'},
-       '2002':{'display_name':'Second Tech','is_mst':False,'is_manager':False,'shift':'S3'},
-       '8972':{'display_name':'Manager','is_mst':False,'is_manager':True,'shift':'ALL'},
+        "1001":{"display_name":"First MST","is_mst":True,
+                "is_manager":False,"shift":"S2"},
+        "2002":{"display_name":"Non-MST Technician","is_mst":False,
+                "is_manager":False,"shift":"S3"},
+        "3003":{"display_name":"Second MST","is_mst":True,
+                "is_manager":False,"shift":"S3"},
+        "8972":{"display_name":"Manager","is_mst":False,
+                "is_manager":True,"shift":"ALL"}
     }
-    visited=[]
-    async def old_dashboard(request:Request,shift_id:int):
-        visited.append(shift_id)
-        return HTMLResponse(f'V2 LOTO OOS/RTS Vendors Report Send End Shift {shift_id}')
     app=FastAPI()
-    app.mount('/static',StaticFiles(directory=str(ROOT/'static')),name='static')
+    app.mount("/static",StaticFiles(directory=str(ROOT/"static")),name="static")
     app.include_router(create_v3_router(
-       templates=Jinja2Templates(directory=str(ROOT/'templates')),
-       is_lead_authed=lambda request: False,
-       can_manage_shift=lambda request,sid: False,
-       resolve_my_shift=lambda request: None,
-       shift_window=lambda shift,d:(datetime.combine(d,time(0)), datetime.combine(d+timedelta(days=1),time(0))),
-       lead_redirect=lambda destination: None,
-       get_mst_roster=lambda:roster,
-       start_eligibility=lambda person,shift,now:(person.get('shift')==shift,False,'Wrong assignment'),
-       allowed_shift_days={'S2':{1},'S3':{1}},
-       now_func=lambda:datetime(2026,10,20,21,0),
-       get_v2_cookie_value=lambda:'v2-lead-auth',
-       legacy_lead_page=old_dashboard,
+        templates=Jinja2Templates(directory=str(ROOT/"templates")),
+        is_lead_authed=lambda _:False,
+        can_manage_shift=lambda _req,_sid:False,
+        resolve_my_shift=lambda _:None,
+        shift_window=lambda _code,day:(
+            datetime.combine(day,time(0)),
+            datetime.combine(day+timedelta(days=1),time(0))),
+        lead_redirect=lambda _:RedirectResponse("/v3/login",status_code=303),
+        get_mst_roster=lambda:roster,
+        start_eligibility=lambda person,code,now:(
+            person.get("shift")==code,False,"Wrong assignment"),
+        allowed_shift_days={"S2":{1},"S3":{1}},
+        now_func=lambda:datetime(2026,10,20,21,0),
     ))
     with TestClient(app) as browser:
-        entry=browser.get('/v3/login')
-        assert entry.status_code==200
-        assert 'walmart-logo-white.svg' in entry.text
-        assert 'Your associate number' in entry.text
-        assert 'name="pin"' not in entry.text
-        deny=browser.post('/v3/login',data={'associate_id':'8972','mode':'start','shift_type':'S2','shift_date':'2026-10-20'})
-        assert 'Associate number not found' in deny.text
-        first=browser.post('/v3/login',data={'associate_id':'1001','mode':'start','shift_type':'S2','shift_date':'2026-10-20'},follow_redirects=False)
-        assert first.status_code==303
-        sid1=db.get_active_shifts()[0]['id']
-        assert db.get_shift(sid1)['opened_by_role']=='mst'
-        assert db.get_shift(sid1)['opened_by_assoc']=='1001'
-        assert browser.get(f'/v3/operations?shift_id={sid1}').status_code==200
-        assert visited==[sid1]
-        # Non-MST associate cannot take over a shift started by someone else.
-        browser.get('/v3/logout')
-        wrong=browser.post('/v3/login',data={'associate_id':'2002','mode':'resume','shift_id':sid1})
-        assert 'not started by your associate number' in wrong.text
-        second=browser.post('/v3/login',data={'associate_id':'2002','mode':'start','shift_type':'S3','shift_date':'2026-10-20'},follow_redirects=False)
+        page=browser.get("/v3/login")
+        assert page.status_code==200
+        assert "walmart-wordmark-cropped.svg" in page.text
+        assert 'name="pin"' not in page.text
+        assert 'name="associate_id"' in page.text
+
+        # Recognized manager receives the V3 shift-selector, not a V2 login.
+        manager=browser.post("/v3/login",data={
+            "associate_id":"8972","mode":"start"},follow_redirects=False)
+        assert manager.status_code==200
+        assert 'master-shift-dialog' in manager.text
+        browser.get("/v3/logout")
+
+        started=browser.post("/v3/login",data={
+            "associate_id":"1001","mode":"start"},follow_redirects=False)
+        assert started.status_code==303
+        shifts=db.get_active_shifts()
+        assert len(shifts)==1
+        sid1=shifts[0]["id"]
+        assert db.get_shift(sid1)["opened_by_role"]=="mst"
+        assert db.get_shift(sid1)["opened_by_assoc"]=="1001"
+        assert browser.get(f"/v3/operations?shift_id={sid1}").status_code==200
+        browser.get("/v3/logout")
+
+        # Technician participation in a WO does not authorize starting or
+        # resuming the MST shift without an MST role.
+        denied=browser.post("/v3/login",data={
+            "associate_id":"2002","mode":"resume","shift_id":str(sid1)})
+        assert denied.status_code==200
+        assert "Only authorized MST associates" in denied.text
+        rejected=browser.post("/v3/login",data={
+            "associate_id":"2002","mode":"start"})
+        assert "Only authorized MST associates" in rejected.text
+
+        second=browser.post("/v3/login",data={
+            "associate_id":"3003","mode":"start"},follow_redirects=False)
         assert second.status_code==303
-        sid2=next(s['id'] for s in db.get_active_shifts() if s['shift_type']=='S3')
-        assert db.get_shift(sid2)['opened_by_role']=='tech'
-        assert db.get_shift(sid2)['opened_by_assoc']=='2002'
-        assert browser.get(f'/v3/operations?shift_id={sid2}').status_code==200
-        assert browser.get(f'/v3/operations?shift_id={sid1}').status_code==403
-        assert browser.post('/v3/manual',data={'shift_id':sid1,'unit':'M1','issue':'cross-shift'},follow_redirects=False).status_code==403
-        duplicate=browser.post('/v3/login',data={'associate_id':'2002','mode':'start','shift_type':'S3','shift_date':'2026-10-20'})
-        assert 'already active' in duplicate.text
-        # Restore the original session and verify that it still sees only sid1.
-        browser.get('/v3/logout')
-        own=browser.post('/v3/login',data={'associate_id':'1001','mode':'resume','shift_id':sid1},follow_redirects=False)
-        assert own.status_code==303
-        assert browser.get(f'/v3/operations?shift_id={sid1}').status_code==200
-        assert browser.get(f'/v3/operations?shift_id={sid2}').status_code==403
+        sid2=next(s["id"] for s in db.get_active_shifts()
+                  if s["shift_type"]=="S3")
+        assert db.get_shift(sid2)["opened_by_assoc"]=="3003"
+        assert browser.get(f"/v3/operations?shift_id={sid2}").status_code==200
+        assert browser.get(f"/v3/operations?shift_id={sid1}").status_code==403
+        assert browser.post("/v3/manual",data={
+            "shift_id":sid1,"unit":"M1","issue":"cross-shift"
+        },follow_redirects=False).status_code==403
+
+        browser.get("/v3/logout")
+        resumed=browser.post("/v3/login",data={
+            "associate_id":"1001","mode":"resume","shift_id":str(sid1)
+        },follow_redirects=False)
+        assert resumed.status_code==303
+        assert resumed.headers["location"]==f"/v3?shift_id={sid1}"
+        assert browser.get(f"/v3/operations?shift_id={sid1}").status_code==200
+        assert browser.get(f"/v3/operations?shift_id={sid2}").status_code==403
