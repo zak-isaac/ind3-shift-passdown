@@ -26,7 +26,10 @@ REQUIRED = (
     "WO Number", "Asset #", "WO Status", "Primary RFR",
     "Service/Repair Description", "Technician", "Technician Remarks",
 )
-PM_CATEGORIES = {"preventive maintenance", "preventative maintenance", "pm"}
+PM_CATEGORIES = {"preventive maintenance", "preventative maintenance"}
+# NOTE: bare "pm" is deliberately excluded -- real Cetaris RFR text like
+# "Found During PM" must never count as a completed PM on RFR text alone
+# (see test_only_preventive_maintenance_counts).
 DATE_FORMATS = ("%m/%d/%Y %I:%M %p", "%m/%d/%Y %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d")
 MAX_SIZE = 12 * 1024 * 1024
 MAX_ROWS = 30000
@@ -143,6 +146,25 @@ def technician_counts(rows: list[dict]) -> list[dict]:
     return [{"name":name, "count":len(wos)} for name,wos in sorted(by_tech.items())]
 
 
+def _is_pm_category(r: dict) -> bool:
+    """A WO is PM primarily through a populated SJ / PM Code -- that field's
+    sole purpose in Cetaris is tagging a PM job plan, unlike Primary RFR
+    which is free-text reason-for-repair that can read many different ways
+    for the same underlying work. Real facility exports confirmed this:
+    every populated SJ / PM Code (e.g. 'RNPK.001.PKM', 'E.001.BALER.WALK')
+    co-occurred with Primary RFR == 'Preventive Maintenance' in every
+    sample checked (2026-10-26, pm_uploads/*.csv) -- the two signals never
+    disagreed there. Primary RFR remains a fallback only for the case
+    where SJ / PM Code is blank but RFR still says Preventive/Preventative
+    Maintenance, so no currently-recognized real PM silently stops
+    counting. Never flip a WO to PM from RFR text alone once a populated
+    PM Code is available to check first.
+    """
+    if str(r.get("pm_code", "")).strip():
+        return True
+    return r["rfr"].strip().casefold() in PM_CATEGORIES
+
+
 def select_records(rows: list[dict], selected: set[str], start: datetime, end: datetime,
                    closure_reviews: dict[str, str] | None = None):
     """Count Completed or Closed PM WOs; other Completed WOs require MST choice."""
@@ -168,7 +190,7 @@ def select_records(rows: list[dict], selected: set[str], start: datetime, end: d
             summary["breakdown_in_process"] += 1
             eligible.append({**r, "kind": "oos"})
             continue
-        if status == "completed" and category in {"preventive maintenance", "preventative maintenance"}:
+        if status == "completed" and _is_pm_category(r):
             # Completing maintenance fulfills a PM. Cetaris administrative
             # closure may occur later and must not delay the completed count.
             summary["pm_rows"] += 1
@@ -193,7 +215,7 @@ def select_records(rows: list[dict], selected: set[str], start: datetime, end: d
         if status != "closed":
             summary["not_closed"] += 1
             continue
-        if category in {"preventive maintenance", "preventative maintenance"}:
+        if _is_pm_category(r):
             summary["pm_rows"] += 1
             eligible.append({**r, "kind": "pm"})
         else:
