@@ -294,3 +294,71 @@ def test_ai_retry_requeues_older_passed_draft_rejected_by_new_checks(tmp_path,mo
         row=c.execute("SELECT draft,status FROM v3_ollama_drafts WHERE shift_id=?",
                       (sid,)).fetchone()
     assert row["status"]=="queued" and row["draft"]==""
+
+
+def test_structured_ollama_output_is_real_maintenance_text_without_prompt_echo(monkeypatch):
+    """The 3B model must receive only source notes, never 'Remark 1' or
+    'Return only consolidated paragraph' text that appeared in the EML."""
+    import json
+    capture = {}
+    class Response:
+        def __enter__(self):return self
+        def __exit__(self,*args):return False
+    def local_response(request,timeout=None):
+        capture["url"]=request.full_url
+        capture["body"]=json.loads(request.data.decode())
+        return Response()
+    monkeypatch.setattr(ai.urllib.request,"urlopen",local_response)
+    monkeypatch.setattr(ai.json,"load",lambda _:{
+        "message":{"content":json.dumps({
+            "work_log":"Paper was repositioned properly."
+        })}})
+    text,status,reason=ai._generate({
+        "source_json":json.dumps(["Paper repositioned properly."]),
+        "asset":"BAG0009","cause":"Excessive regen or internal voltage"})
+    assert status=="passed" and text=="Paper was repositioned properly."
+    assert capture["url"]=="http://127.0.0.1:11434/api/chat"
+    body=capture["body"]
+    assert body["format"]["required"]==["work_log"]
+    assert body["options"]["temperature"]==0
+    original_prompt=body["messages"][1]["content"]
+    assert json.loads(original_prompt)=={
+        "technician_notes":["Paper repositioned properly."]}
+    assert "Remark 1:" not in original_prompt
+    assert "Excessive regen" not in original_prompt
+    assert "Return only the consolidated" not in original_prompt
+
+
+def test_structured_ollama_can_preserve_distinct_multitech_actions(monkeypatch):
+    import json
+    class Response:
+        def __enter__(self):return self
+        def __exit__(self,*args):return False
+    monkeypatch.setattr(ai.urllib.request,"urlopen",lambda *a,**kw:Response())
+    monkeypatch.setattr(ai.json,"load",lambda _:{
+        "message":{"content":json.dumps({
+            "work_log":"Paper repositioned properly; reset module and cleaned blade."
+        })}})
+    text,status,_=ai._generate({
+        "source_json":json.dumps(["Paper repositioned properly.",
+                                  "Reset module; blade cleaned."]),
+        "asset":"BAG0002","cause":"Paper adjustment"})
+    assert status=="passed", (status,text)
+    assert "reset module" in text
+
+
+def test_structured_ollama_bad_content_still_restores_source(monkeypatch):
+    import json
+    class Response:
+        def __enter__(self):return self
+        def __exit__(self,*args):return False
+    monkeypatch.setattr(ai.urllib.request,"urlopen",lambda *a,**kw:Response())
+    monkeypatch.setattr(ai.json,"load",lambda _:{
+        "message":{"content":json.dumps({
+            "work_log":"Consolidated maintenance actions: Replaced two boxes of wire."
+        })}})
+    text,status,reason=ai._generate({
+        "source_json":json.dumps(["Replaced two boxes of wire."]),
+        "asset":"BALER0005","cause":"Wire"})
+    assert text=="" and status=="original"
+    assert "instruction" in reason.lower()
