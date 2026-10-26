@@ -124,6 +124,15 @@ def init_db() -> None:
         existing_shift_cols = {row[1] for row in c.execute("PRAGMA table_info(shifts)")}
         if "notes" not in existing_shift_cols:
             c.execute("ALTER TABLE shifts ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
+        if "is_test_shift" not in existing_shift_cols:
+            # A durable sandbox shift (2026-10-24 request): exempt from the
+            # time-window auto-close in v3_routes._v3_live_shifts(), exempt
+            # from purge_orphaned_shifts() below, and ignored by every real
+            # shift-start eligibility/slot-occupancy check so it can never
+            # block a real technician/MST from starting their own S1-S5
+            # shift. Does NOT count toward the 2-active-shift cap either --
+            # see start_shift()'s active_count query.
+            c.execute("ALTER TABLE shifts ADD COLUMN is_test_shift INTEGER NOT NULL DEFAULT 0")
 
 
         c.execute("""
@@ -276,27 +285,34 @@ def init_db() -> None:
 
 def start_shift(date: str, shift_type: str, lead_name: str,
                 opened_by_role: str = "mst", is_ot: bool = False,
-                opened_by_assoc: str = "") -> int:
-    """Open a new shift. Up to 2 can run simultaneously during overlap windows.
-    Raises ValueError('max_active') if 2 are already running.
+                opened_by_assoc: str = "", is_test_shift: bool = False) -> int:
+    """Open a new shift. Up to 2 REAL shifts can run simultaneously during
+    overlap windows. Raises ValueError('max_active') if 2 are already running.
 
     opened_by_role: 'mst' or 'tech' -- who actually started this shift.
     is_ot: True when an MST started a shift outside their normal assignment
     (legit overtime) -- surfaced as a badge on the dashboard for visibility.
     opened_by_assoc: the associate number that started it, for audit trail.
+    is_test_shift: a durable manual-testing sandbox (2026-10-24 request), NOT
+    a real physical shift. Never counts toward the 2-active cap, is exempt
+    from the time-window auto-close in v3_routes._v3_live_shifts() and from
+    purge_orphaned_shifts() below, and is invisible to every real shift-start
+    slot-occupancy check -- so it can never block a real technician/MST from
+    starting their own S1-S5 shift of the same type.
     """
     with _conn() as c:
-        active_count = c.execute(
-            "SELECT COUNT(*) FROM shifts WHERE is_active=1"
-        ).fetchone()[0]
-        if active_count >= 2:
-            raise ValueError("max_active")
+        if not is_test_shift:
+            active_count = c.execute(
+                "SELECT COUNT(*) FROM shifts WHERE is_active=1 AND is_test_shift=0"
+            ).fetchone()[0]
+            if active_count >= 2:
+                raise ValueError("max_active")
         cur = c.execute(
             "INSERT INTO shifts (date, shift_type, lead_name, created_at, is_active, "
-            "opened_by_role, is_ot, opened_by_assoc)"
-            " VALUES (?,?,?,?,1,?,?,?)",
+            "opened_by_role, is_ot, opened_by_assoc, is_test_shift)"
+            " VALUES (?,?,?,?,1,?,?,?,?)",
             (date, shift_type, lead_name, _now(), opened_by_role,
-             1 if is_ot else 0, opened_by_assoc.strip()),
+             1 if is_ot else 0, opened_by_assoc.strip(), 1 if is_test_shift else 0),
         )
         return cur.lastrowid
 
@@ -578,7 +594,8 @@ def get_analytics() -> dict:
 def purge_orphaned_shifts() -> int:
     """Delete inactive shifts that have zero entries and zero reports.
     These were started but abandoned before PIN verification under the old flow.
-    Safe to call at startup — active shifts are never touched.
+    Safe to call at startup — active shifts AND test/sandbox shifts
+    (is_test_shift=1) are never touched, regardless of entries/reports.
     Returns count of purged shifts.
     """
     with _conn() as c:
@@ -586,6 +603,7 @@ def purge_orphaned_shifts() -> int:
             r[0] for r in c.execute("""
                 SELECT s.id FROM shifts s
                 WHERE s.is_active = 0
+                  AND s.is_test_shift = 0
                   AND NOT EXISTS (SELECT 1 FROM entries e WHERE e.shift_id = s.id)
                   AND NOT EXISTS (SELECT 1 FROM reports r WHERE r.shift_id = s.id)
             """).fetchall()

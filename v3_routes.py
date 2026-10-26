@@ -50,6 +50,14 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         who=decode_session(request)
         return [shift for shift in db.get_active_shifts() if shift_owned_by(shift,who)]
 
+    def _v3_real_shifts():
+        """_v3_live_shifts() minus any test/sandbox shift. Every real
+        shift-start slot-occupancy or active-count check must use this, not
+        _v3_live_shifts() directly -- a sandbox shift must never block (or
+        count toward the cap for) a real technician/MST starting their own
+        S1-S5 shift of the same type."""
+        return [sh for sh in _v3_live_shifts() if not sh.get("is_test_shift")]
+
     def set_session_cookies(response, who, sid, elevated=False):
         response.set_cookie(v3_cookie, signed_session(who["associate"],sid,elevated=elevated), max_age=12*3600,
                             httponly=True, samesite="strict", path="/", secure=False)
@@ -63,6 +71,12 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         now = now_func() if now_func else datetime.now()
         visible = []
         for shift in db.get_active_shifts():
+            if shift.get("is_test_shift"):
+                # Durable manual-testing sandbox (2026-10-24 request): never
+                # auto-closed by the real-shift time-window check below --
+                # it isn't a physical shift with a scheduled end time.
+                visible.append(shift)
+                continue
             try:
                 window = shift_window(shift["shift_type"], date.fromisoformat(shift["date"]))
                 if not window:
@@ -168,10 +182,12 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         if allowed_shift_days and parsed.weekday() not in allowed_shift_days.get(shift_type,()):
             return entry_page(request,"Selected shift is not scheduled for this date.")
         # Never create a second instance of a shift code; allow distinct shift
-        # codes to overlap, each under their own starter's identity.
-        if any(sh["shift_type"]==shift_type for sh in _v3_live_shifts()):
+        # codes to overlap, each under their own starter's identity. Test/
+        # sandbox shifts are invisible here -- they must never block a real
+        # associate from starting their own real shift of the same type.
+        if any(sh["shift_type"]==shift_type for sh in _v3_real_shifts()):
             return entry_page(request,f"{shift_type} is already active. Resume your own shift or contact its starter.")
-        if len(_v3_live_shifts())>=2:
+        if len(_v3_real_shifts())>=2:
             return entry_page(request,"Two overlapping shifts are already running.")
         if start_eligibility:
             allowed,is_ot,message=start_eligibility(profile,shift_type,now_func() if now_func else datetime.now())
@@ -211,7 +227,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         day=_v3_shift_day(shift_type) if shift_type in ("S1","S2","S3","S4","S5") else None
         if not day:
             return entry_page(request, "Shift is outside its working window.", master_verified=True)
-        active=_v3_live_shifts()
+        active=_v3_real_shifts()
         chosen=next((sh for sh in active if sh["shift_type"]==shift_type),None)
         if not chosen:
             if len(active)>=2:
