@@ -188,7 +188,7 @@ _SUCCESS_CUE = re.compile(
     r"(?:back|returned)\s+to\s+normal|working\s+(?:good|fine|properly|normally)|"
     r"(?:ran|running|operat(?:ing|ed)|function(?:ing|ed)?)\s+(?:good|fine|smoothly|normally|properly|well)|"
     r"(?:no|without)\s+(?:further\s+)?(?:issues|faults|problems)|"
-    r"seams?\s+(?:ok|okay|good)|(?:ran|tested|watched)\s+\d+\s+(?:cases|boxes)\s+"
+    r"seams?\s+(?:ok|okay|good)|ran\s+(?:bags|cases|boxes|machine|unit)\s+(?:good|fine|well|smoothly)|(?:ran|tested|watched)\s+\d+\s+(?:cases|boxes)\s+"
     r"(?:without|with\s+no)\s+(?:issues|faults|problems))\b", re.I)
 _TERMS_STOPWORDS = {
     "the","a","an","in","on","at","and","or","to","of","for","by","from",
@@ -238,6 +238,8 @@ def _verify(source: list[str], result: str) -> tuple[bool, str]:
     _instruction_leaks=(
         r"\bconsolidat(?:e|ed|ing|ion)\b",
         r"\bduplicat(?:e|ed|es|ing|ion)\b.{0,45}\b(?:action|remark|note|entr|line|word|statement|task|work)\b",
+        r"\bis\s+duplicat(?:e|ed)\b",
+        r"\b(?:action|remark|note|entr|line|word|statement|task|work)\b.{0,45}\bduplicat(?:e|ed|es|ing|ion)\b",
         r"\b(?:maintenance|technical|rewritten|consolidated)\s+(?:paragraph|summary|rewrite|note)\b",
         r"\b(?:source|original|technician)\s+remarks?\b",
         r"\b(?:remark|note)\s+\d+\s*:",
