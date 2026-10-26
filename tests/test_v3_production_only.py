@@ -6,9 +6,9 @@ from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
 def test_production_only_paths():
-    main=(ROOT/"main.py").read_text()
-    routes=(ROOT/"v3_routes.py").read_text()
-    html=(ROOT/"templates/v3/workspace.html").read_text()
+    main=(ROOT/"main.py").read_text(encoding="utf-8")
+    routes=(ROOT/"v3_routes.py").read_text(encoding="utf-8")
+    html=(ROOT/"templates/v3/workspace.html").read_text(encoding="utf-8")
     assert "/dev/login" not in main
     assert "db.use_sandbox_db" not in main
     assert "/dev/shift" not in routes

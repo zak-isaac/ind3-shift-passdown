@@ -964,7 +964,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
         # the import audit; they never stop extraction or demand an MST guess.
         attributed,unresolved=v3_split.assign(
             rows, selected, shift["shift_type"], shift["date"],
-            confirmed_s5_techs=split_selected, roster_shifts=roster_shifts)
+            roster_shifts=roster_shifts)
         # A Cetaris Completed WO is not officially Closed. Offer exactly
         # two MST choices before counting anything from this import.
         closure_candidates = {}

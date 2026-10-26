@@ -34,7 +34,7 @@ def test_file_preview_status_is_unique_by_wo():
     assert preview_status(rows)=={"work_orders":1,"closed":1,"completed":0,"other":0,"technicians":2}
 
 def test_workspace_jinja_keeps_production_shell():
-    html=(ROOT/"templates/v3/workspace.html").read_text()
+    html=(ROOT/"templates/v3/workspace.html").read_text(encoding="utf-8")
     assert 'class="shell design2-shell"' in html
     assert "Cetaris import summary" in html
     assert "Show {{ import_audit.ignored_count }}" not in html

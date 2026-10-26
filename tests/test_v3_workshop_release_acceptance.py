@@ -61,7 +61,7 @@ def test_analytics_handles_fresh_db_without_v3_metadata(tmp_path):
 
 
 def test_workspace_has_one_file_card_and_five_columns_without_debug_labels():
-    workspace=(ROOT/"templates/v3/workspace.html").read_text()
+    workspace=(ROOT/"templates/v3/workspace.html").read_text(encoding="utf-8")
     assert workspace.count("Change technicians</a>")==1
     assert "d2-import-summary card" not in workspace
     assert "d2-import-flow card" in workspace
@@ -75,15 +75,15 @@ def test_workspace_has_one_file_card_and_five_columns_without_debug_labels():
     assert "Completed · Close WO" not in workspace
     assert "data-ai-remark-wo" in workspace
     assert "/v3/ai/drafts?" in workspace  # AI still rewrites text automatically
-    analytics=(ROOT/"templates/v3/analytics.html").read_text()
+    analytics=(ROOT/"templates/v3/analytics.html").read_text(encoding="utf-8")
     assert "priority_totals" not in analytics
     assert "down_count" not in analytics
     assert "Down events" not in analytics
     assert "chartCategories" in analytics and "chartPMTrend" in analytics
-    topbar=(ROOT/"templates/v3/_topbar.html").read_text()
+    topbar=(ROOT/"templates/v3/_topbar.html").read_text(encoding="utf-8")
     assert "Shift owner" not in topbar and "Maintenance" not in topbar
     assert "/static/v3_live_clock.js" in topbar
-    login=(ROOT/"templates/v3/login.html").read_text()
+    login=(ROOT/"templates/v3/login.html").read_text(encoding="utf-8")
     assert "→" not in login
 
 

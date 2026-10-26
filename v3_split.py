@@ -39,14 +39,6 @@ def owner_for_close(value, day, confirmed_s5=False):
     return None
 
 
-def _owners(items, field, day, confirmed):
-    values = [parse_close(r.get(field)) for r in items]
-    values = [v for v in values if v is not None]
-    return {owner_for_close(v, day, confirmed_s5=any(
-        r.get("tech_name") in confirmed and parse_close(r.get(field)) == v
-        for r in items)) for v in values} if values else set()
-
-
 def _windows(when):
     """Return all scheduled shift/date pairs covering a work timestamp."""
     found = []
@@ -68,14 +60,15 @@ def _windows(when):
     return found
 
 
-def _resolve(when, tech, work_history, roster_shifts, confirmed_s5=False):
+def _resolve(when, tech, work_history, roster_shifts):
+    """Resolve a single timestamp to one (shift, day) pair, or None if
+    genuinely ambiguous. The S5 06:00-06:30 morning grace is NOT a special
+    case: _windows() already lists it as a real overlap option for any
+    timestamp in that range, resolved by the same roster-then-continuity
+    evidence as every other overlap below -- never auto-assigned to S5 just
+    because the technician was selected for the import.
+    """
     options = _windows(when)
-    # S5 grace is an overlap, not an automatic S4 assignment.
-    if confirmed_s5:
-        yesterday = when.date() - timedelta(days=1)
-        grace = ("S5", yesterday.isoformat())
-        if grace in options and datetime.combine(when.date(), time(6)) <= when <= datetime.combine(when.date(), time(6, 30)):
-            return grace
     if len(options) == 1:
         return options[0]
     if not options:
@@ -103,23 +96,23 @@ def _person_key(name):
     return tuple(sorted(re.findall(r"[a-z0-9]+", str(name or "").casefold())))
 
 
-def _grace_requires_confirmation(when, owner, confirmed_tech, tech):
-    if not owner or owner[0] != "S5":
-        return False
-    day = date.fromisoformat(owner[1]) + timedelta(days=1)
-    return (datetime.combine(day, time(6)) <= when <=
-            datetime.combine(day, time(6, 30)) and tech not in confirmed_tech)
-
-
-def _choose_completion_owner(when, tech, items, history, roster_shifts, confirmed):
+def _choose_completion_owner(when, tech, items, history, roster_shifts):
     """Resolve recorded *work completion*, never an administrative close.
 
     Overlaps retain established site policy: S4 until 18:00, S3 until
-    07:00 when S3 technician labor is documented, and confirmed S5 grace.
+    07:00 when S3 technician labor is documented. The S5 06:00-06:30
+    morning grace is deliberately NOT a special case here -- it is just
+    another scheduled overlap (S5-yesterday vs S4/S1-today) that _windows()
+    already lists for any timestamp in that range. Being SELECTED for the
+    S5 import confirms shift participation, not that this specific WO's
+    work continued past 6:00 AM, so grace-window work is resolved by the
+    exact same roster-then-continuity evidence as any other overlap below
+    -- never auto-granted to S5 merely because the technician was selected
+    (2026-10-26 production fix: a selected-but-unrelated technician's
+    6:15 AM completion was being silently handed to S5 with no roster or
+    continuity evidence at all).
     """
     options = _windows(when)
-    options = [pair for pair in options
-               if not _grace_requires_confirmation(when, pair, confirmed, tech)]
     if not options:
         return None
 
@@ -151,8 +144,7 @@ def _choose_completion_owner(when, tech, items, history, roster_shifts, confirme
                 return pair
 
     # Prefer completing technician's shift when two daypart windows overlap.
-    result = _resolve(when, tech, history, roster_shifts,
-                      confirmed_s5=tech in confirmed)
+    result = _resolve(when, tech, history, roster_shifts)
     if result in options:
         return result
     if len(options) == 1:
@@ -263,20 +255,25 @@ def _actual_completion(items):
 
 
 def assign(rows, selected_split, shift_code, shift_day, decisions=None,
-           confirmed_s5_techs=None, roster_shifts=None):
+           roster_shifts=None):
     """Attribute finished WOs using documented technician + completion time.
 
     No ownership dialog or MST guesswork. Ambiguous/incomplete evidence
     produces an ignored-WO audit reason; it cannot block valid WOs.
     Legacy decisions are intentionally ignored: an administrative choice
     cannot override Cetaris technician completion evidence.
+
+    `confirmed_s5_techs` was removed 2026-10-26: being selected for the S5
+    import only confirms shift participation, not that a given WO's work
+    continued into the 06:00-06:30 grace window. The grace window is now
+    resolved exactly like every other overlap, via roster assignment and
+    nearby unambiguous labor start (see _choose_completion_owner/_resolve).
     """
     if shift_code not in ("S1", "S2", "S3", "S4", "S5") or not selected_split:
         return rows, []
     day = shift_day.isoformat() if isinstance(shift_day,date) else str(shift_day)
     selected = set(selected_split)
     roster_shifts = roster_shifts or {}
-    confirmed = set(confirmed_s5_techs or ())
     history = defaultdict(list)
     by_wo = defaultdict(list)
     selected_completed = {
@@ -306,7 +303,7 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
                 owner = None
             else:
                 owner = _choose_completion_owner(
-                    when, completing_tech, items, history, roster_shifts, confirmed)
+                    when, completing_tech, items, history, roster_shifts)
                 # A shared return cannot decide an otherwise unresolved
                 # S1/S2 or S4/S5 overlap merely by list order.
                 if source.startswith("Shared In Service") and len(_windows(when))>1:
@@ -320,9 +317,6 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
             if owner is None:
                 if not reason:
                     reason = "Completion timestamp lacks reliable technician shift evidence"
-            elif _grace_requires_confirmation(when, owner, confirmed, completing_tech):
-                owner = None
-                reason = "S5 completion during grace requires confirmed S5 technician"
             else:
                 reason = ""
         else:
@@ -362,7 +356,6 @@ def assign(rows, selected_split, shift_code, shift_day, decisions=None,
             # Breakdown OOS retains start-time ownership, because an active
             # breakdown naturally has no completion timestamp yet.
             when = parse_close(r.get("start_at")) or parse_close(r.get("opened_at"))
-            if when and _resolve(when,tech,history,roster_shifts,
-                                 confirmed_s5=tech in confirmed) == (shift_code, day):
+            if when and _resolve(when,tech,history,roster_shifts) == (shift_code, day):
                 accepted.append(r)
     return accepted, pending

@@ -18,7 +18,7 @@ def test_late_admin_close_does_not_steal_s4_work():
     rows=[row(start="2026-10-23T17:17:00",service="2026-10-23T17:43:00",
               opened="2026-10-23T15:50:00",closed="2026-10-24T06:15:00")]
     assert assign(rows,{"Tech A"},"S4","2026-10-23")==(rows,[])
-    assert assign(rows,{"Tech A"},"S5","2026-10-23",confirmed_s5_techs={"Tech A"})==([],[])
+    assert assign(rows,{"Tech A"},"S5","2026-10-23")==([],[])
 
 
 def test_s5_real_work_overrides_earlier_open():
@@ -33,10 +33,37 @@ def test_cross_shift_work_resolved_by_actual_in_service():
     assert assign(rows,{"Tech A"},"S4","2026-10-23")==([],[])
 
 
-def test_s5_grace_requires_confirmation_for_actual_work():
+def test_s5_grace_without_roster_or_continuity_evidence_goes_to_review():
+    """2026-10-26 fix: being selected for the S5 import is NOT roster or
+    continuity evidence that THIS technician's 6:15 AM completion belongs to
+    S5 rather than the new day's S4. With neither kind of evidence, the WO
+    must surface to the audit for an explicit MST choice -- never be
+    silently guessed either way (old behavior incorrectly auto-granted S5
+    ownership purely because the technician was checked/selected)."""
     rows=[row(start="2026-10-24T06:15:00",service="2026-10-24T06:20:00")]
-    assert assign(rows,{"Tech A"},"S5","2026-10-23")==([],[])
-    assert assign(rows,{"Tech A"},"S5","2026-10-23",confirmed_s5_techs={"Tech A"})==(rows,[])
+    accepted,pending=assign(rows,{"Tech A"},"S5","2026-10-23")
+    assert accepted==[]
+    assert len(pending)==1 and pending[0]["wo_number"]=="101"
+    assert pending[0]["reason"]=="Completion timestamp falls in overlapping shifts without reliable technician shift evidence"
+
+
+def test_s5_grace_credited_via_roster_not_mere_selection():
+    """The fix still lets a REAL S5 technician's grace-window work through --
+    via roster assignment, the same evidence every other overlap uses."""
+    rows=[row(start="2026-10-24T06:15:00",service="2026-10-24T06:20:00")]
+    assert assign(rows,{"Tech A"},"S5","2026-10-23",
+                  roster_shifts={"Tech A":"S5"})==(rows,[])
+
+
+def test_s5_grace_credited_via_prior_unambiguous_start_this_shift():
+    """Continuity evidence (an earlier unambiguous S5 start this same shift,
+    within the 8-hour lookback window) also resolves the grace window, with
+    no roster entry needed."""
+    rows=[row(wo="201",start="2026-10-23T22:30:00",service="2026-10-23T22:50:00"),
+          row(wo="202",start="2026-10-24T06:15:00",service="2026-10-24T06:20:00")]
+    accepted,pending=assign(rows,{"Tech A"},"S5","2026-10-23")
+    assert {r["wo_number"] for r in accepted}=={"201","202"}
+    assert pending==[]
 
 
 def test_in_service_fallback_without_start():

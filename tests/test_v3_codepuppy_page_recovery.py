@@ -16,18 +16,18 @@ ROOT=Path(__file__).resolve().parents[1]
 
 def test_restored_v3_pages_and_partial_dependencies():
     for page in ("history","analytics","admin"):
-        html=(ROOT/"templates"/"v3"/(page+".html")).read_text()
+        html=(ROOT/"templates"/"v3"/(page+".html")).read_text(encoding="utf-8")
         assert "v3/_sidebar.html" in html
         assert "v3/_topbar.html" in html
         Environment().parse(html)
     for partial in ("v3_assoc_list","v3_assoc_row","v3_assoc_row_edit"):
         assert (ROOT/"templates"/"partials"/(partial+".html")).exists()
-    history=(ROOT/"templates/v3/history.html").read_text()
+    history=(ROOT/"templates/v3/history.html").read_text(encoding="utf-8")
     assert "/v3/history/{{ s.id }}/eml" in history
-    analytics=(ROOT/"templates/v3/analytics.html").read_text()
+    analytics=(ROOT/"templates/v3/analytics.html").read_text(encoding="utf-8")
     assert "chartTopAssets" in analytics and "chartWOTrend" in analytics
     assert "data | tojson" in analytics
-    admin=(ROOT/"templates/v3/admin.html").read_text()
+    admin=(ROOT/"templates/v3/admin.html").read_text(encoding="utf-8")
     assert "/v3/admin/roster" in admin and "/v3/admin/teams-webhook" in admin
     assert 'action="/admin/teams-webhook"' not in admin
 
@@ -75,8 +75,8 @@ def test_actual_s5_work_completion_is_displayed_next_calendar_day(tmp_path):
 
 
 def test_restored_admin_permissions_and_history_eml_wiring_are_present():
-    routes=(ROOT/"v3_routes.py").read_text()
-    main=(ROOT/"main.py").read_text()
+    routes=(ROOT/"v3_routes.py").read_text(encoding="utf-8")
+    main=(ROOT/"main.py").read_text(encoding="utf-8")
     assert 'async def v3_admin_roster' in routes
     assert 'async def v3_admin_roster_edit' in routes
     assert 'async def v3_history_eml' in routes
