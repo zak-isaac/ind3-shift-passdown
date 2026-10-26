@@ -15,6 +15,10 @@ def ensure_tables(db):
         CREATE TABLE IF NOT EXISTS v3_oos_overrides (
             asset_id TEXT PRIMARY KEY, keep_oos INTEGER NOT NULL DEFAULT 1
         );
+        CREATE TABLE IF NOT EXISTS v3_rts_manual_removals (
+            shift_id INTEGER NOT NULL, asset_id TEXT NOT NULL,
+            PRIMARY KEY (shift_id, asset_id)
+        );
         """)
 
 def _unresolved(c, asset, exclude_wo=""):
@@ -27,34 +31,43 @@ def _manual_hold(c, asset):
     row=c.execute("SELECT keep_oos FROM v3_oos_overrides WHERE asset_id=?", (asset,)).fetchone()
     return bool(row and row[0])
 
-def _maybe_rts(db, c, wo, asset, shift_id):
+def _maybe_rts(db, c, wo, asset, shift_id, *, repair_legacy=False):
     if _unresolved(c,asset,wo) or _manual_hold(c,asset):
         return False
-    state=c.execute("SELECT rts_logged FROM v3_breakdown_state WHERE wo_number=?", (wo,)).fetchone()
-    if not state or state[0]: return False
-    # A first-seen CLOSED Breakdown also represents a completed repair.
-    # The earlier In Process export may not be available in this shift's
-    # Cetaris file. Such a WO is allowed here only after actual technician
-    # completion/shift attribution (or if it was already tracked as OOS).
-    # Do not invent RTS when any other Breakdown remains unresolved or the
-    # MST explicitly holds the asset Out of Service (checked above).
+    # Explicit MST removal of a report line must not be undone by reimports.
+    removed=c.execute("""SELECT 1 FROM v3_rts_manual_removals
+        WHERE shift_id=? AND asset_id=?""", (shift_id,asset)).fetchone()
+    if removed:
+        return False
+    state=c.execute("""SELECT rts_logged,updated_shift_id FROM v3_breakdown_state
+        WHERE wo_number=?""",(wo,)).fetchone()
+    if not state:
+        return False
+    if state["rts_logged"] and not repair_legacy:
+        return False
+    if state["rts_logged"] and state["updated_shift_id"] != shift_id:
+        return False
+    # Older versions set rts_logged=1 even when there was no OOS row and
+    # no RTS event. Repair that *same-shift* state on a repeat Cetaris import.
+    # Other shifts' already-Closed WOs must never create a new-shift RTS.
     present=c.execute("SELECT 1 FROM oos_units WHERE unit=?", (asset,)).fetchone()
     if present:
         c.execute("DELETE FROM oos_units WHERE unit=?", (asset,))
-    # Multiple Closed Breakdown WOs for the same unit in one shift should
-    # produce one RTS display entry, not inflated duplicate unit counts.
-    already=c.execute("SELECT 1 FROM rts_log WHERE shift_id=? AND unit=? LIMIT 1",
-                      (shift_id,asset)).fetchone()
+    already=c.execute("""SELECT 1 FROM rts_log
+        WHERE shift_id=? AND unit=? LIMIT 1""",(shift_id,asset)).fetchone()
     if not already:
         c.execute("INSERT INTO rts_log(shift_id,unit,removed_at) VALUES (?,?,?)",
                   (shift_id,asset,datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")))
-    c.execute("UPDATE v3_breakdown_state SET rts_logged=1 WHERE wo_number=?", (wo,))
+    c.execute("UPDATE v3_breakdown_state SET rts_logged=1 WHERE wo_number=?",(wo,))
     return bool(present) or not bool(already)
 
 def sync(db, rows, selected, shift_id, allowed_new_wos=None):
     """Apply tracked-WO status updates from later exports without leaking new WOs from other shifts."""
     ensure_tables(db)
     priority={"in process":1,"completed":2,"closed":3}
+    # Existing Cetaris installations use Manager Review Required for a
+    # repaired Breakdown awaiting decision. It is not the same as Closed.
+    status_aliases={"manager review required":"completed"}
     allowed_new_wos = None if allowed_new_wos is None else set(allowed_new_wos)
     selected_wos={}
     with db._conn() as c:
@@ -62,7 +75,8 @@ def sync(db, rows, selected, shift_id, allowed_new_wos=None):
     for r in rows:
         if r.get("rfr","").strip().casefold()!="breakdown": continue
         wo=str(r.get("wo_number","")).strip()
-        status=str(r.get("status","")).strip().casefold()
+        status=status_aliases.get(str(r.get("status","")).strip().casefold(),
+                                   str(r.get("status","")).strip().casefold())
         asset=str(r.get("asset_id","")).strip()
         if not wo or not asset or status not in priority: continue
         if wo not in tracked and (r.get("tech_name") not in selected or
@@ -72,6 +86,7 @@ def sync(db, rows, selected, shift_id, allowed_new_wos=None):
         if previous is None or priority[status]>priority[previous[0]]:
             selected_wos[wo]=(status,asset)
     updated=0
+    retry_closed=[]
     with db._conn() as c:
         for wo,(status,asset) in selected_wos.items():
             old=c.execute("SELECT * FROM v3_breakdown_state WHERE wo_number=?", (wo,)).fetchone()
@@ -80,6 +95,8 @@ def sync(db, rows, selected, shift_id, allowed_new_wos=None):
             if old and priority[status] < priority.get(old["status"],0):
                 continue
             if old and old["status"]==status and old["asset_id"]==asset:
+                if status=="closed" and old["updated_shift_id"]==shift_id:
+                    retry_closed.append((wo,asset))
                 continue
             decision = (old["rts_decision"] if old and old["status"]==status else "")
             logged = (old["rts_logged"] if old and old["status"]==status else 0)
@@ -97,9 +114,13 @@ def sync(db, rows, selected, shift_id, allowed_new_wos=None):
                           (asset,datetime.now(timezone.utc).isoformat()))
             updated+=1
         # Resolve Closed WOs only after ALL statuses have been processed.
+        # Historical Closed states on the SAME shift may have rts_logged=1
+        # with no event (the previous false-positive "processed" bug).
         for wo,(status,asset) in selected_wos.items():
-            if status=="closed":
+            if status=="closed" and (wo,asset) not in retry_closed:
                 _maybe_rts(db,c,wo,asset,shift_id)
+        for wo,asset in retry_closed:
+            _maybe_rts(db,c,wo,asset,shift_id,repair_legacy=True)
     return updated
 
 def pending(db):
@@ -124,6 +145,14 @@ def decide(db, shift_id, decisions):
                           (asset,datetime.now(timezone.utc).isoformat()))
             else:
                 _maybe_rts(db,c,wo,asset,shift_id)
+
+def suppress_rts_reimport(db, shift_id, asset):
+    """A human removed this shift's RTS line; never recreate it on reimport."""
+    ensure_tables(db)
+    with db._conn() as c:
+        c.execute("""INSERT OR IGNORE INTO v3_rts_manual_removals
+            (shift_id,asset_id) VALUES (?,?)""",(shift_id,asset))
+
 
 def hold(db, asset, keep=True):
     ensure_tables(db)
