@@ -1,10 +1,10 @@
 {% if not pm_files %}
-<div id="v3-pm-file-list"><p>No files uploaded yet.</p></div>
+<div id="v3-pm-file-list"><p class="d2-pm-empty">No files uploaded yet.</p></div>
 {% else %}
 <div id="v3-pm-file-list">
   {% for f in pm_files %}
-  <div style="display:flex;align-items:center;gap:8px;padding:4px 0;">
-    <a href="/v3/pm-file/{{ f.id }}/download?shift_id={{ shift_id }}" title="{{ f.filename }}" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ f.filename }}</a>
+  <div class="d2-pm-file-row">
+    <a class="d2-pm-file-link" href="/v3/pm-file/{{ f.id }}/download?shift_id={{ shift_id }}" title="{{ f.filename }}">{{ f.filename }}</a>
     <form method="post" action="/v3/pm-file/{{ f.id }}/delete">
       <input type="hidden" name="shift_id" value="{{ shift_id }}">
       <button type="submit" class="d2-icon-button" title="Remove file" aria-label="Remove {{ f.filename }}">Remove</button>

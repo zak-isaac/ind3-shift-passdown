@@ -61,12 +61,10 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
 .d2-row-actions { white-space: normal; }
 .d2-row-actions form { display: block; margin-top: 5px; }
 .d2-icon-button { background: none; padding: 4px 3px; border: none; color: #0053e2; font-size: 12px; font-weight: 700; }
-.d2-wo-table th:nth-child(1) { width: 17%; }
-.d2-wo-table th:nth-child(2) { width: 17%; }
-.d2-wo-table th:nth-child(3) { width: 22%; }
-.d2-wo-table th:nth-child(4) { width: 26%; }
-.d2-wo-table th:nth-child(5) { width: 10%; }
-.d2-wo-table th:nth-child(6) { width: 8%; }
+/* Column widths are now scoped per-table below (.d2-happenings for Shift
+   Happenings, .d2-import-audit for the ignored-WO audit) -- a shared,
+   unscoped width rule here doesn't make sense once the two tables have a
+   different number of columns. */
 .d2-table-footer { font-size: 11px; }
 .d2-tools-card h2 { font-size: 17px; }
 .d2-tool summary, .d2-tool-inner { font-size: 12px; }
@@ -129,15 +127,39 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
 @media(max-width:790px){.d2-real-clock{min-width:0}.d2-real-clock time{white-space:normal}}
 
 /* Additional WO audit inside the existing production V3 command center. */
-.d2-import-audit{margin:14px 0;padding:18px 22px}
+.d2-import-audit{margin:14px 0;padding:18px 22px;border-top:3px solid #0053e2}
 .d2-audit-kpis{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 16px}
-.d2-audit-kpis span{font-size:12px;background:#f5f8fd;padding:7px 10px;border-radius:8px;border:1px solid #dbe5f0;color:#2b4664}
+.d2-audit-kpis span{font-size:12px;background:#f5f8fd;padding:8px 12px;border-radius:8px;border:1px solid #dbe5f0;color:#2b4664}
 .d2-audit-kpis strong{font-weight:800;color:#003d77;font-size:16px;margin-right:4px}
 .d2-audit-details{border-top:1px solid #dfe8f4;padding-top:12px}
 .d2-audit-details summary{font-weight:750;font-size:13px;color:#0053a5;cursor:pointer}
-.d2-audit-scroll{margin-top:10px;max-height:380px;overflow:auto}
-.d2-audit-scroll .d2-wo-table{min-width:850px}
+.d2-audit-scroll{margin-top:10px;max-height:380px;overflow:auto;border:1px solid #e9eef5;border-radius:10px}
+.d2-import-audit .d2-wo-table{min-width:900px;table-layout:fixed}
+.d2-import-audit .d2-wo-table th:nth-child(1){width:10%}
+.d2-import-audit .d2-wo-table th:nth-child(2){width:12%}
+.d2-import-audit .d2-wo-table th:nth-child(3){width:10%}
+.d2-import-audit .d2-wo-table th:nth-child(4){width:18%}
+.d2-import-audit .d2-wo-table th:nth-child(5){width:14%}
+.d2-import-audit .d2-wo-table th:nth-child(6){width:14%}
+.d2-import-audit .d2-wo-table th:nth-child(7){width:22%}
+.d2-pm-empty{font-size:12px;color:#8698b2;font-style:italic;margin:4px 0}
+.d2-pm-file-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #eef2f8}
+.d2-pm-file-row:last-child{border-bottom:none}
+.d2-pm-file-link{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:700;color:#0053e2;text-decoration:none}
+.d2-pm-file-link:hover{text-decoration:underline}
 
+/* Shared header/row chrome for every .d2-wo-table (Shift Happenings and the
+   Imported WO audit) -- column widths stay scoped per-table above/below,
+   but both tables should look like the same application, not two
+   unrelated feature drops. Matches the approved roster-table pattern. */
+.d2-table-scroll{overflow-x:auto;border:1px solid #e9eef5;border-radius:10px}
+.d2-wo-table{border-collapse:collapse}
+.d2-wo-table thead th{text-align:left;background:#f6f9fd;color:#5c6e88;text-transform:uppercase;letter-spacing:.04em;font-weight:800;border-bottom:1px solid #e9eef5}
+.d2-wo-table tbody tr{border-bottom:1px solid #eef2f8}
+.d2-wo-table tbody tr:last-child{border-bottom:none}
+.d2-wo-table tbody tr:nth-child(even){background:#fafcfe}
+.d2-wo-table tbody tr:hover{background:#f0f6ff}
+.d2-wo-table tbody tr.d2-empty:hover{background:none}
 
 /* Restored production sidebar controls from the original Workshop UI.
    Keep styles scoped to the sidebar so the current live-clock topbar is untouched. */
@@ -255,14 +277,6 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
 
 
 /* WO completion is based on technician work, not administrative WO closure. */
-.design2-shell .d2-wo-table { min-width:1090px; }
-.design2-shell .d2-wo-table th:nth-child(1) { width:14%; }
-.design2-shell .d2-wo-table th:nth-child(2) { width:14%; }
-.design2-shell .d2-wo-table th:nth-child(3) { width:18%; }
-.design2-shell .d2-wo-table th:nth-child(4) { width:26%; }
-.design2-shell .d2-wo-table th:nth-child(5) { width:12%; }
-.design2-shell .d2-wo-table th:nth-child(6) { width:10%; }
-.design2-shell .d2-wo-table th:nth-child(7) { width:6%; }
 .d2-work-time { min-width:110px;font-size:12px;color:#1f466f;font-weight:700; }
 .d2-work-time time { display:block;font-variant-numeric:tabular-nums;white-space:nowrap; }
 .d2-work-time small {color:#62758c;font-weight:400;font-size:11px; }

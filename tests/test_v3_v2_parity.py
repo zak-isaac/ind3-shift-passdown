@@ -102,3 +102,57 @@ def test_v3_mst_only_login_shift_isolation_and_manager_selection(tmp_path):
         assert resumed.headers["location"]==f"/v3?shift_id={sid1}"
         assert browser.get(f"/v3/operations?shift_id={sid1}").status_code==200
         assert browser.get(f"/v3/operations?shift_id={sid2}").status_code==403
+
+
+def test_personal_override_2759_gets_elevated_rights_without_manager_flag(tmp_path):
+    """2026-10-26: 2759 is Isaac's own associate number, not a shared manager
+    account. It must get the same elevated/override rights as the 8972
+    master code (per main.py's _MASTER_CODES and v3_identity.py's elevated
+    session check), but its roster record itself must stay is_manager=False
+    -- the elevation is granted at the session level only, exactly like
+    production's real roster row for 2759.
+    """
+    db.set_db_path(tmp_path/"override.db");db.init_db()
+    roster={
+        "2759":{"display_name":"Isaac S","full_name":"Isaac Ssaku",
+                "is_mst":False,"is_manager":False,"shift":"S2"},
+        "1001":{"display_name":"Ordinary MST","is_mst":True,
+                "is_manager":False,"shift":"S2"},
+    }
+    app=FastAPI()
+    app.mount("/static",StaticFiles(directory=str(ROOT/"static")),name="static")
+    app.include_router(create_v3_router(
+        templates=Jinja2Templates(directory=str(ROOT/"templates")),
+        is_lead_authed=lambda _:False,
+        can_manage_shift=lambda _req,_sid:False,
+        resolve_my_shift=lambda _:None,
+        shift_window=lambda _code,day:(
+            datetime.combine(day,time(0)),
+            datetime.combine(day+timedelta(days=1),time(0))),
+        lead_redirect=lambda _:RedirectResponse("/v3/login",status_code=303),
+        get_mst_roster=lambda:roster,
+        start_eligibility=lambda person,code,now:(
+            person.get("shift")==code,False,"Wrong assignment"),
+        allowed_shift_days={"S2":{1}},
+        now_func=lambda:datetime(2026,10,20,21,0),
+    ))
+    with TestClient(app) as browser:
+        # The roster record itself is never a manager.
+        assert roster["2759"]["is_manager"] is False
+
+        # 2759 gets the same master-shift-dialog override entry as 8972,
+        # despite its roster record saying is_manager=False.
+        override=browser.post("/v3/login",data={
+            "associate_id":"2759","mode":"start"},follow_redirects=False)
+        assert override.status_code==200
+        assert "master-shift-dialog" in override.text
+
+        # Manager-only admin surface is reachable with the elevated session.
+        assert browser.get("/v3/admin/roster").status_code==200
+        browser.get("/v3/logout")
+
+        # An ordinary MST without the override code is correctly denied.
+        started=browser.post("/v3/login",data={
+            "associate_id":"1001","mode":"start"},follow_redirects=False)
+        assert started.status_code==303
+        assert browser.get("/v3/admin/roster",follow_redirects=False).status_code==403
