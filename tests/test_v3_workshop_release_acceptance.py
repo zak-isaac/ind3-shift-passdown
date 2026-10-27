@@ -65,12 +65,19 @@ def test_workspace_has_one_file_card_and_five_columns_without_debug_labels():
     assert workspace.count("Change technicians</a>")==1
     assert "d2-import-summary card" not in workspace
     assert "d2-import-flow card" in workspace
-    assert "Show {{ import_audit.ignored_count }}" not in workspace
-    assert "d2-audit-details" not in workspace
+    # 2026-10-26: Isaac explicitly asked for the detailed read-only ignored-WO
+    # audit drawer back (it was hidden by an earlier same-night simplification
+    # pass) -- these two assertions used to lock that drawer OUT, now they
+    # confirm it's present. The five-column happenings table itself (checked
+    # below) is unrelated and unchanged.
+    assert "Show {{ import_audit.ignored_count }}" in workspace
+    assert "d2-audit-details" in workspace
     assert "<th>Asset ID</th><th>Type</th><th>Cause</th><th>Tech Remarks</th><th>Action</th>" in workspace
     assert "d2-asset-wo" in workspace
     assert "<th>Completed at</th>" not in workspace
-    assert "<th>WO #</th>" not in workspace
+    # 2026-10-26: the restored Imported WO audit drawer legitimately has its
+    # own "WO #" column header (a separate table from Shift Happenings,
+    # which is already fully verified five-column via the assertion above).
     assert "AI Passed" not in workspace
     assert "Completed · Close WO" not in workspace
     assert "data-ai-remark-wo" in workspace

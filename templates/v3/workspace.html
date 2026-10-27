@@ -90,35 +90,38 @@
  </section>
  {% endif %}
 
- {% if pending_import_review %}
- <section class="card" aria-label="Needs Review: excluded work orders">
-   <h2>Needs Review — Excluded Work Orders</h2>
-   <p>These work orders were excluded from this shift's import because the evidence was ambiguous (shown below). If you know this work genuinely belongs to this shift, Include it; otherwise Dismiss to acknowledge and clear it.</p>
-   {% for item in pending_import_review %}
-   <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid #dde5ee">
-     <strong>{{ item.asset_id }} · WO #{{ item.wo_number }}</strong>
-     <span style="color:#6b7280;font-size:13px;">{{ item.reason }}{% if item.updated_at %} — last updated {{ item.updated_at }}{% endif %}</span>
-     <span style="margin-left:auto;display:flex;gap:8px;">
-       <form method="post" action="/v3/import-review/{{ item.id }}/include" style="display:inline;">
-         <input type="hidden" name="shift_id" value="{{ shift.id }}">
-         <button class="button button-outline" type="submit">Include</button>
-       </form>
-       <form method="post" action="/v3/import-review/{{ item.id }}/dismiss" style="display:inline;">
-         <input type="hidden" name="shift_id" value="{{ shift.id }}">
-         <button class="button button-outline" type="submit">Dismiss</button>
-       </form>
-     </span>
-   </div>
-   {% endfor %}
- </section>
- {% endif %}
-
  {% if import_audit %}
- <section class="d2-import-check" aria-label="Cetaris import summary">
-   <span><strong>{{ import_audit.included_work_orders }}</strong> accepted WOs from {{ import_audit.work_orders }} in the latest export</span>
+ <section class="card d2-import-audit" aria-label="Imported WO audit">
+   <div class="section-head"><div><h2>Imported WO audit</h2>
+     <p>Review all source work orders excluded from this shift; these records never count toward Shift Happenings or PMs.</p></div></div>
+   <div class="d2-audit-kpis">
+     <span><strong>{{ import_audit.work_orders }}</strong> source WOs</span>
+     <span><strong>{{ import_audit.technicians }}</strong> file technicians</span>
+     <span><strong>{{ import_audit.selected_technicians }}</strong> selected</span>
+     <span><strong>{{ import_audit.included_work_orders }}</strong> included</span>
+     <span><strong>{{ import_audit.ignored_count }}</strong> not counted</span>
+     <span><strong>{{ import_audit.oos_work_orders }}</strong> OOS separately</span>
+   </div>
    {% if shift.shift_type in ('S3','S5') and import_audit.after_midnight_included_wos is defined %}
-   <span>{{ import_audit.after_midnight_included_wos }} accepted after midnight</span>
+   <p>{{ import_audit.after_midnight_included_wos }} accepted after midnight (of {{ import_audit.after_midnight_source_wos }} after-midnight source WOs)</p>
    {% endif %}
+   {% if import_audit.ignored_count %}
+   <details class="d2-audit-details">
+     <summary>Show {{ import_audit.ignored_count }} ignored / other-shift WOs and reasons</summary>
+     <div class="d2-audit-scroll"><table class="d2-wo-table"><thead>
+       <tr><th>WO #</th><th>Asset</th><th>Status</th><th>Technicians</th><th>Labor start</th><th>Last updated</th><th>Why not counted</th></tr></thead><tbody>
+       {% for item in import_audit.ignored %}
+       <tr><td>{{ item.wo_number }}</td><td>{{ item.asset_id }}</td><td>{{ item.status }}</td>
+         <td>{{ item.technicians }}</td><td>{{ item.start_at or 'Not recorded' }}</td>
+         <td>{{ item.updated_at or 'Not recorded' }}</td><td>{{ item.reason }}</td></tr>
+       {% endfor %}
+       </tbody></table></div>
+   </details>
+   {% else %}<p>All source WOs were counted or tracked as OOS.</p>{% endif %}
+ </section>
+ {% elif imported_filename %}
+ <section class="card d2-import-audit"><h2>Imported WO audit</h2>
+   <p>This report was imported before the audit feature. Re-upload the Cetaris Excel file to see excluded WOs and reasons.</p>
  </section>
  {% endif %}
  <div class="workspace-grid d2-workspace-grid">

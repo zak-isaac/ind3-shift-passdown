@@ -76,12 +76,14 @@ def test_s4_three_closed_wos_and_older_ignored_wo_are_visible(tmp_path):
         assert "/v3?shift_id" in confirm.headers["location"]
         screen=client.get(f"/v3?shift_id={shift_id}")
         assert screen.status_code==200,screen.text[:800]
-        assert "Cetaris import summary" in screen.text
+        assert "Imported WO audit" in screen.text
         # 2026-10-26: this WO has genuinely ambiguous evidence (old September
-        # labor date), so it now legitimately appears in the actionable
-        # Needs Review panel -- but must never be counted as a real entry.
+        # labor date). The interactive Needs Review Include/Dismiss panel
+        # was removed at Isaac's request the same day; it's visible again
+        # only in the restored read-only ignored-WO audit drawer, and must
+        # never be counted as a real entry.
         assert "28025555" not in {x["wo_number"] for x in db.get_entries(shift_id)}
-        assert "Needs Review" in screen.text and "28025555" in screen.text
+        assert "Imported WO audit" in screen.text and "28025555" in screen.text
         assert "Outside this shift" in screen.text
         with db._conn() as c:
             audit=c.execute("SELECT audit_json FROM v3_import_audit WHERE shift_id=?",(shift_id,)).fetchone()

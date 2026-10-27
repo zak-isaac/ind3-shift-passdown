@@ -303,9 +303,11 @@ def test_duplicate_completed_wo_cannot_credit_another_shift(app_client):
     assert response.status_code==303
     screen=client.get(f"/v3?shift_id={sid}")
     assert screen.status_code==200
-    # Historical rejected-WO reasons remain in the DB import audit, but
-    # the old thousands-row review drawer is intentionally hidden.
-    assert "Already credited to another shift (not counted)" not in screen.text
+    # 2026-10-26: the detailed ignored-WO reason drawer is visible again
+    # (restored at Isaac's request) -- what actually matters here is that
+    # the duplicate WO was never counted as a real PM/entry for this shift,
+    # which the pm_count/get_entries checks below still verify independently.
+    assert "Already credited to another shift (not counted)" in screen.text
     with db._conn() as c:
         saved=c.execute("SELECT audit_json FROM v3_import_audit WHERE shift_id=?",(sid,)).fetchone()
     assert saved is not None

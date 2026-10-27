@@ -8,7 +8,7 @@ def test_production_v3_shell_and_import_audit():
     for token in ('class="shell design2-shell"',
                   "{% include 'v3/_sidebar.html' %}",
                   "{% include 'v3/_topbar.html' %}",
-                  "Cetaris import summary"):
+                  "Imported WO audit"):
         assert token in content
     assert "is_dev_mode" not in content
     Environment().parse(content)

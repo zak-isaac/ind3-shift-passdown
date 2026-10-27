@@ -36,6 +36,12 @@ def test_file_preview_status_is_unique_by_wo():
 def test_workspace_jinja_keeps_production_shell():
     html=(ROOT/"templates/v3/workspace.html").read_text(encoding="utf-8")
     assert 'class="shell design2-shell"' in html
-    assert "Cetaris import summary" in html
-    assert "Show {{ import_audit.ignored_count }}" not in html
+    # 2026-10-26: restored the detailed read-only "Imported WO audit" drawer
+    # (ignored WOs + reasons) at Isaac's explicit request -- the one-line
+    # "Cetaris import summary" and the assertion hiding the ignored-count
+    # drawer were both from an earlier same-night simplification that he's
+    # now reversing. The interactive Needs Review Include/Dismiss panel
+    # added earlier the same day stays removed; this is read-only again.
+    assert "Imported WO audit" in html
+    assert "Show {{ import_audit.ignored_count }}" in html
     Environment().parse(html)
