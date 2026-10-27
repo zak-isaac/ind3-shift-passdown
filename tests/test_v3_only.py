@@ -69,8 +69,11 @@ def test_actual_main_registers_only_v3_and_exports():
     assert "/tech" not in paths
     assert "/lead/generate" not in paths
     assert "/report/{report_id}/compose-outlook" in paths
-    # FastAPI 0.161 uses _IncludedRouter rather than flat route entries.
-    assert any(type(route).__name__=="_IncludedRouter" for route in main.app.router.routes)
+    # Route-registration behavior (V2 routes gone, V3 functional below) is
+    # what actually matters -- checking a specific FastAPI internal wrapper
+    # class name here was fragile and version-coupled (named _IncludedRouter
+    # on 0.161+, something else on 0.136.x; proven by this exact test
+    # failing across two otherwise-identical environments, 2026-10-26).
     client=TestClient(main.app)
     assert client.get("/",follow_redirects=False).headers["location"]=="/v3"
     assert client.get("/v3/login").status_code==200
