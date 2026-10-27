@@ -9,13 +9,15 @@ import base64
 import os
 import secrets
 import time
+from pathlib import Path
 from datetime import date, datetime, timedelta, timezone
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 import db
 import v3_breakdown
 import v3_import_review
+import pm_pending_parser
 from v3_cetaris_analytics import get_cetaris_analytics
 import v3_split
 from v3_import_audit import build_audit, preview_status
@@ -452,6 +454,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             "ai_enabled": ollama_drafts.enabled(),
             "pending_breakdowns": v3_breakdown.pending(db),
             "pending_import_review": v3_import_review.pending(db, shift_id),
+            "pending_pm_count": len(db.get_pending_pms(shift_id)),
         }
 
     def _remarks(e):
@@ -1374,6 +1377,71 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             c.execute("INSERT INTO v3_entry_meta(entry_id,shift_id,reported_issue,original_remarks,mst_edited,imported_v3,rfr_type) VALUES (?,?,?,?,1,0,'Work Request')",
                       (eid,shift_id,issue.strip()[:4000],json.dumps([remarks.strip()] if remarks.strip() else [])))
         return RedirectResponse(f"/v3?shift_id={shift_id}&notice=Manual+happening+added",status_code=303)
+
+    PM_UPLOAD_DIR=Path("pm_uploads")
+    PM_UPLOAD_DIR.mkdir(exist_ok=True)
+    ALLOWED_PM_EXTS={".pdf",".xlsx",".xls",".csv",".png",".jpg",".jpeg"}
+
+    def pm_section_response(request:Request,shift_id:int):
+        return templates.TemplateResponse(request,"partials/v3_pm_section.html",{
+            "shift_id":shift_id,
+            "pm_files":db.get_pm_files(shift_id),
+            "pending_pms":db.get_pending_pms(shift_id),
+        })
+
+    @router.get("/pm-files",response_class=HTMLResponse)
+    async def v3_pm_files(request:Request,shift_id:int):
+        secure(request,shift_id)
+        return pm_section_response(request,shift_id)
+
+    @router.post("/pm-upload",response_class=HTMLResponse)
+    async def v3_pm_upload(request:Request,shift_id:int=Form(...),pm_file:UploadFile=File(...)):
+        secure(request,shift_id)
+        ext=Path(pm_file.filename or "").suffix.lower()
+        if ext not in ALLOWED_PM_EXTS:
+            return HTMLResponse('<p class="d2-form-error">File type not allowed. Use PDF, Excel, CSV or image.</p>',status_code=400)
+        stored=f"{shift_id}_{uuid.uuid4().hex[:8]}{ext}"
+        dest=PM_UPLOAD_DIR/stored
+        data=await pm_file.read()
+        dest.write_bytes(data)
+        db.save_pm_file(shift_id,pm_file.filename or stored,stored,"v3-mst")
+        # Try to parse as a Cetaris open/pending PM report -- dailies to be
+        # done, a different report than the completed-WO Cetaris import above.
+        # PDF/image uploads are stored for reference only; not parsed.
+        if ext in (".xlsx",".xls",".csv"):
+            try:
+                rows=pm_pending_parser.parse_pm_pending(data,pm_file.filename or "")
+                if rows:
+                    db.save_pending_pms(shift_id,[{
+                        "wo_number":r.wo_number,"wo_date":r.wo_date,
+                        "pm_due_date":r.pm_due_date,"promise_date":r.promise_date,
+                        "asset_num":r.asset_num,
+                    } for r in rows])
+            except Exception:
+                pass
+        return pm_section_response(request,shift_id)
+
+    @router.post("/pm-file/{file_id}/delete",response_class=HTMLResponse)
+    async def v3_pm_file_delete(request:Request,file_id:int,shift_id:int=Form(...)):
+        secure(request,shift_id)
+        stored=db.delete_pm_file(file_id)
+        if stored:
+            p=PM_UPLOAD_DIR/stored
+            if p.exists(): p.unlink()
+            # Also wipe the PMs extracted from this file -- no separate
+            # per-file tracking, a shift only has one active PM report at a time.
+            db.clear_pending_pms(shift_id)
+        return pm_section_response(request,shift_id)
+
+    @router.get("/pm-file/{file_id}/download")
+    async def v3_pm_file_download(request:Request,file_id:int,shift_id:int):
+        secure(request,shift_id)
+        files={f["id"]:f for f in db.get_pm_files(shift_id)}
+        row=files.get(file_id)
+        if not row: raise HTTPException(404,"File not found")
+        path=PM_UPLOAD_DIR/row["stored_name"]
+        if not path.exists(): raise HTTPException(404,"File missing from disk")
+        return FileResponse(path,filename=row["filename"],media_type="application/octet-stream")
 
     @router.post("/loto")
     async def loto(request:Request,shift_id:int=Form(...),verified:str=Form(""),missing_keys:str=Form("")):

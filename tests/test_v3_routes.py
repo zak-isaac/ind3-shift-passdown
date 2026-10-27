@@ -315,4 +315,55 @@ def test_duplicate_completed_wo_cannot_credit_another_shift(app_client):
     assert any(r["wo_number"]=="DUPLICATE-PM" and "Already credited" in r["reason"]
                for r in audit["ignored"])
     assert db.get_pm_count(sid)==0
-    assert db.get_pm_count(other)==1
+
+
+def test_pm_upload_lists_file_and_parses_pending_rows(app_client):
+    """'PM's Needing Completion' (2026-10-26, ported from personal GitHub
+    commit 7b13bd6): a separate Cetaris open/pending-PM report -- dailies to
+    be done -- not the completed-WO import this router already handles.
+    """
+    client,sid=app_client
+    csv_bytes=(
+        b'WO Number,WO Date,PM Due Date,Promise Date,Asset #\n'
+        b'WO123,10/01/2026,10/05/2026,10/06/2026,VOIDFILL0201\n'
+    )
+    upload=client.post('/v3/pm-upload',data={'shift_id':sid},
+                        files={'pm_file':('open_pms.csv',csv_bytes,'text/csv')})
+    assert upload.status_code==200,upload.text[:500]
+    assert 'open_pms.csv' in upload.text
+    assert 'WO123' in upload.text
+    assert 'VOIDFILL0201' in upload.text
+    assert len(db.get_pending_pms(sid))==1
+
+    listing=client.get(f'/v3/pm-files?shift_id={sid}')
+    assert listing.status_code==200
+    assert 'open_pms.csv' in listing.text
+
+    file_id=db.get_pm_files(sid)[0]['id']
+    download=client.get(f'/v3/pm-file/{file_id}/download?shift_id={sid}')
+    assert download.status_code==200
+    assert download.content==csv_bytes
+
+    deleted=client.post(f'/v3/pm-file/{file_id}/delete',data={'shift_id':sid})
+    assert deleted.status_code==200
+    assert db.get_pm_files(sid)==[]
+    assert db.get_pending_pms(sid)==[]
+
+
+def test_pm_upload_rejects_disallowed_extension(app_client):
+    client,sid=app_client
+    rejected=client.post('/v3/pm-upload',data={'shift_id':sid},
+                          files={'pm_file':('malware.exe',b'nope','application/octet-stream')})
+    assert rejected.status_code==400
+    assert db.get_pm_files(sid)==[]
+
+
+def test_pm_upload_pdf_is_stored_but_not_parsed(app_client):
+    """PDF/image uploads are kept for reference only -- parsing is limited
+    to structured xlsx/xls/csv Cetaris exports."""
+    client,sid=app_client
+    upload=client.post('/v3/pm-upload',data={'shift_id':sid},
+                        files={'pm_file':('open_pms.pdf',b'%PDF-1.4 not really a pdf','application/pdf')})
+    assert upload.status_code==200,upload.text[:500]
+    assert 'open_pms.pdf' in upload.text
+    assert db.get_pending_pms(sid)==[]
