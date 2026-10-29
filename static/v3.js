@@ -24,34 +24,79 @@ document.addEventListener('keydown',(event)=>{if(event.key==='Escape'&&!document
 
 // Design 2: UI-only table search/filter; the server still enforces imports and edit permissions.
 let d2CurrentPage=1;
+let d2SelectedCategory='';
+function d2ChooseCategory(category,btn){
+  d2SelectedCategory=(category||'').toLowerCase();
+  document.querySelectorAll('.rs-filter').forEach(item=>{
+    const active=item===btn;
+    item.classList.toggle('active',active);
+    item.setAttribute('aria-pressed',String(active));
+  });
+  d2FilterHappenings(true);
+}
+function d2ShowExcluded(){
+  const checkbox=document.getElementById('rs-show-excluded');
+  if(!checkbox)return;
+  checkbox.checked=true;
+  d2FilterHappenings(true);
+  document.querySelector('.rs-is-excluded:not([hidden])')?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
 function d2FilterHappenings(resetPage=false){
   if(resetPage)d2CurrentPage=1;
-  const q=(document.getElementById('d2-search')?.value||'').toLowerCase().trim();
-  const type=(document.getElementById('d2-type')?.value||'').toLowerCase();
-  const asset=(document.getElementById('d2-asset')?.value||'').toLowerCase();
+  const search=(document.getElementById('d2-search')?.value||'').toLowerCase().trim();
+  const includeExcluded=Boolean(document.getElementById('rs-show-excluded')?.checked);
   const rows=[...document.querySelectorAll('.d2-data-row')];
   const matched=rows.filter(row=>{
     const text=(row.dataset.search+' '+row.innerText).toLowerCase();
-    return (!q||text.includes(q))&&(!type||row.dataset.type===type)&&(!asset||row.dataset.asset===asset);
+    return (!search||text.includes(search))&&
+           (!d2SelectedCategory||row.dataset.type===d2SelectedCategory)&&
+           (includeExcluded||row.dataset.excluded!=='1');
   });
-  const perPage=5;
-  const pageCount=Math.max(1,Math.ceil(matched.length/perPage));
+  const pageSize=5,pageCount=Math.max(1,Math.ceil(matched.length/pageSize));
   d2CurrentPage=Math.max(1,Math.min(d2CurrentPage,pageCount));
-  const start=(d2CurrentPage-1)*perPage;
-  const shown=new Set(matched.slice(start,start+perPage));
+  const start=(d2CurrentPage-1)*pageSize;
+  const shown=new Set(matched.slice(start,start+pageSize));
   rows.forEach(row=>{row.hidden=!shown.has(row)});
   const count=document.getElementById('d2-visible-count');
-  if(count)count.textContent=matched.length?'Showing '+(start+1)+'–'+Math.min(start+perPage,matched.length)+' of '+matched.length+' work orders':'Showing 0 of 0 work orders';
+  if(count)count.textContent=matched.length?
+    'Showing '+(start+1)+'–'+Math.min(start+pageSize,matched.length)+' of '+matched.length+' work orders':
+    'Showing 0 of 0 work orders';
   const label=document.getElementById('rs-page-label');
   if(label)label.textContent='Page '+d2CurrentPage+' of '+pageCount;
-  const prev=document.getElementById('rs-prev-page');
-  const next=document.getElementById('rs-next-page');
-  if(prev)prev.disabled=d2CurrentPage<=1;
-  if(next)next.disabled=d2CurrentPage>=pageCount;
+  const numberBtns=document.getElementById('rs-page-buttons');
+  if(numberBtns){
+    numberBtns.replaceChildren();
+    for(let p=1;p<=pageCount;p++){
+      const btn=document.createElement('button');btn.type='button';
+      btn.textContent=String(p);btn.classList.toggle('active',p===d2CurrentPage);
+      btn.setAttribute('aria-label','Page '+p);
+      if(p===d2CurrentPage)btn.setAttribute('aria-current','page');
+      btn.addEventListener('click',()=>{d2CurrentPage=p;d2FilterHappenings()});
+      numberBtns.append(btn);
+    }
+  }
+  const nav=document.getElementById('rs-pagination');
+  if(nav){
+    const buttons=nav.querySelectorAll(':scope > button');
+    if(buttons.length===4){
+      buttons[0].disabled=buttons[1].disabled=d2CurrentPage<=1;
+      buttons[2].disabled=buttons[3].disabled=d2CurrentPage>=pageCount;
+    }
+  }
 }
-function d2ChangePage(delta){d2CurrentPage+=delta;d2FilterHappenings();}
-for(const id of ['d2-search','d2-type','d2-asset'])document.getElementById(id)?.addEventListener('input',()=>d2FilterHappenings(true));
-document.addEventListener('DOMContentLoaded',()=>d2FilterHappenings());
+function d2ChangePage(delta){d2CurrentPage+=delta;d2FilterHappenings()}
+function d2GoFirst(){d2CurrentPage=1;d2FilterHappenings()}
+function d2GoLast(){const total=[...document.querySelectorAll('.d2-data-row:not([hidden])')].length;
+  // Count all matching rows by moving forward until the last page; never alter data.
+  d2CurrentPage=Number(document.getElementById('rs-page-buttons')?.children.length)||1;
+  d2FilterHappenings();
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('d2-search')?.addEventListener('input',()=>d2FilterHappenings(true));
+  document.getElementById('rs-show-excluded')?.addEventListener('change',()=>d2FilterHappenings(true));
+  document.querySelector('.rs-filter.active')?.setAttribute('aria-pressed','true');
+  d2FilterHappenings();
+});
 function v3ToggleAudit(button){
   const panel=document.getElementById('rs-audit-panel');
   if(!panel)return;
