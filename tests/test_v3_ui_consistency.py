@@ -7,7 +7,7 @@ ROOT=Path(__file__).resolve().parents[1]
 def test_production_v3_shell_and_import_audit():
     content=(ROOT/"templates/v3/workspace.html").read_text(encoding="utf-8")
     for token in (
-        'class="shell design2-shell rs-shell"',
+        'class="shell design2-shell" id="rs-shell"',
         "{% include 'v3/_sidebar.html' %}",
         "{% include 'v3/_topbar.html' %}",
         "Imported WO audit",
