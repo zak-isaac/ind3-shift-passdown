@@ -118,7 +118,7 @@
       </div>
       <div class="rs-table-scroll">
       <table class="rs-wo-table" aria-label="Shift Happenings work orders">
-        <thead><tr><th scope="col">Asset ID : Cause (WO#)</th><th scope="col">Category</th><th scope="col">Technician Remarks / Final Report</th><th scope="col">Actions</th></tr></thead>
+        <thead><tr><th scope="col">Asset ID : Cause (WO#)</th><th scope="col">Category</th><th scope="col">Technician Remarks / Final Report</th><th>Action</th></tr></thead>
         <tbody>
         {% for g in happenings %}
           <tr class="d2-data-row {{ 'rs-is-excluded' if g.excluded else '' }}" data-asset="{{ g.unit|lower|e }}" data-type="{{ g.rfr_type|lower|e }}" data-search="{{ (g.unit ~ ' ' ~ g.wo_number ~ ' ' ~ (g.cause_text or g.reported_issue) ~ ' ' ~ (g.rows|map(attribute='tech_name')|join(' ')))|lower|e }}">
