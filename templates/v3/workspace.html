@@ -193,11 +193,13 @@
         <form method="post" action="/v3/notes"><input type="hidden" name="shift_id" value="{{ shift.id }}"><label for="rs-notes-field">Notes for the next shift</label><textarea id="rs-notes-field" name="notes" rows="5" placeholder="Record reminders…">{{ shift_notes }}</textarea><button class="button button-blue" type="submit">Save Notes</button></form>
       </div></details>
       <details class="rs-section" id="rs-loto"><summary>LOTO Verification</summary><div class="rs-section-body">
-        <form method="post" action="/v3/loto"><input type="hidden" name="shift_id" value="{{ shift.id }}"><label class="rs-checkbox"><input type="checkbox" name="verified" value="1" {% if loto.loto_verified %}checked{% endif %}> All LOTO keys accounted for</label>
-        <label for="rs-loto-keys">Missing key selection (1–20)</label><select id="rs-loto-keys" name="missing_keys">
-          <option value="" {{ 'selected' if not loto.loto_missing_keys else '' }}>No missing key</option>
-          {% for i in range(1,21) %}<option value="Key {{ i }}" {{ 'selected' if loto.loto_missing_keys == 'Key ' ~ i else '' }}>Key {{ i }}</option>{% endfor %}
-        </select><p>For multiple missing keys, enter their numbers in Shift Notes until multi-select is available.</p><button type="submit" class="button button-blue">Save LOTO</button></form>
+        <form id="rs-loto-form" method="post" action="/v3/loto"><input type="hidden" name="shift_id" value="{{ shift.id }}"><label class="rs-checkbox"><input type="checkbox" name="verified" value="1" {% if loto.loto_verified %}checked{% endif %}> All LOTO keys accounted for</label>
+        <label>Missing key selection (1–20)</label><span id="rs-missing-label">{{ loto.loto_missing_keys if loto.loto_missing_keys else 'No missing keys' }}</span>
+        <input type="hidden" name="missing_keys" value="{{ loto.loto_missing_keys or '' }}">
+        <div class="rs-key-grid" role="group" aria-label="Select any missing LOTO keys">{% for i in range(1,21) %}
+          <label class="rs-key"><input type="checkbox" data-rs-missing-key value="Key {{ i }}" onchange="v3SyncMissingKeys()" {% if ('Key ' ~ i) in (loto.loto_missing_keys or '').split(', ') %}checked{% endif %}>{{ i }}</label>
+        {% endfor %}</div>
+        <button type="submit" class="button button-blue">Save LOTO</button></form>
       </div></details>
       <details class="rs-section rs-section-pm" id="rs-pending-pm"><summary>PMs Needing Completion</summary><div class="rs-section-body">
         <p>Upload the pending PM report from Cetaris; do not infer that missing records mean no PMs are pending.</p>
