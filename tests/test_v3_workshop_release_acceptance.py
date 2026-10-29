@@ -138,11 +138,17 @@ def test_manager_resume_selected_shift_opens_workspace_without_choose_again(tmp_
         assert posted2.headers["location"]==f"/v3?shift_id={s4}"
 
 
-def test_outlook_signature_matches_report_font_and_is_compact():
+def test_outlook_signature_matches_approved_reference_card():
+    """2026-10-28: Isaac asked to roll back to 'our original signature' --
+    the bordered Next Gen card matching the approved reference image. A
+    same-night Oct 25 simplification pass (commit bad54da) had swapped this
+    for a compact one-line Calibri signoff; this test used to lock that
+    compact version in. Restored signatures.py to its pre-bad54da content.
+    """
     import signatures
     output=signatures.get_signature_html("MST Test","S5")
-    assert "font-family:Calibri,Arial,sans-serif" in output
-    assert "font-size:14px" in output
+    assert "border-radius:16px" in output
+    assert "font-size:28px" in output
     assert "cid:ind3-walmart-spark" in output
-    assert "border-radius:16px" not in output
     assert "NEXT GEN FULFILLMENT" in output
+    assert "Next Generation Fulfillment Center #8972" in output
