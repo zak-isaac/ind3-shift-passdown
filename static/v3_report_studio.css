@@ -1,5 +1,5 @@
 /* Approved Report Studio only. Leaves login, analytics, and backend behavior intact. */
-.rs-shell{background:#f7f9fc}
+#rs-shell{background:#f7f9fc}
 .design2-shell .rs-main{max-width:1700px;margin:0 auto;padding:20px 18px 16px}
 .rs-intro{margin:0 0 15px}.rs-intro h1{font-size:24px;color:#11233f;margin:0;font-weight:800;letter-spacing:-.4px}.rs-intro p{color:#5a6c82;margin:3px 0 0;font-size:12px}
 .rs-import-controls{display:grid;grid-template-columns:1.15fr 1.35fr 1.05fr .95fr;gap:10px;margin-bottom:13px;align-items:stretch}
