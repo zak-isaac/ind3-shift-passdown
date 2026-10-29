@@ -1,2 +1,19 @@
-{# Primary navigation, shift owner and sign-out now live only in the sidebar. #}
-<script src="/static/v3_live_clock.js" defer></script>
+{# Shared report shell: shift information lives in the header, never repeated in the sidebar. #}
+<header class="rs-topbar" role="banner">
+  <div class="rs-header-brand">
+    <img src="/static/walmart-logo-white.svg" alt="Walmart" class="rs-header-logo">
+    <span class="rs-brand-divider" aria-hidden="true"></span>
+    <div><strong>IND3 – MST Reliability Operations</strong><small>Shift Reporting &amp; Passdown</small></div>
+  </div>
+  <div class="rs-header-meta">
+    {% if shift is defined and shift %}
+    <span class="rs-shift-badge"><span aria-hidden="true" class="rs-status-dot"></span>{{ shift.shift_type }} – {{ 'Active' if shift.is_active else 'Ended' }}</span>
+    <span class="rs-shift-date">{{ shift.date }}</span>
+    {% set scheduled_hours = {'S1':'5:30 AM – 4:00 PM','S2':'12:00 PM – 10:30 PM','S3':'8:30 PM – 7:00 AM','S4':'5:30 AM – 6:00 PM','S5':'5:30 PM – 6:00 AM'} %}
+    <span class="rs-shift-hours">{{ scheduled_hours.get(shift.shift_type, 'Shift hours vary') }}</span>
+    <span class="rs-header-user">{{ shift.lead_name or 'MST Management' }}</span>
+    {% else %}
+    <span class="rs-header-user">MST Reliability Operations</span>
+    {% endif %}
+  </div>
+</header>
