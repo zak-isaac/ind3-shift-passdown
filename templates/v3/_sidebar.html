@@ -1,17 +1,13 @@
 {% set sid = shift.id if shift is defined and shift else (shift_id if shift_id is defined else 0) %}
 <aside class="navy-sidebar rs-sidebar" id="v3-sidebar" aria-label="Primary navigation">
   <nav class="nav-block rs-primary-nav" aria-label="Application pages">
-    <a class="nav-link{{ ' active' if active_page=='workspace' else '' }}"{{ ' aria-current="page"' if active_page=='workspace' else '' }} href="/v3?shift_id={{ sid }}"><span>Shift Report</span></a>
-    <a class="nav-link{{ ' active' if active_page=='history' else '' }}"{{ ' aria-current="page"' if active_page=='history' else '' }} href="/v3/history?shift_id={{ sid }}"><span>Shift History</span></a>
-    <a class="nav-link{{ ' active' if active_page=='analytics' else '' }}"{{ ' aria-current="page"' if active_page=='analytics' else '' }} href="/v3/analytics?shift_id={{ sid }}"><span>Analytics</span></a>
-    <a class="nav-link{{ ' active' if active_page=='admin' else '' }}"{{ ' aria-current="page"' if active_page=='admin' else '' }} href="/v3/admin"><span>Administration</span></a>
+    <a class="nav-link{{ ' active' if active_page=='workspace' else '' }}"{{ ' aria-current="page"' if active_page=='workspace' else '' }} href="/v3?shift_id={{ sid }}"><svg viewBox="0 0 24 24" aria-hidden="true" class="rs-icon" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="17" rx="2"/><rect x="9" y="2" width="6" height="5" rx="1"/><path d="M9 12h6M9 16h6"/></svg><span>Shift Report</span></a>
+    <a class="nav-link{{ ' active' if active_page=='history' else '' }}"{{ ' aria-current="page"' if active_page=='history' else '' }} href="/v3/history?shift_id={{ sid }}"><svg viewBox="0 0 24 24" aria-hidden="true" class="rs-icon" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18M8 14h3M13 14h3"/></svg><span>Shift History</span></a>
+    <a class="nav-link{{ ' active' if active_page=='analytics' else '' }}"{{ ' aria-current="page"' if active_page=='analytics' else '' }} href="/v3/analytics?shift_id={{ sid }}"><svg viewBox="0 0 24 24" aria-hidden="true" class="rs-icon" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18M6 16v-6M12 16V5M18 16v-9"/><path d="M5 21V10M11 21V5M17 21V7"/></svg><span>Analytics</span></a>
+    <a class="nav-link{{ ' active' if active_page=='admin' else '' }}"{{ ' aria-current="page"' if active_page=='admin' else '' }} href="/v3/admin"><svg viewBox="0 0 24 24" aria-hidden="true" class="rs-icon" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.3 14 4l1 2 2.3.4 1.6 1.7-.7 2.2.7 2.2-1.6 1.7-2.3.4-1 2-2 .7-2-.7-1-2-2.3-.4-1.6-1.7.7-2.2-.7-2.2L7 6.4 9.3 6l1-2z"/><circle cx="12" cy="11.5" r="2.3"/></svg><span>Administration</span></a>
   </nav>
   <div class="d2-nav-bottom rs-nav-bottom">
-    <div class="rs-site"><strong>IND3</strong><small>McCordsville, IN</small><span class="rs-online"><span aria-hidden="true"></span> System Online</span></div>
-    <div class="d2-sidebar-profile">
-      <div class="d2-avatar">{{ (shift.lead_name[0]|upper if (shift is defined and shift and shift.lead_name) else 'M') }}</div>
-      <div class="d2-profile-info"><b>{{ shift.lead_name if (shift is defined and shift) else 'MST Management' }}</b><small>MST Operations</small></div>
-    </div>
-    <a class="d2-signout" href="/v3/logout" title="Sign out">Sign Out</a>
+    <div class="rs-site"><svg viewBox="0 0 24 24" aria-hidden="true" class="rs-icon" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V8l9-5 9 5v13M2 21h20M7 21v-7h10v7M7 10h2M15 10h2"/></svg><div><strong>IND3</strong><small>McCordsville, IN</small></div></div>
+    <div class="rs-online"><span class="rs-status-dot" aria-hidden="true"></span>System Online</div>
   </div>
 </aside>
