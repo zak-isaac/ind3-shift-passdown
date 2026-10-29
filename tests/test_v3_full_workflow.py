@@ -149,7 +149,7 @@ def test_full_login_import_ai_preview_and_eml(tmp_path,monkeypatch):
         html="".join(p.get_content() for p in msg.walk() if p.get_content_type()=="text/html")
         assert rewritten in html
         assert "M28030001" in html
-        assert "NEXT GEN FULFILLMENT" in html
+        assert "Save money." in html and "Live better" in html
         assert "colum tention" not in html
         assert db.get_shift(sid)["is_active"]
 

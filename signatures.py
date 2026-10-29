@@ -1,8 +1,11 @@
-"""IND3 Next Gen signature matching the approved reference image.
+"""IND3 Next Gen signature matching Isaac's real corporate Outlook signature.
 
 Table-based, inline-style HTML for Outlook. Does not alter report sections.
-The six-ray Spark is referenced by Content-ID; the EML composer must attach
-IND3_Approved_Walmart_Spark.png as an inline MIME image with the matching CID.
+The small Spark glyph is referenced by Content-ID; the EML composer must
+attach ind3-walmart-spark.png as an inline MIME image with the matching CID.
+
+Exact-name contact mapping only; never guess employee IDs or email addresses
+for someone not in KNOWN.
 """
 from __future__ import annotations
 
@@ -11,13 +14,17 @@ import re
 
 SIGNATURE_MARKER = "<!-- IND3-NEXT-GEN-SIGNATURE -->"
 SPARK_CID = "ind3-walmart-spark"
-ADDRESS = "5259 W. 500 N., McCordsville, IN 46055"
+FACILITY = "eCommerce Fulfillment Center # 7552/8972"
+ADDRESS = "5259 W. 500 North McCordsville, Indiana, 46055"
+# name -> (role, email, Walmart default/NT ID). The ID is what actually
+# appears in the signature ("Full Name - defaultid"); role/email are kept
+# for callers that still want them but are not rendered in this design.
 KNOWN = {
-    "isaac ssaku": ("Maintenance Technician", "isaac.ssaku@walmart.com"),
-    "stanley augustin": ("Maintenance Technician", "stanley.augustin@walmart.com"),
-    "alexander carr": ("Maintenance Technician", "Alexander.Carr@walmart.com"),
-    "len ward": ("Maintenance Technician", "len.ward@walmart.com"),
-    "kevin smith": ("Maintenance Technician", "Kevin.Smith1@walmart.com"),
+    "isaac ssaku": ("Maintenance Technician", "isaac.ssaku@walmart.com", "ins0002"),
+    "stanley augustin": ("Maintenance Technician", "stanley.augustin@walmart.com", "s0a00ns"),
+    "alexander carr": ("Maintenance Technician", "Alexander.Carr@walmart.com", "acarr1"),
+    "len ward": ("Maintenance Technician", "len.ward@walmart.com", "ldw006f"),
+    "kevin smith": ("Maintenance Technician", "Kevin.Smith1@walmart.com", "k0s08q0"),
 }
 
 
@@ -27,68 +34,33 @@ def get_signature_html(
 ) -> str:
     """Return a standalone signature; spark_src may be a data URL for preview.
 
-    Exact-name contact mapping only; never guess employee email addresses.
+    `shift`, `role`, and `email` are accepted for backward compatibility with
+    existing callers but are intentionally not rendered -- this design is a
+    plain name/facility/address block plus the Walmart tagline, matching
+    Isaac's real signature exactly, not a role- or shift-specific business
+    card.
     """
     name = (lead_name or "").strip() or "IND3 Maintenance Team"
-    known_role, known_email = KNOWN.get(name.casefold(), ("", ""))
-    title = (role or known_role or "IND3 Team Member").strip()
-    shift = (shift or "").strip()
-    if shift:
-        title += f" | {shift}"
-    mail = (email or known_email).strip()
-    safe_name, safe_title = html.escape(name), html.escape(title)
+    _, _, known_id = KNOWN.get(name.casefold(), ("", "", ""))
+    safe_name = html.escape(name)
+    id_html = f" - {html.escape(known_id)}" if known_id else ""
     safe_src = html.escape(spark_src, quote=True)
-    mail_row = ""
-    if mail:
-        safe_mail = html.escape(mail, quote=True)
-        mail_row = (
-            '<tr><td style="padding:0 0 11px;color:#344154;font-size:17px;'
-            'line-height:22px;">'
-            f'<a href="mailto:{safe_mail}" style="color:#344154;'
-            f'text-decoration:none;">{safe_mail}</a></td></tr>'
-        )
+    line_style = "font-family:Georgia,'Times New Roman',serif;font-weight:700;color:#4472c4;"
 
     return SIGNATURE_MARKER + f"""<table role="presentation" cellspacing="0" cellpadding="0" border="0"
-      style="width:100%;max-width:612px;background:#ffffff;border:1px solid #e4e7eb;
-      border-radius:16px;border-collapse:separate;font-family:Arial,Calibri,sans-serif;">
-      <tr><td style="padding:25px 22px 23px 23px;">
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-          <tr>
-            <td width="4" bgcolor="#0053E2" style="width:4px;min-width:4px;background:#0053E2;">&nbsp;</td>
-            <td style="padding-left:19px;">
-              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                <tr><td style="font-size:28px;line-height:34px;font-weight:700;
-                  color:#172B4D;padding:0 0 16px;">{safe_name}</td></tr>
-                <tr><td style="font-size:20px;line-height:26px;font-weight:700;
-                  color:#0053E2;padding:0 0 13px;">{safe_title}</td></tr>
-                <tr><td style="font-size:18px;line-height:24px;color:#6B778C;
-                  padding:0 0 23px;">IND3 &middot; Next Generation Fulfillment Center #8972</td></tr>
-                {mail_row}
-                <tr><td style="font-size:17px;line-height:22px;color:#465367;
-                  padding:0 0 27px;">{html.escape(ADDRESS)}</td></tr>
-                <tr><td style="border-top:1px solid #dce2ea;padding:25px 0 0;">
-                  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                    <tr>
-                      <td width="44" valign="middle" style="width:44px;padding-right:7px;">
-                        <img src="{safe_src}" width="38" height="38" alt="Walmart Spark"
-                         style="display:block;width:38px;height:38px;border:0;" />
-                      </td>
-                      <td valign="middle" style="white-space:nowrap;">
-                        <div style="font-size:21px;line-height:25px;font-weight:700;color:#0053E2;">Walmart</div>
-                        <div style="font-size:15px;line-height:20px;letter-spacing:.25px;
-                          color:#68768C;">NEXT GEN FULFILLMENT</div>
-                      </td>
-                      <td align="right" valign="middle" style="font-size:15px;line-height:20px;
-                        color:#68768C;white-space:nowrap;padding-left:12px;">
-                        Maintenance Operations
-                      </td>
-                    </tr>
-                  </table>
-                </td></tr>
-              </table>
-            </td>
-          </tr>
-        </table>
+      style="width:100%;max-width:560px;margin:20px 0 0;border-collapse:collapse;">
+      <tr><td style="{line_style}font-size:18px;line-height:24px;padding:0 0 4px;">{safe_name}{id_html}</td></tr>
+      <tr><td style="{line_style}font-size:18px;line-height:24px;padding:0 0 4px;">{html.escape(FACILITY)}</td></tr>
+      <tr><td style="{line_style}font-size:18px;line-height:24px;padding:0 0 10px;">{html.escape(ADDRESS)}</td></tr>
+      <tr><td style="padding:0 0 6px;">
+        <span style="{line_style}font-style:italic;font-size:19px;line-height:24px;">Walmart</span>
+        <img src="{safe_src}" width="16" height="16" alt="Spark"
+         style="display:inline-block;width:16px;height:16px;border:0;vertical-align:middle;margin-left:4px;" />
+      </td></tr>
+      <tr><td style="font-family:Georgia,'Times New Roman',serif;font-weight:700;
+        font-style:italic;font-size:19px;line-height:24px;">
+        <span style="color:#c0491e;">Save money.</span>
+        <span style="color:#8b6f1a;"> Live better</span>
       </td></tr>
     </table>"""
 

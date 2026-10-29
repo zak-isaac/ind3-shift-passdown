@@ -10,8 +10,8 @@ def test_signature_does_not_modify_existing_report():
     report = "<html><body><h1>S2 Passdown</h1><p>LOTO pending</p></body></html>"
     output = signatures.append_signature(report, "Isaac Ssaku", "S2")
     assert output.startswith(report.split("</body>")[0])
-    assert "Maintenance Technician | S2" in output
-    assert "NEXT GEN FULFILLMENT" in output
+    assert "Isaac Ssaku - ins0002" in output
+    assert "Save money." in output and "Live better" in output
     assert 'cid:ind3-walmart-spark' in output
     assert output.count(signatures.SIGNATURE_MARKER) == 1
     assert signatures.append_signature(output, "Isaac Ssaku", "S2") == output

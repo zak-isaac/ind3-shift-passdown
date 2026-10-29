@@ -138,17 +138,20 @@ def test_manager_resume_selected_shift_opens_workspace_without_choose_again(tmp_
         assert posted2.headers["location"]==f"/v3?shift_id={s4}"
 
 
-def test_outlook_signature_matches_approved_reference_card():
-    """2026-10-28: Isaac asked to roll back to 'our original signature' --
-    the bordered Next Gen card matching the approved reference image. A
-    same-night Oct 25 simplification pass (commit bad54da) had swapped this
-    for a compact one-line Calibri signoff; this test used to lock that
-    compact version in. Restored signatures.py to its pre-bad54da content.
+def test_outlook_signature_matches_real_corporate_format():
+    """2026-10-28: Isaac later provided a screenshot of his actual real
+    corporate Outlook signature and asked for 'something like this' instead
+    of the invented IND3 Next Gen card branding -- name-ID, facility number,
+    address, then the Walmart tagline. This supersedes the brief earlier
+    rollback to the old bordered card (same day); that design is gone too.
     """
     import signatures
-    output=signatures.get_signature_html("MST Test","S5")
-    assert "border-radius:16px" in output
-    assert "font-size:28px" in output
+    output=signatures.get_signature_html("Isaac Ssaku","S5")
+    assert "Isaac Ssaku - ins0002" in output
+    assert "eCommerce Fulfillment Center # 7552/8972" in output
+    assert "5259 W. 500 North McCordsville, Indiana, 46055" in output
     assert "cid:ind3-walmart-spark" in output
-    assert "NEXT GEN FULFILLMENT" in output
-    assert "Next Generation Fulfillment Center #8972" in output
+    assert "Save money." in output and "Live better" in output
+    # Role/shift is accepted for backward compatibility but not rendered.
+    assert "Maintenance Technician" not in output
+    assert "S5" not in output
