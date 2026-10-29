@@ -18,6 +18,10 @@ def test_production_v3_shell_and_import_audit():
         'name="pm_file"',
         'name="missing_keys"',
         'id="rs-pagination"',
+        'id="rs-show-excluded"',
+        'rs-category-filters',
+        'rs-tool-shortcut',
+        'rs-loto-quick-toggle',
         '/v3/happening/{{ g.main_id }}/exclude',
         '/v3/operations?shift_id={{ shift.id }}',
     ):
@@ -42,9 +46,9 @@ def test_approved_sidebar_does_not_repeat_header_details():
     css=(ROOT/"static/v3_design2.css").read_text(encoding="utf-8")
     assert 'id="v3-sidebar"' in sidebar
     for route in ('/v3?shift_id={{ sid }}','/v3/history?shift_id={{ sid }}',
-                  '/v3/analytics?shift_id={{ sid }}','/v3/admin','/v3/logout'):
+                  '/v3/analytics?shift_id={{ sid }}','/v3/admin'):
         assert route in sidebar
-    for title in ('Shift Report','Shift History','Analytics','Administration','Sign Out'):
+    for title in ('Shift Report','Shift History','Analytics','Administration'):
         assert title in sidebar
     for redundant in ('Dashboard','Work Orders','PMs','Change Technicians',
                       'data-v3-live-time','data-v3-live-date'):
@@ -53,7 +57,8 @@ def test_approved_sidebar_does_not_repeat_header_details():
     assert 'rs-shift-badge' in topbar
     assert 'rs-shift-hours' in topbar
     assert 'shift.date' not in sidebar
-    assert "d2-sidebar-profile" in sidebar
+    assert 'rs-header-signout' in topbar
+    assert 'href="/v3/logout"' in topbar
     assert "rs-sidebar" in css
     assert "TEST MODE" not in sidebar
     Environment().parse(sidebar)
@@ -69,4 +74,6 @@ def test_work_order_tools_and_report_sections_are_real_routes():
     assert 'range(1,21)' in content
     js=(ROOT/"static/v3.js").read_text(encoding="utf-8")
     assert 'function d2ChangePage(delta)' in js
+    assert 'function d2ChooseCategory(category,btn)' in js
+    assert 'function d2ShowExcluded()' in js
     assert 'function v3SyncMissingKeys()' in js
