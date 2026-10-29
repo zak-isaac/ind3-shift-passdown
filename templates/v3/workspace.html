@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="/static/v3_report_studio.css">
 <script src="/static/htmx.min.js"></script><script src="/static/v3.js" defer></script>
 </head><body>
-<div class="shell design2-shell rs-shell">
+<div class="shell design2-shell" id="rs-shell">
 {% set active_page = 'workspace' %}
 {% include 'v3/_sidebar.html' %}
 <div class="viewport">
@@ -125,7 +125,7 @@
             <td>
               <strong class="rs-asset">{{ g.unit or 'Unassigned' }}</strong>
               <span class="rs-cause">{{ g.cause_text or g.reported_issue or 'No cause recorded' }}</span>
-              <small class="rs-wo">{{ 'WO# ' ~ g.wo_number if g.wo_number else 'Manual entry' }}</small>
+              <small class="rs-wo">{{ 'WO #' ~ g.wo_number if g.wo_number else 'Manual entry' }}</small>
               {% if g.excluded %}<span class="d2-flag d2-flag-off">Excluded</span>{% endif %}
               {% if g.needs_review %}<span class="d2-flag">Review update</span>{% endif %}
             </td>
