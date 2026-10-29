@@ -39,7 +39,7 @@ def test_login_and_import_and_editor_and_review(app_client):
     client,sid=app_client
     resp=client.get('/v3')
     assert resp.status_code==200, resp.text[:500]
-    assert 'Shift workspace' in resp.text
+    assert 'S2 Shift Report' in resp.text
     sample=Path('/mnt/data/trial.xlsx')
     if not sample.exists(): pytest.skip('trial.xlsx unavailable')
     stage=client.post('/v3/import',data={'shift_id':sid},files={'file':('trial.xlsx',sample.read_bytes(),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')})

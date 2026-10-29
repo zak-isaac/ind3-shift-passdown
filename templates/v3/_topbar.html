@@ -1,2 +1,20 @@
-{# Primary navigation, shift owner and sign-out now live only in the sidebar. #}
-<script src="/static/v3_live_clock.js" defer></script>
+{# Shared Report Studio header; date, status and scheduled shift hours live only here. #}
+<header class="rs-topbar" role="banner">
+  <div class="rs-header-brand">
+    <img src="/static/walmart-logo-white.svg" alt="Walmart" class="rs-header-logo">
+    <span class="rs-brand-divider" aria-hidden="true"></span>
+    <div><strong>IND3 – MST Reliability Operations</strong><small>Shift Reporting &amp; Passdown</small></div>
+  </div>
+  <div class="rs-header-meta">
+    {% if shift is defined and shift %}
+    <span class="rs-shift-badge"><span class="rs-status-dot" aria-hidden="true"></span>{{ shift.shift_type }} – {{ 'Active' if shift.is_active else 'Ended' }}</span>
+    <span class="rs-shift-date">{{ shift.date }}</span>
+    {% set scheduled_hours = {'S1':'5:30 AM – 4:00 PM','S2':'12:00 PM – 10:30 PM','S3':'8:30 PM – 7:00 AM','S4':'5:30 AM – 6:00 PM','S5':'5:30 PM – 6:00 AM'} %}
+    <span class="rs-shift-hours">{{ scheduled_hours.get(shift.shift_type, 'Shift hours vary') }}</span>
+    <span class="rs-header-user"><svg viewBox="0 0 24 24" aria-hidden="true" class="rs-icon" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-7 8-7s8 3 8 7"/></svg><span>{{ shift.lead_name or 'MST Management' }}</span></span>
+    {% else %}
+    <span class="rs-header-user"><svg viewBox="0 0 24 24" aria-hidden="true" class="rs-icon" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-7 8-7s8 3 8 7"/></svg><span>MST Management</span></span>
+    {% endif %}
+    <a class="rs-header-signout" href="/v3/logout" title="Sign out"><svg viewBox="0 0 24 24" aria-hidden="true" class="rs-icon" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6M15 8l4 4-4 4M8 12h11"/></svg><span>Sign Out</span></a>
+  </div>
+</header>

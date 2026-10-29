@@ -300,3 +300,31 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
 .d2-asset-wo{display:block;margin:5px 0 0;color:#586e86;font-size:10px;font-weight:650;white-space:nowrap}
 .design2-shell .d2-dashboard{padding-top:22px}
 @media(max-width:940px){.d2-import-actions{width:100%;flex-direction:row}.d2-import-actions .button{width:auto;flex:1}.d2-import-flow{flex-wrap:wrap}}
+
+
+/* Approved IND3 Report Studio shell: compact navigation, one shared shift header. */
+.design2-shell .rs-sidebar{width:188px;flex-basis:188px;background:#102b4a;color:#ecf3ff}
+.rs-sidebar .rs-primary-nav{padding:18px 8px 0}
+.design2-shell .rs-sidebar .nav-link{font-size:13px;padding:13px 13px;margin:4px 0;color:#edf3fa;border-radius:7px;font-weight:600}
+.design2-shell .rs-sidebar .nav-link:hover{background:#224264}
+.design2-shell .rs-sidebar .nav-link.active{background:#ffc928;box-shadow:none;color:#12233a;font-weight:800}
+.rs-sidebar .rs-nav-bottom{border-top:1px solid #42607b;padding:18px 12px 16px}
+.rs-sidebar .rs-site{display:flex;flex-direction:column;gap:4px;font-size:12px;padding:4px 6px 17px;color:#fff}
+.rs-site strong{font-size:17px}.rs-site small{font-size:11px;color:#c3d3e5}
+.rs-site .rs-online{display:flex;align-items:center;gap:7px;margin-top:8px;background:#133e3c;padding:8px 10px;border-radius:8px;color:#ceffe6;font-size:11px}
+.rs-online span{width:9px;height:9px;border-radius:100%;background:#20d567}
+.rs-sidebar .d2-sidebar-profile{margin:7px 0 8px;border-top:1px solid #36516c;padding:13px 2px 3px}
+.rs-sidebar .d2-profile-info b{color:#fff}.rs-sidebar .d2-profile-info small{color:#b0c0d4}
+.rs-sidebar .d2-signout{display:block;border:1px solid #4d6985;color:#fff;border-radius:7px;text-align:center;padding:9px;margin-top:7px;font-weight:700}
+.rs-topbar{min-height:70px;padding:12px 23px;display:flex;align-items:center;justify-content:space-between;gap:16px;background:linear-gradient(114deg,#122941 0%,#132d4a 43%,#344e68 44%,#16283d 100%);border-bottom:3px solid #ffce32;color:#fff}
+.rs-header-brand{display:flex;align-items:center;gap:15px;min-width:0}.rs-header-logo{height:31px;width:143px;object-fit:contain;object-position:left center}
+.rs-brand-divider{height:30px;width:1px;background:#9baec4;flex:none}
+.rs-header-brand strong{display:block;color:white;font-size:15px;white-space:nowrap}
+.rs-header-brand small{display:block;color:#e0e8f4;font-size:11px;margin-top:3px}
+.rs-header-meta{display:flex;gap:10px;align-items:center;font-size:12px;white-space:nowrap}
+.rs-header-meta>span{padding:7px 10px;background:#10243abf;border-radius:6px}
+.rs-header-meta .rs-shift-badge{background:#104935;color:#d8ffe8;font-weight:800}
+.rs-status-dot{width:8px;height:8px;display:inline-block;border-radius:50%;background:#25e16c;margin-right:8px}
+.rs-header-meta .rs-header-user{max-width:155px;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:1190px){.rs-topbar{flex-wrap:wrap}.rs-header-brand{flex:1}}
+@media(max-width:830px){.design2-shell .rs-sidebar{width:100%;height:auto;min-height:0;position:relative}.rs-sidebar .rs-primary-nav{display:flex;flex-wrap:wrap;padding:9px}.rs-sidebar .rs-primary-nav .nav-link{display:inline-flex}.rs-sidebar .rs-nav-bottom{display:none}.rs-topbar{padding:12px}.rs-header-meta{flex-wrap:wrap}.rs-header-brand strong{white-space:normal}}

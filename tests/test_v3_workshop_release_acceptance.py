@@ -60,36 +60,32 @@ def test_analytics_handles_fresh_db_without_v3_metadata(tmp_path):
     assert get_cetaris_analytics()["totals"]["total_shifts"]==0
 
 
-def test_workspace_has_one_file_card_and_five_columns_without_debug_labels():
+def test_workspace_has_approved_report_studio_sections_without_debug_labels():
     workspace=(ROOT/"templates/v3/workspace.html").read_text(encoding="utf-8")
-    assert workspace.count("Change technicians</a>")==1
-    assert "d2-import-summary card" not in workspace
-    assert "d2-import-flow card" in workspace
-    # 2026-10-26: Isaac explicitly asked for the detailed read-only ignored-WO
-    # audit drawer back (it was hidden by an earlier same-night simplification
-    # pass) -- these two assertions used to lock that drawer OUT, now they
-    # confirm it's present. The five-column happenings table itself (checked
-    # below) is unrelated and unchanged.
+    assert "Change Technicians" in workspace
+    assert 'rs-import-controls' in workspace
+    assert 'd2-import-flow card' not in workspace
+    assert 'd2-kpis' not in workspace
+    assert 'rs-report-sections' in workspace
     assert "Show {{ import_audit.ignored_count }}" in workspace
-    assert "d2-audit-details" in workspace
-    assert "<th>Asset ID</th><th>Type</th><th>Cause</th><th>Tech Remarks</th><th>Action</th>" in workspace
-    assert "d2-asset-wo" in workspace
-    assert "<th>Completed at</th>" not in workspace
-    # 2026-10-26: the restored Imported WO audit drawer legitimately has its
-    # own "WO #" column header (a separate table from Shift Happenings,
-    # which is already fully verified five-column via the assertion above).
+    assert 'd2-audit-details' in workspace
+    for heading in ('Asset ID : Cause (WO#)','Category',
+                    'Technician Remarks / Final Report','Action'):
+        assert heading in workspace
+    assert '<th>Completed at</th>' not in workspace
     assert "AI Passed" not in workspace
     assert "Completed · Close WO" not in workspace
     assert "data-ai-remark-wo" in workspace
-    assert "/v3/ai/drafts?" in workspace  # AI still rewrites text automatically
+    assert "/v3/ai/drafts?" in workspace
     analytics=(ROOT/"templates/v3/analytics.html").read_text(encoding="utf-8")
     assert "priority_totals" not in analytics
     assert "down_count" not in analytics
     assert "Down events" not in analytics
     assert "chartCategories" in analytics and "chartPMTrend" in analytics
     topbar=(ROOT/"templates/v3/_topbar.html").read_text(encoding="utf-8")
-    assert "Shift owner" not in topbar and "Maintenance" not in topbar
-    assert "/static/v3_live_clock.js" in topbar
+    assert "rs-shift-badge" in topbar
+    assert "rs-header-brand" in topbar
+    assert "data-v3-live-clock" not in topbar
     login=(ROOT/"templates/v3/login.html").read_text(encoding="utf-8")
     assert "→" not in login
 
@@ -128,8 +124,8 @@ def test_manager_resume_selected_shift_opens_workspace_without_choose_again(tmp_
         assert "master-shift-dialog" not in posted.text
         dashboard=client.get(f"/v3?shift_id={s5}")
         assert dashboard.status_code==200, dashboard.text[:300]
-        assert "S5 · 2026-10-24" in dashboard.text
-        assert "Shift happenings" in dashboard.text
+        assert "S5 Shift Report" in dashboard.text and "2026-10-24" in dashboard.text
+        assert "Shift Happenings" in dashboard.text
         # A different selected active shift can be resumed without double-chooser.
         client.get("/v3/logout")
         posted2=client.post("/v3/login",data={

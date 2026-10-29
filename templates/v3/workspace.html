@@ -1,35 +1,65 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>IND3 / Passdown — Shift workspace</title>
-<link rel="stylesheet" href="/static/v3.css"><link rel="stylesheet" href="/static/v3_design2.css"><script src="/static/htmx.min.js"></script><script src="/static/v3.js" defer></script>
+<title>IND3 · MST Shift Report</title>
+<link rel="stylesheet" href="/static/v3.css">
+<link rel="stylesheet" href="/static/v3_design2.css">
+<link rel="stylesheet" href="/static/v3_report_studio.css">
+<script src="/static/htmx.min.js"></script><script src="/static/v3.js" defer></script>
 </head><body>
-<div class="shell design2-shell">
 {% set active_page = 'workspace' %}
+{% include 'v3/_topbar.html' %}
+<div class="shell design2-shell" id="rs-shell">
 {% include 'v3/_sidebar.html' %}
 <div class="viewport">
-{% set crumb = 'Shift workspace' %}
-{% include 'v3/_topbar.html' %}
-<main class="dashboard d2-dashboard" id="main-content">
- {% if notice %}<div class="banner success" role="status">{{ notice }}</div>{% endif %}
- {% if warning %}<div class="banner warn" role="alert">{{ warning }}</div>{% endif %}
-
- <section class="d2-import-flow card" id="cetaris" aria-label="Cetaris upload and extraction">
-   <div class="d2-flow-step {{ 'is-complete' if imported_filename or staged else '' }}"><span class="d2-step-number">1</span><div><strong>Upload Cetaris File</strong><small>{{ staged.filename if staged else (imported_filename if imported_filename else 'One Cetaris Desktop XLSX') }}</small><span class="d2-step-status">{{ 'File ready' if staged else ('Uploaded' if imported_filename else 'Awaiting upload') }}</span></div></div>
-   <div class="d2-flow-step {{ 'is-complete' if selected_techs else '' }}"><span class="d2-step-number">2</span><div><strong>Select Technicians</strong><small>{{ selected_techs|length }} technician{{ 's' if selected_techs|length != 1 else '' }} selected</small><span class="d2-step-status">{{ 'Review new selection below' if staged else ('Confirmed' if selected_techs else 'After upload') }}</span></div></div>
-   <div class="d2-flow-step {{ 'is-complete' if imported_filename else '' }}"><span class="d2-step-number">3</span><div><strong>Extraction</strong><small>{{ happenings|length }} happenings · {{ pm_count }} PMs</small><span class="d2-step-status">{{ 'Extracted successfully' if imported_filename else 'Ready to review' }}</span></div></div>
-   <div class="d2-import-actions">
-     <button class="button button-blue d2-reupload" onclick="v3OpenImport()" type="button">{{ 'Replace file' if imported_filename else 'Upload Cetaris File' }}</button>
-     {% if imported_filename %}<a class="button button-outline" href="/v3/technicians?shift_id={{ shift.id }}">Change technicians</a>{% endif %}
+<main class="dashboard d2-dashboard rs-main" id="main-content">
+  {% if notice %}<div class="banner success" role="status">{{ notice }}</div>{% endif %}
+  {% if warning %}<div class="banner warn" role="alert">{{ warning }}</div>{% endif %}
+<section class="rs-intro" aria-label="Shift report"><span class="rs-intro-icon"><svg class="rs-ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="17" rx="2"/><rect x="9" y="2" width="6" height="5" rx="1"/><path d="M9 12h6M9 16h6"/></svg></span><div><h1>{{ shift.shift_type }} Shift Report <span class="rs-active-label">{{ 'Active' if shift.is_active else 'Ended' }}</span></h1><p>Build your shift passdown report from completed work orders, key repairs, and notable events.</p></div></section>
+<section class="rs-import-controls" aria-label="Cetaris and technician controls">
+  <button type="button" class="rs-import-button" onclick="v3OpenImport()"><svg class="rs-ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V3m-5 5 5-5 5 5M4 16v4h16v-4"/></svg><span>{{ 'Replace Cetaris' if imported_filename else 'Import Cetaris' }}</span></button>
+  <div class="rs-control rs-file"><span class="rs-control-symbol rs-file-symbol"><svg class="rs-ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6zM15 3v4h4M9 12h7M9 16h7"/></svg></span><div><strong>{{ staged.filename if staged else (imported_filename if imported_filename else 'No Cetaris File Imported') }}</strong><small>{{ 'Review technician selection' if staged else (imported_at if imported_at else 'Choose an .xlsx file to begin') }}</small></div></div>
+  <a class="rs-control rs-control-link" href="/v3/technicians?shift_id={{ shift.id }}" aria-label="Change selected technicians"><span class="rs-control-symbol rs-tech-symbol"><svg class="rs-ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20v-3c0-3 3-5 6-5s6 2 6 5v3M17 5a3 3 0 0 1 0 6M19 13c2 1 2 3 2 5v2"/></svg></span><div><strong>Change Technicians ({{ selected_techs|length }})</strong><small>{{ (selected_techs|join(', ')) if selected_techs else 'None selected' }}</small></div></a>
+  <button type="button" class="rs-control rs-control-link rs-audit-toggle" aria-controls="rs-audit-panel" aria-expanded="false" onclick="v3ToggleAudit(this)"><span class="rs-control-symbol"><svg class="rs-ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6zM15 3v4h4M9 12h7M9 16h7"/></svg></span><div><strong>Import Audit</strong><small>View import details</small></div></button>
+</section>
+  <details class="rs-audit-panel card" id="rs-audit-panel">
+    <summary>Import Audit · work order inclusion and exclusions</summary>
+ {% if import_audit %}
+ <section class="card d2-import-audit" aria-label="Imported WO audit">
+   <div class="section-head"><div><h2>Imported WO audit</h2>
+     <p>Review all source work orders excluded from this shift; these records never count toward Shift Happenings or PMs.</p></div></div>
+   <div class="d2-audit-kpis">
+     <span><strong>{{ import_audit.work_orders }}</strong> source WOs</span>
+     <span><strong>{{ import_audit.technicians }}</strong> file technicians</span>
+     <span><strong>{{ import_audit.selected_technicians }}</strong> selected</span>
+     <span><strong>{{ import_audit.included_work_orders }}</strong> included</span>
+     <span><strong>{{ import_audit.ignored_count }}</strong> not counted</span>
+     <span><strong>{{ import_audit.oos_work_orders }}</strong> OOS separately</span>
    </div>
+   {% if shift.shift_type in ('S3','S5') and import_audit.after_midnight_included_wos is defined %}
+   <p>{{ import_audit.after_midnight_included_wos }} accepted after midnight (of {{ import_audit.after_midnight_source_wos }} after-midnight source WOs)</p>
+   {% endif %}
+   {% if import_audit.ignored_count %}
+   <details class="d2-audit-details">
+     <summary>Show {{ import_audit.ignored_count }} ignored / other-shift WOs and reasons</summary>
+     <div class="d2-audit-scroll"><table class="d2-wo-table"><thead>
+       <tr><th>WO #</th><th>Asset</th><th>Status</th><th>Technicians</th><th>Labor start</th><th>Last updated</th><th>Why not counted</th></tr></thead><tbody>
+       {% for item in import_audit.ignored %}
+       <tr><td>{{ item.wo_number }}</td><td>{{ item.asset_id }}</td><td>{{ item.status }}</td>
+         <td>{{ item.technicians }}</td><td>{{ item.start_at or 'Not recorded' }}</td>
+         <td>{{ item.updated_at or 'Not recorded' }}</td><td>{{ item.reason }}</td></tr>
+       {% endfor %}
+       </tbody></table></div>
+   </details>
+   {% else %}<p>All source WOs were counted or tracked as OOS.</p>{% endif %}
  </section>
-
- <section class="d2-kpis" aria-label="Shift overview">
-   <div class="card d2-kpi d2-shift-kpi"><div><small>Current shift</small><strong>{{ shift.shift_type }} · {{ shift.date }}</strong><span>IND3 · {{ shift.lead_name }}</span></div></div>
-   <div class="card d2-kpi"><div><small>Selected technicians</small><strong>{{ selected_techs|length }}</strong><span>From the Cetaris report</span></div></div>
-   <div class="card d2-kpi"><div><small>Shift happenings</small><strong>{{ happenings|length }}</strong><span>Reported work orders</span></div></div>
-   <div class="card d2-kpi"><div><small>Completed PMs</small><strong>{{ pm_count }}</strong><span>Unique Completed or Closed PM WOs</span></div></div>
+ {% elif imported_filename %}
+ <section class="card d2-import-audit"><h2>Imported WO audit</h2>
+   <p>This report was imported before the audit feature. Re-upload the Cetaris Excel file to see excluded WOs and reasons.</p>
  </section>
+ {% endif %}
 
+    <div class="rs-audit-bottom"><button type="button" class="button button-outline" onclick="v3OpenManual()">Add manual Shift Happening</button></div>
+  </details>
  <dialog class="d2-dialog" id="v3-import-dialog" aria-labelledby="v3-import-title">
    <div class="d2-dialog-head"><div><p class="eyebrow">CETARIS DESKTOP</p><h2 id="v3-import-title">Upload Cetaris File</h2></div><button type="button" class="d2-close" onclick="v3CloseImport()" aria-label="Close upload window">Close</button></div>
    <form method="post" action="/v3/import" enctype="multipart/form-data" class="d2-dialog-body">
@@ -72,6 +102,37 @@
    </form>{% else %}<div class="d2-dialog-body"><p>Upload a Cetaris file first to retrieve the technician list.</p></div>{% endif %}
  </dialog>
 
+
+<div class="rs-content">
+<section class="card rs-happenings d2-happenings" id="happenings" aria-labelledby="rs-happenings-title">
+ <div class="rs-section-heading"><span class="rs-section-icon"><svg class="rs-ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="17" rx="2"/><rect x="9" y="2" width="6" height="5" rx="1"/><path d="M9 12h6M9 16h6"/></svg></span><div class="rs-heading-copy"><h2 id="rs-happenings-title">Shift Happenings</h2><p>Select, review, and refine work orders for your shift report.</p></div>
+   <div class="rs-filter-tools"><label class="rs-search"><svg class="rs-ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="d2-search" type="search" placeholder="Search by Asset ID, WO#, keyword, or technician..." aria-label="Search Shift Happenings"></label>
+    <label class="rs-show-excluded"><input type="checkbox" id="rs-show-excluded">Show Excluded ({{ happenings|selectattr('excluded')|list|length }})</label>
+    <button type="button" id="rs-restore-toggle" class="rs-restore-all" onclick="d2ShowExcluded()"><svg class="rs-ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v5h5M4 12a8 8 0 1 1 2 6"/></svg>Restore</button></div>
+ </div>
+ <div class="rs-category-filters" role="group" aria-label="Work order category">
+  <button type="button" class="rs-filter active" data-category="" onclick="d2ChooseCategory('',this)">All ({{ happenings|length }})</button>
+  {% for category in ['Breakdown','Process Interruption','Proactive Repair','Work Request'] %}<button type="button" class="rs-filter" data-category="{{ category|lower }}" onclick="d2ChooseCategory('{{ category|lower }}',this)">{{ category }} ({{ happenings|selectattr('rfr_type','equalto',category)|list|length }})</button>{% endfor %}
+ </div>
+ <div class="rs-table-scroll"><table class="rs-wo-table" aria-label="Shift Happenings work orders"><thead><tr><th>#</th><th>Asset ID : Cause (WO#)</th><th>Technician Remarks / Final Report</th><th>Category</th><th>Action</th></tr></thead><tbody>
+ {% for g in happenings %}
+ <tr class="d2-data-row {{ 'rs-is-excluded' if g.excluded else '' }} rs-row-type-{{ g.rfr_type|lower|replace(' ','-') }}" data-excluded="{{ '1' if g.excluded else '0' }}" data-asset="{{ g.unit|lower|e }}" data-type="{{ g.rfr_type|lower|e }}" data-search="{{ (g.unit ~ ' ' ~ g.wo_number ~ ' ' ~ (g.cause_text or g.reported_issue) ~ ' ' ~ (g.rows|map(attribute='tech_name')|join(' ')) ~ ' ' ~ g.display_remarks)|lower|e }}">
+   <td><span class="rs-row-number">{{ loop.index }}</span></td>
+   <td><strong class="rs-asset">{{ g.unit or 'Unassigned' }}</strong><span class="rs-cause">{{ g.cause_text or g.reported_issue or 'No cause recorded' }}</span><small class="rs-wo">{{ 'WO #' ~ g.wo_number if g.wo_number else 'Manual entry' }}</small>{% if g.excluded %}<span class="d2-flag d2-flag-off">Excluded</span>{% endif %}{% if g.needs_review %}<span class="d2-flag">Review update</span>{% endif %}</td>
+   <td><div class="rs-remarks" {% if g.wo_number %}data-ai-remark-wo="{{ g.wo_number|e }}" data-ai-eligible="{{ '1' if g.ai_eligible else '0' }}" data-ai-original="{{ g.original_remarks|e }}"{% endif %}>{{ g.display_remarks or 'No technician remarks recorded.' }}</div></td>
+   <td><span class="d2-category {{ 'd2-breakdown' if g.rfr_type|lower == 'breakdown' else 'd2-interruption' if g.rfr_type|lower == 'process interruption' else 'd2-proactive' if g.rfr_type|lower == 'proactive repair' else 'd2-request' if g.rfr_type|lower == 'work request' else 'd2-other' }}">{{ g.rfr_type or 'Other' }}</span></td>
+   <td class="rs-actions"><button type="button" class="rs-action" onclick="v3OpenHappening({{ g.main_id }},{{ shift.id }})"><svg class="rs-ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.8-6 10-6 10 6 10 6-3.8 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></svg>View</button><button type="button" class="rs-action" onclick="v3OpenHappening({{ g.main_id }},{{ shift.id }},true)"><svg class="rs-ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m4 20 5-.9L20 8l-4-4L5 15zM14 6l4 4"/></svg>Edit</button><form method="post" action="/v3/happening/{{ g.main_id }}/exclude"><input type="hidden" name="shift_id" value="{{ shift.id }}"><input type="hidden" name="excluded" value="{{ 0 if g.excluded else 1 }}"><button type="submit" class="rs-action {{ 'rs-restore' if g.excluded else 'rs-exclude' }}"><svg class="rs-ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m5.5 5.5 13 13"/></svg>{{ 'Restore' if g.excluded else 'Exclude' }}</button></form></td>
+ </tr>
+ {% else %}<tr class="rs-empty-row"><td colspan="5">No Shift Happenings yet. Import a Cetaris XLSX file to begin.</td></tr>{% endfor %}
+ </tbody></table></div>
+ <div class="rs-table-footer"><span id="d2-visible-count" aria-live="polite">Showing {{ 1 if happenings else 0 }}–{{ [happenings|length,5]|min }} of {{ happenings|length }} work orders</span><div class="rs-pagination" id="rs-pagination"><button type="button" onclick="d2GoFirst()" aria-label="First page">«</button><button type="button" onclick="d2ChangePage(-1)" aria-label="Previous page">‹</button><span id="rs-page-buttons"></span><button type="button" onclick="d2ChangePage(1)" aria-label="Next page">›</button><button type="button" onclick="d2GoLast()" aria-label="Last page">»</button><span class="sr-only" id="rs-page-label" aria-live="polite"></span></div></div>
+</section>
+<aside class="card rs-report-sections" aria-label="Report Sections">
+ <h2>Report Sections</h2><p class="rs-section-description">Add additional items to include in your shift report.</p>
+ <button type="button" class="rs-tool-shortcut" onclick="document.getElementById('rs-pending-pm').open=true;document.getElementById('rs-pending-pm').scrollIntoView({block:'nearest',behavior:'smooth'})"><span class="rs-tool-symbol"><svg class="rs-ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 3v3M16 3v3M4 9h16M8 13h8M8 17h5"/></svg></span><span><strong>PMs Needing Completion</strong><small>Upload pending PMs from Cetaris</small></span><span class="rs-chevron">›</span></button>
+ <details class="rs-section" id="rs-oos"><summary><span class="rs-tool-symbol"><svg class="rs-ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 9v5M12 17v1"/></svg></span><span class="rs-tool-text">Breakdown / OOS</span><span class="rs-chevron">›</span></summary>
+        <div class="rs-section-body">
+          <h3>Out of Service (OOS)</h3>
  {% if pending_breakdowns %}
  <section class="card" aria-label="Breakdown return-to-service confirmation">
    <h2>Breakdown — Confirm Equipment Status</h2>
@@ -90,75 +151,45 @@
  </section>
  {% endif %}
 
- {% if import_audit %}
- <section class="card d2-import-audit" aria-label="Imported WO audit">
-   <div class="section-head"><div><h2>Imported WO audit</h2>
-     <p>Review all source work orders excluded from this shift; these records never count toward Shift Happenings or PMs.</p></div></div>
-   <div class="d2-audit-kpis">
-     <span><strong>{{ import_audit.work_orders }}</strong> source WOs</span>
-     <span><strong>{{ import_audit.technicians }}</strong> file technicians</span>
-     <span><strong>{{ import_audit.selected_technicians }}</strong> selected</span>
-     <span><strong>{{ import_audit.included_work_orders }}</strong> included</span>
-     <span><strong>{{ import_audit.ignored_count }}</strong> not counted</span>
-     <span><strong>{{ import_audit.oos_work_orders }}</strong> OOS separately</span>
-   </div>
-   {% if shift.shift_type in ('S3','S5') and import_audit.after_midnight_included_wos is defined %}
-   <p>{{ import_audit.after_midnight_included_wos }} accepted after midnight (of {{ import_audit.after_midnight_source_wos }} after-midnight source WOs)</p>
-   {% endif %}
-   {% if import_audit.ignored_count %}
-   <details class="d2-audit-details">
-     <summary>Show {{ import_audit.ignored_count }} ignored / other-shift WOs and reasons</summary>
-     <div class="d2-audit-scroll"><table class="d2-wo-table"><thead>
-       <tr><th>WO #</th><th>Asset</th><th>Status</th><th>Technicians</th><th>Labor start</th><th>Last updated</th><th>Why not counted</th></tr></thead><tbody>
-       {% for item in import_audit.ignored %}
-       <tr><td>{{ item.wo_number }}</td><td>{{ item.asset_id }}</td><td>{{ item.status }}</td>
-         <td>{{ item.technicians }}</td><td>{{ item.start_at or 'Not recorded' }}</td>
-         <td>{{ item.updated_at or 'Not recorded' }}</td><td>{{ item.reason }}</td></tr>
-       {% endfor %}
-       </tbody></table></div>
-   </details>
-   {% else %}<p>All source WOs were counted or tracked as OOS.</p>{% endif %}
- </section>
- {% elif imported_filename %}
- <section class="card d2-import-audit"><h2>Imported WO audit</h2>
-   <p>This report was imported before the audit feature. Re-upload the Cetaris Excel file to see excluded WOs and reasons.</p>
- </section>
- {% endif %}
- <div class="workspace-grid d2-workspace-grid">
- <section class="card happenings d2-happenings" id="happenings">
-   <div class="section-head d2-happenings-head"><div><h2>Shift happenings <span class="count-label">{{ happenings|length }}</span></h2><p>Accepted non-PM work orders and technician remarks from Cetaris. Automatic proofreading and source-verified rewriting remain active in the report.</p></div>{% if ai_enabled %}<form method="post" action="/v3/ai/retry" style="display:inline-flex;margin-right:6px"><input type="hidden" name="shift_id" value="{{ shift.id }}"><button class="button button-outline" type="submit" title="Retry AI safely with the original technician remarks retained">Retry AI</button></form>{% endif %}<button class="button button-outline" onclick="v3OpenManual()" type="button">Manual entry</button></div>
-   <div class="d2-table-filters"><input id="d2-search" type="search" placeholder="Search assets, issues, or remarks" aria-label="Search shift happenings"><select id="d2-type" aria-label="Filter by work type"><option value="">All types</option>{% for type in happenings|map(attribute="rfr_type")|unique|sort %}<option value="{{ type|lower|e }}">{{ type or "Unspecified" }}</option>{% endfor %}</select><select id="d2-asset" aria-label="Filter by asset"><option value="">All assets</option>{% for g in happenings %}<option value="{{ g.unit }}">{{ g.unit }}</option>{% endfor %}</select></div>
-   <div class="d2-table-scroll"><table class="d2-wo-table"><thead><tr><th>Asset ID</th><th>Type</th><th>Cause</th><th>Tech Remarks</th><th>Action</th></tr></thead><tbody>
-   {% for g in happenings %}
-   <tr class="d2-data-row {% if g.excluded %}d2-excluded{% endif %}" data-asset="{{ g.unit|lower }}" data-type="{{ g.rfr_type|lower }}" data-search="{{ (g.unit ~ ' ' ~ g.wo_number ~ ' ' ~ (g.cause_text or g.reported_issue) ~ ' ' ~ (g.rows|map(attribute='tech_name')|join(' ')))|lower }}">
-    <td class="d2-id"><button type="button" onclick="v3OpenHappening({{ g.main_id }}, {{ shift.id }})">{{ g.unit or 'Unassigned' }}</button><small class="d2-asset-wo">{{ 'WO #' ~ g.wo_number if g.wo_number else 'Manual entry' }}</small>{% if g.excluded %}<span class="d2-flag d2-flag-off">Excluded</span>{% endif %}{% if g.needs_review %}<span class="d2-flag">Review update</span>{% endif %}</td>
-    <td><span class="d2-category {{ 'd2-breakdown' if g.rfr_type|lower == 'breakdown' else 'd2-interruption' if g.rfr_type|lower == 'process interruption' else 'd2-proactive' if g.rfr_type|lower == 'proactive repair' else 'd2-request' if g.rfr_type|lower == 'work request' else 'd2-other' }}">{{ g.rfr_type or 'Other' }}</span></td>
-    <td><div class="d2-truncate" title="{{ g.cause_text or g.reported_issue }}">{{ g.cause_text or g.reported_issue or 'No issue recorded' }}</div></td>
-    <td><div class="d2-truncate d2-tech-summary" {% if g.wo_number %}data-ai-remark-wo="{{ g.wo_number|e }}" data-ai-eligible="{{ '1' if g.ai_eligible else '0' }}" data-ai-original="{{ g.original_remarks|e }}"{% endif %}>{{ g.display_remarks }}</div><small class="d2-tech-names">{{ g.rows|map(attribute='tech_name')|join(', ') }}</small></td>
-    <td class="d2-row-actions"><button type="button" class="d2-icon-button" title="View work order" aria-label="View or edit {{ g.unit }}" onclick="v3OpenHappening({{ g.main_id }}, {{ shift.id }})">View</button><form method="post" action="/v3/happening/{{ g.main_id }}/exclude"><input type="hidden" name="shift_id" value="{{ shift.id }}"><input type="hidden" name="excluded" value="{{ 0 if g.excluded else 1 }}"><button type="submit" class="d2-icon-button" title="{{ 'Restore' if g.excluded else 'Exclude' }}" aria-label="{{ 'Restore' if g.excluded else 'Exclude' }} {{ g.unit }}">{{ 'Restore' if g.excluded else 'Exclude' }}</button></form></td>
-   </tr>
-   {% else %}<tr class="d2-empty"><td colspan="5">No Shift Happenings yet. Import a Cetaris XLSX file or add a manual entry.</td></tr>{% endfor %}
-   </tbody></table></div><div class="d2-table-footer"><span><b id="d2-visible-count">{{ happenings|length }}</b> work orders shown · {{ happenings|selectattr('needs_review')|list|length }} pending review</span><span>Click an asset or View to open its details</span></div>
- </section>
- <aside class="d2-tools">
- <section class="card d2-tools-card"><h2>Shift tools</h2>
- <details class="d2-tool" id="d2-pm"><summary><span class="d2-tool-name">PM's Needing Completion</span><span class="d2-tool-count d2-badge-green">{{ pending_pm_count }}</span></summary><div class="d2-tool-inner">
-   <p>Upload the Cetaris open/pending PM report &mdash; due dates to be done, parsed automatically.</p>
-   <div hx-get="/v3/pm-files?shift_id={{ shift.id }}" hx-trigger="load" hx-target="#v3-pm-file-list" hx-swap="outerHTML"><div id="v3-pm-file-list"><p>Loading&hellip;</p></div></div>
-   <form hx-post="/v3/pm-upload" hx-target="#v3-pm-file-list" hx-swap="outerHTML" hx-encoding="multipart/form-data"><input type="hidden" name="shift_id" value="{{ shift.id }}"><input type="file" name="pm_file" required accept=".pdf,.xlsx,.xls,.csv,.png,.jpg,.jpeg"><button class="button button-blue" type="submit">Upload PM Report</button></form>
- </div></details>
- <details class="d2-tool"><summary><span class="d2-tool-name">LOTO Verification</span><span class="d2-tool-count {{ 'd2-badge-green' if loto.loto_verified else 'd2-badge-red' }}">{{ 'Verified' if loto.loto_verified else 'Review' }}</span></summary><form class="d2-tool-inner" method="post" action="/v3/loto"><input type="hidden" name="shift_id" value="{{ shift.id }}"><label><input type="checkbox" name="verified" value="1" {% if loto.loto_verified %}checked{% endif %}> All LOTO keys accounted for</label><label>Missing keys<input name="missing_keys" value="{{ loto.loto_missing_keys }}" placeholder="Key #"></label><button class="button button-blue" type="submit">Save LOTO</button></form></details>
- <details class="d2-tool"><summary><span class="d2-tool-name">Out of Service (OOS)</span><span class="d2-tool-count d2-badge-red">{{ oos_units|length }}</span></summary><div class="d2-tool-inner"><form method="post" action="/v3/oos/add"><input type="hidden" name="shift_id" value="{{ shift.id }}"><label>Asset ID<input name="unit" required maxlength="80" placeholder="VOIDFILL0201"></label><button class="button button-blue" type="submit">Mark OOS</button></form>{% for unit in oos_units %}<form method="post" action="/v3/oos/rts"><input type="hidden" name="shift_id" value="{{ shift.id }}"><input type="hidden" name="unit" value="{{ unit }}"><span>{{ unit }}</span> <button type="submit" class="button button-outline">Return to Service</button></form>{% else %}<p>No OOS assets.</p>{% endfor %}</div></details>
- <details class="d2-tool"><summary><span class="d2-tool-name">Returned to Service</span><span class="d2-tool-count d2-badge-yellow">{{ rts_units|length }}</span></summary><div class="d2-tool-inner">{% for unit in rts_units %}<form method="post" action="/v3/rts/undo"><input type="hidden" name="shift_id" value="{{ shift.id }}"><input type="hidden" name="unit" value="{{ unit }}"><span>{{ unit }}</span> <button class="button button-outline" type="submit">Remove log entry</button></form>{% else %}<p>No RTS events this shift.</p>{% endfor %}</div></details>
- <details class="d2-tool"><summary><span class="d2-tool-name">Vendors</span><span class="d2-tool-count"></span></summary><div class="d2-tool-inner"><form method="post" action="/v3/vendor/add"><input type="hidden" name="shift_id" value="{{ shift.id }}"><label>Vendor / company<input name="name" required maxlength="160"></label><label>Work / visit notes<textarea name="notes" maxlength="2000" rows="2"></textarea></label><button class="button button-blue" type="submit">Add vendor</button></form>{% for v in vendors %}<form method="post" action="/v3/vendor/{{ v.id }}/delete"><input type="hidden" name="shift_id" value="{{ shift.id }}"><strong>{{ v.name }}</strong><p>{{ v.notes }}</p><button class="button button-outline" type="submit">Remove</button></form>{% endfor %}</div></details>
- <details class="d2-tool"><summary><span class="d2-tool-name">Shift Notes</span><span class="d2-tool-count">Edit</span></summary><form class="d2-tool-inner" method="post" action="/v3/notes"><input type="hidden" name="shift_id" value="{{ shift.id }}"><textarea name="notes" rows="5" placeholder="Shift notes…">{{ shift_notes }}</textarea><button class="button button-blue" type="submit">Save notes</button></form></details>
- <details class="d2-tool"><summary><span class="d2-tool-name">Carry-overs</span><span class="d2-tool-count"></span></summary><div class="d2-tool-inner">{% for e in carry_overs %}<div class="d2-carry-entry"><strong>{{ e.unit }}</strong><p>{{ e.issue }}</p><form method="post" action="/v3/carry-over/{{ e.id }}/adopt"><input type="hidden" name="shift_id" value="{{ shift.id }}"><button class="button button-blue" type="submit">Adopt</button></form><form method="post" action="/v3/carry-over/{{ e.id }}/dismiss"><input type="hidden" name="shift_id" value="{{ shift.id }}"><button class="button button-outline" type="submit">Dismiss</button></form></div>{% else %}<p>No outstanding carry-overs from a previous shift.</p>{% endfor %}</div></details>
- <div class="d2-report-actions"><a class="button d2-send" href="/v3/operations?shift_id={{ shift.id }}">Generate &amp; Send</a><a class="button button-outline" href="/v3/preview?shift_id={{ shift.id }}">Preview report</a><a class="button d2-end" href="/v3/operations?shift_id={{ shift.id }}">End shift</a></div>
- </section>
- </aside>
- </div>
- <footer class="d2-footer">IND3 Shift Passdown · MST Reliability Operations · Shift Command Center</footer>
- </main></div></div>
+
+          <form method="post" action="/v3/oos/add"><input type="hidden" name="shift_id" value="{{ shift.id }}"><label>Asset ID<input name="unit" required maxlength="80" placeholder="VOIDFILL0201"></label><button type="submit" class="button button-outline">Mark OOS</button></form>
+          {% for unit in oos_units %}<form method="post" action="/v3/oos/rts" class="rs-inline-form"><input type="hidden" name="shift_id" value="{{ shift.id }}"><input type="hidden" name="unit" value="{{ unit }}"><strong>{{ unit }}</strong><button type="submit" class="button button-outline">Return to Service</button></form>{% else %}<p>No equipment currently marked OOS.</p>{% endfor %}
+          {% for unit in rts_units %}<form method="post" action="/v3/rts/undo" class="rs-inline-form"><input type="hidden" name="shift_id" value="{{ shift.id }}"><input type="hidden" name="unit" value="{{ unit }}"><span>RTS: {{ unit }}</span><button type="submit" class="button button-outline">Undo</button></form>{% endfor %}
+          {% if carry_overs %}<details><summary>Previous shift follow-ups</summary>{% for e in carry_overs %}<div class="rs-follow-up"><strong>{{ e.unit }}</strong><p>{{ e.issue }}</p><form method="post" action="/v3/carry-over/{{ e.id }}/adopt"><input type="hidden" name="shift_id" value="{{ shift.id }}"><button type="submit">Adopt</button></form><form method="post" action="/v3/carry-over/{{ e.id }}/dismiss"><input type="hidden" name="shift_id" value="{{ shift.id }}"><button type="submit">Dismiss</button></form></div>{% endfor %}</details>{% endif %}
+        </div>
+      </details>
+      
+ <details class="rs-section" id="rs-vendors"><summary><span class="rs-tool-symbol"><svg class="rs-ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h12v11H3zM15 10h4l3 4v3h-7M7 21a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM19 21a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></svg></span><span class="rs-tool-text">Vendors Activity</span><span class="rs-chevron">›</span></summary><div class="rs-section-body">
+        <form method="post" action="/v3/vendor/add"><input type="hidden" name="shift_id" value="{{ shift.id }}"><label>Vendor / company<input name="name" required maxlength="160"></label><label>Work performed / visit notes<textarea name="notes" maxlength="2000" rows="3"></textarea></label><button class="button button-blue" type="submit">Add Vendor</button></form>
+        {% for v in vendors %}<form method="post" action="/v3/vendor/{{ v.id }}/delete" class="rs-vendor-entry"><input type="hidden" name="shift_id" value="{{ shift.id }}"><strong>{{ v.name }}</strong><p>{{ v.notes }}</p><button class="button button-outline" type="submit">Remove</button></form>{% endfor %}
+      </div></details>
+      
+ <details class="rs-section" id="rs-ro"><summary><span class="rs-tool-symbol"><svg class="rs-ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6zM15 3v4h4M9 12h7M9 16h7"/></svg></span><span class="rs-tool-text">Repair Orders (RO)</span><span class="rs-chevron">›</span></summary><div class="rs-section-body"><p>Separate Repair Order entry is not yet connected in V3.1. Use Shift Notes for RO reminders; no RO data will be fabricated.</p></div></details>
+      
+ <details class="rs-section" id="rs-notes"><summary><span class="rs-tool-symbol"><svg class="rs-ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v13H9l-5 4zM8 9h8M8 13h5"/></svg></span><span class="rs-tool-text">Shift Notes / Reminders</span><span class="rs-chevron">›</span></summary><div class="rs-section-body">
+        <form method="post" action="/v3/notes"><input type="hidden" name="shift_id" value="{{ shift.id }}"><label for="rs-notes-field">Notes for the next shift</label><textarea id="rs-notes-field" name="notes" rows="5" placeholder="Record reminders…">{{ shift_notes }}</textarea><button class="button button-blue" type="submit">Save Notes</button></form>
+      </div></details>
+      
+ <div class="rs-loto-row"><details class="rs-section" id="rs-loto"><summary><span class="rs-tool-symbol"><svg class="rs-ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></span><span class="rs-tool-text">LOTO Verification</span><span class="rs-chevron">›</span></summary></details><form class="rs-loto-quick-toggle" method="post" action="/v3/loto"><input type="hidden" name="shift_id" value="{{ shift.id }}"><input type="hidden" name="missing_keys" value="{{ loto.loto_missing_keys or '' }}"><label class="rs-loto-checkbox" title="Toggle LOTO verification"><input type="checkbox" name="verified" value="1" {% if loto.loto_verified %}checked{% endif %} onchange="this.form.submit()"><span class="rs-switch" aria-hidden="true"></span></label></form></div><details class="rs-section rs-loto-advanced" id="rs-loto-settings"><summary>LOTO Details</summary><div class="rs-section-body">
+        <form id="rs-loto-form" method="post" action="/v3/loto"><input type="hidden" name="shift_id" value="{{ shift.id }}"><label class="rs-checkbox"><input type="checkbox" name="verified" value="1" {% if loto.loto_verified %}checked{% endif %}> All LOTO keys accounted for</label>
+        <label>Missing key selection (1–20)</label><span id="rs-missing-label">{{ loto.loto_missing_keys if loto.loto_missing_keys else 'No missing keys' }}</span>
+        <input type="hidden" name="missing_keys" value="{{ loto.loto_missing_keys or '' }}">
+        <div class="rs-key-grid" role="group" aria-label="Select any missing LOTO keys">{% for i in range(1,21) %}
+          <label class="rs-key"><input type="checkbox" data-rs-missing-key value="Key {{ i }}" onchange="v3SyncMissingKeys()" {% if ('Key ' ~ i) in (loto.loto_missing_keys or '').split(', ') %}checked{% endif %}>{{ i }}</label>
+        {% endfor %}</div>
+        <button type="submit" class="button button-blue">Save LOTO</button></form>
+      </div></details>
+      
+ <div class="rs-keys-shortcut"><span class="rs-tool-symbol rs-yellow-symbol"><svg class="rs-ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="9" r="5"/><path d="m12 12 9 9M16 16l2-2M18 18l2-2"/></svg></span><div><strong>Missing Key Selection</strong><small>Select missing key(s) if any</small><button type="button" class="rs-open-keys" onclick="document.getElementById('rs-loto-settings').open=true;document.getElementById('rs-loto-settings').scrollIntoView({block:'nearest',behavior:'smooth'})">Select missing keys ▾</button></div></div>
+ <details class="rs-section rs-section-pm" id="rs-pending-pm" open><summary><span class="rs-tool-symbol"><svg class="rs-ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 3v3M16 3v3M4 9h16M8 13h8M8 17h5"/></svg></span><span class="rs-tool-text">PMs Needing Completion</span><span class="rs-chevron">›</span></summary><div class="rs-section-body">
+        <p>Upload the pending PM report from Cetaris; do not infer that missing records mean no PMs are pending.</p>
+        <div hx-get="/v3/pm-files?shift_id={{ shift.id }}" hx-trigger="load" hx-target="#v3-pm-file-list" hx-swap="outerHTML"><div id="v3-pm-file-list">Loading uploaded PM files…</div></div>
+        <form hx-post="/v3/pm-upload" hx-target="#v3-pm-file-list" hx-swap="outerHTML" hx-encoding="multipart/form-data"><input type="hidden" name="shift_id" value="{{ shift.id }}"><label for="rs-pm-file">Upload pending PM file</label><input id="rs-pm-file" type="file" name="pm_file" required accept=".pdf,.xlsx,.xls,.csv,.png,.jpg,.jpeg"><button class="button button-blue" type="submit">Upload PM File</button></form>
+      </div></details>
+
+</aside></div>
+<footer class="rs-footer-actions"><a class="rs-generate" href="/v3/operations?shift_id={{ shift.id }}"><svg class="rs-ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="m3 7 9 7 9-7"/></svg>Generate Outlook Passdown (EML)</a><a class="rs-end" href="/v3/operations?shift_id={{ shift.id }}"><svg class="rs-ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v18M5 4c4-3 7 4 14 0v10c-7 4-10-3-14 0"/></svg>End Shift</a></footer>
+</main></div></div>
 <div id="v3-modal-root" class="modal-shell" hidden></div>
 <dialog id="manual-dialog" class="manual-dialog"><form method="post" action="/v3/manual" class="modal-form"><input type="hidden" name="shift_id" value="{{ shift.id }}"><div class="modal-title"><div><div class="eyebrow">MANUAL SHIFT ENTRY</div><h2>Add Shift Happening</h2></div><button type="button" onclick="document.getElementById('manual-dialog').close()" aria-label="Close">Close</button></div><label>Asset ID<input required name="unit" placeholder="e.g. VOIDFILL0201"></label><label>Reported Issue<input required name="issue" placeholder="What was reported?"></label><label>WO # (optional)<input name="wo_number"></label><label>Technician Remarks<textarea name="remarks" rows="4" placeholder="Work performed"></textarea></label><div class="modal-actions"><button type="button" class="button button-outline" onclick="document.getElementById('manual-dialog').close()">Cancel</button><button type="submit" class="button button-blue">Save manual entry</button></div></form></dialog>
 <script>
