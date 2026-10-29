@@ -3,6 +3,34 @@
 Dated entries, most recent first. Written so anyone picking this up — not
 just Isaac — can see what changed, why, and what's actually live.
 
+## 2026-10-28 (2) — Replaced invented signature branding with the real corporate one
+
+**Deployed and live:** `production-live` branch, commit `679b4ca`, port 8965.
+
+Following the same-day rollback below, Isaac sent a screenshot of his actual
+real Outlook signature and asked for that instead — the app's "IND3 Next
+Gen" branding (bordered card, invented facility tagline, role/shift line)
+never matched anything real. `signatures.py` now renders:
+
+```
+Isaac Ssaku - ins0002
+eCommerce Fulfillment Center # 7552/8972
+5259 W. 500 North McCordsville, Indiana, 46055
+Walmart [spark]
+Save money. Live better
+```
+
+The `- ins0002` is the associate's real Walmart NT ID. `KNOWN` (the
+exact-name-only lookup dict, same philosophy as before: never guess an ID
+or email for someone not explicitly listed) was extended with real
+`default_id` values pulled from the production roster for all 5 known
+associates. `role`/`shift`/`email` are still accepted as parameters for
+backward compatibility with existing call sites but are intentionally not
+rendered in this design. Verified visually via a local, synthetic-data-only
+screenshot render before shipping.
+
+Full suite: 395 passed, 5 skipped, 0 failed, both venvs.
+
 ## 2026-10-28 — Rolled back the Outlook signature to the original approved design
 
 **Deployed and live:** `production-live` branch, commit `190b42d`, port 8965.
