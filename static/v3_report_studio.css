@@ -164,3 +164,17 @@
 .rs-section-pm[open] .rs-section-body{padding-top:3px;padding-bottom:10px}
 .rs-section-pm input[type=file]{font-size:10px}
 .rs-section-pm .button{display:block;width:100%;text-align:center;background:#edf5ff;color:#0053bd;border-color:#a7caff}
+
+/* Fit the right report tools alongside five work-order rows at the approved 864px viewport. */
+@media(min-width:1161px){
+  .rs-report-sections{padding-top:12px;padding-bottom:9px}
+  .rs-tool-shortcut{min-height:55px;margin-bottom:6px;padding:7px 9px}
+  .rs-section{margin-bottom:6px}
+  .rs-section>summary{min-height:53px;padding:7px 9px}
+  .rs-loto-row{min-height:53px;margin-bottom:6px}
+  .rs-loto-row .rs-section>summary{min-height:51px}
+  .rs-keys-shortcut{min-height:78px;margin-bottom:6px;padding:7px 9px}
+  .rs-section-pm[open]>summary{min-height:42px}
+  .rs-section-pm .rs-section-body{padding:4px 9px 8px}
+  .rs-section-pm .rs-section-body p{margin:3px 0 6px}
+}
