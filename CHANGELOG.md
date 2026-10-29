@@ -3,6 +3,25 @@
 Dated entries, most recent first. Written so anyone picking this up — not
 just Isaac — can see what changed, why, and what's actually live.
 
+## 2026-10-28 — Rolled back the Outlook signature to the original approved design
+
+**Deployed and live:** `production-live` branch, commit `190b42d`, port 8965.
+
+`signatures.py` was reverted to its exact pre-`bad54da` content. `bad54da`
+(2026-10-25 23:53, part of the same late-night simplification cluster as the
+Needs-Review-panel and import-audit-drawer removals documented below) had
+replaced the full bordered "Next Gen" signature card — blue left accent bar,
+large bold name/title, "IND3 · Next Generation Fulfillment Center #8972"
+tagline, physical address, 38px Spark logo, matching an approved reference
+image — with a compact one-line Calibri signoff. Isaac asked to restore
+"our original signature"; it's back to the bordered-card version.
+`embed_spark_in_eml()` and `append_signature()` were untouched either time.
+One test locked in the compact version's markers and was updated
+(`test_outlook_signature_matches_report_font_and_is_compact` →
+`test_outlook_signature_matches_approved_reference_card`).
+
+Full suite: 395 passed, 5 skipped, 0 failed, both venvs.
+
 ## 2026-10-26 — Production fully switched to Workshop V3; same-day follow-up fixes
 
 **Deployed and live:** `production-live` branch, commit `ef049df`, running on
