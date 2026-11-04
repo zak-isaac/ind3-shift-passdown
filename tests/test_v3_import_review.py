@@ -31,6 +31,46 @@ def test_only_includable_items_are_persisted(tmp_path):
     assert {p["wo_number"] for p in pending} == {"100"}
 
 
+def test_ensure_tables_migrates_pre_workshop_sandbox_schema(tmp_path):
+    """2026-11-03 production bug: dbs/ind3.db already had a v3_import_review
+    table from the pre-Workshop sandbox branch (tech_name/closed_at/kind
+    columns, no technicians/updated_at). CREATE TABLE IF NOT EXISTS silently
+    no-oped against it, so every confirm_import() 500'd on INSERT. Replicate
+    that exact legacy shape, with real unresolved rows, and confirm
+    ensure_tables() archives it (never destroys it) instead of crashing.
+    """
+    db.set_db_path(tmp_path / "review.db"); db.init_db()
+    with db._conn() as c:
+        c.executescript("""
+        CREATE TABLE v3_import_review (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          shift_id INTEGER NOT NULL, wo_number TEXT NOT NULL,
+          tech_name TEXT NOT NULL, asset_id TEXT NOT NULL DEFAULT '',
+          status TEXT NOT NULL DEFAULT '', start_at TEXT NOT NULL DEFAULT '',
+          closed_at TEXT NOT NULL DEFAULT '', kind TEXT NOT NULL,
+          reason TEXT NOT NULL DEFAULT '', row_json TEXT NOT NULL,
+          resolved INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL
+        );
+        """)
+        c.execute(
+            """INSERT INTO v3_import_review
+               (shift_id,wo_number,tech_name,status,kind,resolved,row_json,created_at)
+               VALUES (121,'28027353','Ssaku, Isaac','In process','excluded',0,'{}','2026-10-24T21:48:27+00:00')"""
+        )
+
+    # The real bug: this used to raise sqlite3.OperationalError here.
+    review.record(db, 1, [_ignored_item("100", includable=True)])
+
+    pending = review.pending(db, 1)
+    assert {p["wo_number"] for p in pending} == {"100"}
+
+    with db._conn() as c:
+        archived = c.execute(
+            "SELECT shift_id,wo_number,tech_name FROM v3_import_review_legacy_sandbox"
+        ).fetchall()
+    assert [tuple(row) for row in archived] == [(121, "28027353", "Ssaku, Isaac")]
+
+
 def _ensure_entry_meta(tmp_path_db):
     """v3_entry_meta is normally created lazily by v3_routes.py's router-level
     ensure_tables() on first request. These unit tests call v3_import_review

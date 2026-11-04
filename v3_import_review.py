@@ -31,7 +31,29 @@ from datetime import datetime, timezone
 
 
 def ensure_tables(db):
+    """Create the Workshop-shaped review table, archiving any pre-Workshop
+    sandbox-era table found under the same name first.
+
+    2026-11-03: production's dbs/ind3.db already had a v3_import_review
+    table from the pre-Workshop sandbox branch (tech_name/closed_at/kind
+    columns, including 'ownership' rows -- a review kind Workshop's
+    v3_split.assign() deliberately does not support, see module docstring).
+    `CREATE TABLE IF NOT EXISTS` silently no-ops against that mismatched
+    table, so every confirm_import() INSERT using the current (technicians/
+    updated_at) column names 500'd. Detect that old shape by column, rename
+    it out of the way (never destroy real review history), then create the
+    current schema fresh.
+    """
     with db._conn() as c:
+        exists = c.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='v3_import_review'"
+        ).fetchone()
+        if exists:
+            cols = {row[1] for row in c.execute("PRAGMA table_info(v3_import_review)").fetchall()}
+            if "technicians" not in cols:
+                c.execute(
+                    "ALTER TABLE v3_import_review RENAME TO v3_import_review_legacy_sandbox"
+                )
         c.executescript("""
         CREATE TABLE IF NOT EXISTS v3_import_review (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
