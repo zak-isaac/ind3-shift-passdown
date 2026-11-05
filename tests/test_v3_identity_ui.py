@@ -41,7 +41,15 @@ def test_own_shift_only_and_xlsx_technician_dialog(tmp_path):
         assert client.get('/v3',params={'shift_id':s_b},follow_redirects=False).status_code==303
         assert client.post('/v3/manual',data={'shift_id':s_b,'unit':'M1','issue':'x'}).status_code==403
         assert client.post(f'/v3/attach/{s_b}',follow_redirects=False).status_code==403
+        choose_page=client.get('/v3/choose').text
         assert client.get('/v3/choose').text.count('Resume shift')==1
+        # Choose Shift must never advertise a manual "Start another shift"
+        # button again. Its backing /v3/start endpoint was intentionally
+        # retired (ea49fc7) and unconditionally 403s -- a stray form
+        # pointing at it (as choose.html did until this fix) silently
+        # bricks login for anyone who lands here with no owned shift.
+        assert 'action="/v3/start"' not in choose_page
+        assert client.post('/v3/start').status_code==403
         sample=Path('/mnt/data/trial.xlsx')
         if sample.exists():
             resp=client.post('/v3/import',data={'shift_id':s_a},files={'file':('trial.xlsx',sample.read_bytes())})

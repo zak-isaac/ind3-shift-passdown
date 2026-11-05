@@ -658,8 +658,7 @@ def create_v3_router(templates, is_lead_authed, can_manage_shift, resolve_my_shi
             if not is_lead_authed(request): return lead_redirect("/v3/choose")
             available=[s for s in db.get_active_shifts() if can_manage_shift(request,s["id"])]
         return templates.TemplateResponse(request,"v3/choose.html",{"shifts":available,
-            "today":(now_func() if now_func else datetime.now()).date().isoformat(),
-            "allow_start":get_mst_roster is not None})
+            "today":(now_func() if now_func else datetime.now()).date().isoformat()})
 
     @router.get("/history", response_class=HTMLResponse)
     async def v3_history(request:Request, shift_id:int=0):

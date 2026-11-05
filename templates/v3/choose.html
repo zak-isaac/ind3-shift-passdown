@@ -10,13 +10,8 @@
   <button class="button button-outline" type="submit">Resume shift</button>
  </form>
  {% else %}<p>You have no active shift assigned to your login.</p>{% endfor %}
- {% if allow_start %}
- <div class="d2-choose-divider">Start another shift</div>
- <form method="post" action="/v3/start">
-  <label class="d2-login-field">Date<input type="date" name="shift_date" value="{{ today }}" required></label>
-  <label class="d2-login-field">Shift<select name="shift_type" required><option value="">Choose shift</option>{% for code in ('S1','S2','S3','S4','S5') %}<option value="{{ code }}">{{ code }}</option>{% endfor %}</select></label>
-  <button class="button button-blue wide" type="submit">Start shift</button>
- </form>
- {% endif %}
+ <!-- "Start another shift" manual override removed: its backing /v3/start
+      endpoint was intentionally retired (ea49fc7). Shifts now start only via
+      the roster-driven V3 login flow or the verified management override. -->
  <a href="/v3/logout" class="d2-choose-signout">Sign out</a>
 </main></body></html>
